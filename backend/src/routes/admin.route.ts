@@ -22,6 +22,11 @@ import {
   listInventoryHandler,
   listMovementsHandler,
 } from '../controllers/inventory.controller.ts';
+import {
+  acknowledgeStockAlertHandler,
+  listStockAlertsHandler,
+  scanStockAlertsHandler,
+} from '../controllers/stock-alert.controller.ts';
 import { requireAuth } from '../middlewares/authenticate.ts';
 import { requirePermission, requireStaff } from '../middlewares/authorize.ts';
 import { verifyOrigin } from '../middlewares/verify-origin.ts';
@@ -93,4 +98,20 @@ adminRouter.post(
   '/inventory/:variantId/adjust',
   requirePermission('inventory:adjust'),
   adjustStockHandler,
+);
+
+/**
+ * แจ้งเตือนสต็อก (STEP 16)
+ * ดูได้ด้วย `inventory:read` · ส่วนการตรวจและรับทราบเขียนข้อมูล จึงขอ `inventory:adjust`
+ */
+adminRouter.get('/stock-alerts', requirePermission('inventory:read'), listStockAlertsHandler);
+adminRouter.post(
+  '/stock-alerts/scan',
+  requirePermission('inventory:adjust'),
+  scanStockAlertsHandler,
+);
+adminRouter.patch(
+  '/stock-alerts/:notificationId/ack',
+  requirePermission('inventory:adjust'),
+  acknowledgeStockAlertHandler,
 );

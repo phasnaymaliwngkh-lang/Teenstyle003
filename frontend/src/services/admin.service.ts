@@ -8,6 +8,7 @@ import type {
   ProductVariantInput,
   UpdateOrderStatusInput,
   UpdateProductInput,
+  StockAlertScanResult,
   UpdateVariantInput,
   VariantInventory,
 } from "@/types/admin";
@@ -93,5 +94,26 @@ export function adjustStock(variantId: string, input: AdjustStockInput): Promise
   return apiFetch<VariantInventory>(
     `/api/admin/inventory/${encodeURIComponent(variantId)}/adjust`,
     { method: "POST", json: input, cache: "no-store", timeoutMs: 30_000 },
+  );
+}
+
+/**
+ * ตรวจเตือนสต็อกทั้งร้าน (STEP 16)
+ *
+ * ปกติระบบตรวจให้เองทุกครั้งที่สต็อกขยับ — ปุ่มนี้ไว้ตรวจย้อนของที่ตกเกณฑ์ไปก่อนหน้า
+ */
+export function scanStockAlerts(): Promise<StockAlertScanResult> {
+  return apiFetch<StockAlertScanResult>("/api/admin/stock-alerts/scan", {
+    method: "POST",
+    cache: "no-store",
+    timeoutMs: 60_000,
+  });
+}
+
+/** รับทราบการแจ้งเตือน — ปิดรายการบนป้าย แต่ไม่ได้แก้ปัญหาสต็อก */
+export function acknowledgeStockAlert(notificationId: string): Promise<{ acknowledged: boolean }> {
+  return apiFetch<{ acknowledged: boolean }>(
+    `/api/admin/stock-alerts/${encodeURIComponent(notificationId)}/ack`,
+    { method: "PATCH", cache: "no-store", timeoutMs: 30_000 },
   );
 }

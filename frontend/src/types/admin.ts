@@ -277,3 +277,45 @@ export interface VariantInventory {
 export type AdjustStockInput =
   | { type: "STOCK_IN" | "STOCK_OUT"; quantity: number; reason: string; idempotencyKey?: string }
   | { type: "ADJUSTMENT"; countedQuantity: number; reason: string; idempotencyKey?: string };
+
+/* ─────────────── แจ้งเตือนสต็อก (STEP 16) ─────────────── */
+
+export type AlertSeverity = "OUT_OF_STOCK" | "LOW_STOCK";
+
+export interface StockAlert {
+  variantId: string;
+  sku: string;
+  severity: AlertSeverity;
+  quantity: number;
+  reserved: number;
+  available: number;
+  minimumStock: number;
+  color: string | null;
+  size: string | null;
+  product: { id: string; name: string; slug: string };
+  /** null = ยังไม่ได้แจ้ง หรือมีคนรับทราบไปแล้ว */
+  notification: { id: string; createdAt: string } | null;
+}
+
+export interface NotificationChannelInfo {
+  code: string;
+  name: string;
+  available: boolean;
+  unavailableReason: string | null;
+}
+
+export interface StockAlertListResult {
+  items: StockAlert[];
+  summary: { outOfStock: number; lowStock: number; unacknowledged: number };
+  channels: NotificationChannelInfo[];
+  emailConfigured: boolean;
+  generatedAt: string;
+}
+
+export interface StockAlertScanResult {
+  created: number;
+  escalated: number;
+  resolved: number;
+  alerts: number;
+  scannedAt: string;
+}

@@ -73,7 +73,7 @@ export default async function AdminDashboardPage() {
     {
       label: "สินค้าสต็อกต่ำ",
       count: data.inventory.lowStock,
-      href: "/admin/inventory?stockStatus=LOW_STOCK",
+      href: "/admin/alerts",
       icon: <AlertTriangle className="size-5 text-danger" aria-hidden />,
     },
   ];
@@ -251,7 +251,7 @@ export default async function AdminDashboardPage() {
       </section>
 
       <p className="mt-8 text-xs text-muted">
-        การแจ้งเตือนสต็อกอัตโนมัติ (STEP 16) · รายงานเชิงลึกและกราฟ (STEP 26) ·
+        บาร์โค้ด/QR (STEP 17) · นำเข้า-ส่งออก CSV (STEP 18) · รายงานเชิงลึกและกราฟ (STEP 26) ·
         ประวัติการแก้ไขของแอดมิน (STEP 27) จะเพิ่มในลำดับถัดไป
       </p>
     </main>

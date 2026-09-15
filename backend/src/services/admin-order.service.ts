@@ -5,6 +5,7 @@ import { ApiError } from '../utils/api-error.ts';
 import type { UpdateOrderStatusInput } from '../validators/admin.validator.ts';
 
 import { releaseReservationForOrder, restockForOrder } from './inventory.service.ts';
+import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
 
 /**
  * จัดการคำสั่งซื้อฝั่งร้าน (STEP 13)
@@ -362,6 +363,16 @@ export async function updateOrderStatus(
       },
     });
   });
+
+  /**
+   * ยกเลิกออเดอร์ทำให้ของกลับมาขายได้ (คืนของที่จอง หรือรับของกลับเข้าคลัง)
+   * → ตรวจเตือนสต็อกหลัง commit เพื่อปิดการเตือนที่ค้างอยู่ (STEP 16)
+   */
+  if (input.status === 'CANCELLED') {
+    await scanAlertsAfterStockChange(
+      current.items.map((item) => item.variantId).filter((id): id is string => id !== null),
+    );
+  }
 
   return getAdminOrder(orderNumber);
 }

@@ -12,6 +12,8 @@ import { resolveVariantPrice } from '../models/pricing.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type { CreateOrderInput, NewAddressInput } from '../validators/order.validator.ts';
 
+import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
+
 /**
  * Order service (STEP 10 — Checkout)
  *
@@ -386,6 +388,9 @@ export async function createOrder(
     return { order: toOrder(existing), created: false };
   }
 
+  // เก็บไว้ตรวจเตือนสต็อกหลัง commit (STEP 16) — `ORDER_SELECT` ไม่มี variantId เพราะเป็น DTO ฝั่งลูกค้า
+  let reservedVariantIds: string[] = [];
+
   const orderId = await prisma.$transaction(async (tx) => {
     const { addressId, snapshot } = await resolveAddress(tx, userId, input);
 
@@ -480,6 +485,8 @@ export async function createOrder(
     // ย้ายของออกจากตะกร้า (รายการที่ไม่ได้ติ๊กยังอยู่)
     await tx.cartItem.deleteMany({ where: { id: { in: selected.map((item) => item.id) } } });
 
+    reservedVariantIds = selected.map((item) => item.variant.id);
+
     return order.id;
   });
 
@@ -487,6 +494,12 @@ export async function createOrder(
     where: { id: orderId },
     select: ORDER_SELECT,
   });
+
+  /**
+   * การจองสต็อกทำให้ "จำนวนที่ขายได้จริง" ลดลงทันที แม้ของจะยังอยู่ในคลัง
+   * → ต้องตรวจเตือนด้วย ไม่ใช่รอถึงตอนตัดสต็อก (STEP 16)
+   */
+  await scanAlertsAfterStockChange(reservedVariantIds);
 
   return { order: toOrder(created), created: true };
 }

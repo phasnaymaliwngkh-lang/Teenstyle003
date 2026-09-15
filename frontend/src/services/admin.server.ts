@@ -10,11 +10,12 @@ import type {
   InventoryListResult,
   MovementListResult,
   ProductFormOptions,
+  StockAlertListResult,
   VariantInventory,
 } from "@/types/admin";
 
 /**
- * อ่านข้อมูลหลังบ้านจากฝั่ง server (STEP 13–15)
+ * อ่านข้อมูลหลังบ้านจากฝั่ง server (STEP 13–16)
  *
  * ทุก endpoint ต้องล็อกอิน + เป็นพนักงาน + มีสิทธิ์ตรงกับงาน (backend ตรวจ)
  * หน้า admin ตรวจสิทธิ์ซ้ำที่ layout/page ผ่าน DAL อีกชั้น
@@ -69,6 +70,14 @@ export function fetchInventoryOnServer(params: URLSearchParams): Promise<Invento
 
 export function fetchVariantInventoryOnServer(variantId: string): Promise<VariantInventory> {
   return apiFetchAsUser<VariantInventory>(`/api/admin/inventory/${encodeURIComponent(variantId)}`, {
+    cache: "no-store",
+  });
+}
+
+export function fetchStockAlertsOnServer(params: URLSearchParams): Promise<StockAlertListResult> {
+  const qs = params.toString();
+
+  return apiFetchAsUser<StockAlertListResult>(`/api/admin/stock-alerts${qs ? `?${qs}` : ""}`, {
     cache: "no-store",
   });
 }

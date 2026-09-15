@@ -65,6 +65,13 @@ export default async function AdminInventoryPage({
 
         <div className="flex flex-wrap gap-2">
           <Link
+            href="/admin/alerts"
+            className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            <AlertTriangle className="size-4" aria-hidden />
+            แจ้งเตือนสต็อก
+          </Link>
+          <Link
             href="/admin/inventory/movements"
             className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
           >

@@ -16,6 +16,7 @@ import { ApiError } from '../utils/api-error.ts';
 import { logger } from '../utils/logger.ts';
 
 import { deductStockForOrder, releaseReservationForOrder } from './inventory.service.ts';
+import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
 
 /**
  * Payment service (STEP 11)
@@ -81,6 +82,11 @@ function getStripe(): Stripe {
   stripeClient ??= new Stripe(env.STRIPE_SECRET_KEY);
 
   return stripeClient;
+}
+
+/** variantId ของทุกรายการในออเดอร์ — ใช้ตรวจเตือนสต็อกหลังสต็อกขยับ (STEP 16) */
+function variantIdsOf(order: { items: { variantId: string | null }[] }): string[] {
+  return order.items.map((item) => item.variantId).filter((id): id is string => id !== null);
 }
 
 async function findOwnOrder(userId: string, orderNumber: string): Promise<OrderForPayment> {
@@ -252,6 +258,9 @@ async function confirmCashOnDelivery(
       },
     });
   });
+
+  // ตัดสต็อกจริงแล้ว → ตรวจเตือนหลัง commit (STEP 16)
+  await scanAlertsAfterStockChange(variantIdsOf(order));
 
   const updated = await prisma.order.findUniqueOrThrow({
     where: { id: order.id },
@@ -450,7 +459,10 @@ async function markOrderPaid(
 
   const prisma = getPrisma();
 
-  return prisma.$transaction(async (tx) => {
+  // เก็บไว้ตรวจเตือนสต็อกหลังทรานแซกชัน commit — ตั้งค่าเฉพาะเส้นทางที่ตัดสต็อกจริง
+  let deductedVariantIds: string[] = [];
+
+  const action = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id: orderId },
       select: ORDER_FOR_PAYMENT_SELECT,
@@ -469,6 +481,8 @@ async function markOrderPaid(
       });
       return 'ignored';
     }
+
+    deductedVariantIds = variantIdsOf(order);
 
     await deductStockForOrder(
       tx,
@@ -514,6 +528,10 @@ async function markOrderPaid(
 
     return 'paid';
   });
+
+  await scanAlertsAfterStockChange(deductedVariantIds);
+
+  return action;
 }
 
 /** session หมดอายุ/จ่ายไม่สำเร็จ → คืนของที่จองไว้ และยกเลิกออเดอร์ */
@@ -527,8 +545,9 @@ async function releaseOrderFromSession(
   if (orderId === null) return 'ignored';
 
   const prisma = getPrisma();
+  let releasedVariantIds: string[] = [];
 
-  return prisma.$transaction(async (tx) => {
+  const action = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
       where: { id: orderId },
       select: ORDER_FOR_PAYMENT_SELECT,
@@ -540,6 +559,8 @@ async function releaseOrderFromSession(
     if (order.status !== 'PENDING_PAYMENT' || order.paymentStatus === 'PAID') {
       return 'ignored';
     }
+
+    releasedVariantIds = variantIdsOf(order);
 
     await releaseReservationForOrder(tx, order);
 
@@ -565,6 +586,10 @@ async function releaseOrderFromSession(
 
     return kind === 'failed' ? 'failed' : 'cancelled';
   });
+
+  await scanAlertsAfterStockChange(releasedVariantIds);
+
+  return action;
 }
 
 /**
@@ -603,6 +628,9 @@ export async function cancelUnpaidOrder(userId: string, orderNumber: string): Pr
     });
   });
 
+  // ของที่จองไว้กลับมาขายได้ → การเตือนที่ค้างอยู่ต้องถูกปิดเอง (STEP 16)
+  await scanAlertsAfterStockChange(variantIdsOf(order));
+
   const updated = await prisma.order.findUniqueOrThrow({
     where: { id: order.id },
     select: ORDER_FOR_PAYMENT_SELECT,
@@ -632,6 +660,7 @@ export async function expireOverdueOrders(now: Date = new Date()): Promise<numbe
   });
 
   let cancelled = 0;
+  const releasedVariantIds: string[] = [];
 
   for (const order of overdue) {
     await prisma.$transaction(async (tx) => {
@@ -659,9 +688,13 @@ export async function expireOverdueOrders(now: Date = new Date()): Promise<numbe
         },
       });
 
+      releasedVariantIds.push(...variantIdsOf(order));
       cancelled += 1;
     });
   }
+
+  // ของที่จองไว้กลับมาขายได้ทั้งหมด → ตรวจปิดการเตือนที่ค้างในรอบเดียว
+  await scanAlertsAfterStockChange(releasedVariantIds);
 
   return cancelled;
 }

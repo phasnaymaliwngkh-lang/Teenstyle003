@@ -61,6 +61,17 @@ const EnvSchema = z.object({
   /** ระยะเวลาที่จองสินค้าไว้ให้ก่อนคำสั่งซื้อหมดอายุ (นาที) */
   PAYMENT_WINDOW_MINUTES: z.coerce.number().int().min(5).max(10_080).default(1440),
 
+  /**
+   * อีเมล (STEP 16 ใช้กับการแจ้งเตือนสต็อก · ระบบส่งอีเมลเต็มรูปแบบคือ STEP 50)
+   * ถ้าตั้งค่าไม่ครบ ช่องทางอีเมลจะถูก **ปิด** และบอกเหตุผลตรง ๆ
+   * (ห้ามสร้างแถวแจ้งเตือนช่องทางอีเมลแล้วบอกว่าส่งแล้วทั้งที่ส่งไม่ได้)
+   */
+  SMTP_HOST: optionalSecret,
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  SMTP_USER: optionalSecret,
+  SMTP_PASSWORD: optionalSecret,
+  MAIL_FROM: optionalSecret,
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),

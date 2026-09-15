@@ -9,6 +9,7 @@ import type {
 } from '../validators/inventory.validator.ts';
 
 import type { AdminActor } from './product-admin.service.ts';
+import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
 
 /**
  * ระบบคลังสินค้าหลังบ้าน (STEP 15)
@@ -497,6 +498,13 @@ export async function adjustStock(
       },
     });
   });
+
+  /**
+   * ตรวจเตือนสต็อก **หลังทรานแซกชัน commit แล้ว** (STEP 16)
+   * รอให้เสร็จก่อนตอบกลับ เพื่อให้หน้าจอที่โหลดต่อจากนี้เห็นสถานะเดียวกัน
+   * ถ้าการแจ้งเตือนล้ม จะถูกกลืนไว้ข้างในแล้ว log — ไม่ทำให้การปรับสต็อกที่สำเร็จแล้วพัง
+   */
+  await scanAlertsAfterStockChange([variantId]);
 
   return getVariantInventory(variantId);
 }

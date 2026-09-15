@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
 
+import { AlertBell } from "@/features/admin/components/alert-bell";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { requireStaff } from "@/lib/dal";
 
@@ -31,6 +33,10 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
           </Link>
 
           <div className="ml-auto flex items-center gap-2">
+            {/* ป้ายแจ้งเตือนยิง API เอง — ห่อ Suspense ไว้เพื่อไม่ให้ถ่วงการแสดงแถบทั้งแถบ */}
+            <Suspense fallback={<div className="size-11" aria-hidden />}>
+              <AlertBell />
+            </Suspense>
             <Link
               href="/"
               className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
