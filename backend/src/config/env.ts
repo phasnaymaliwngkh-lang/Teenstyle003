@@ -30,6 +30,16 @@ const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 
   BACKEND_PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+
+  /**
+   * PORT ที่ผู้ให้บริการโฮสต์ฉีดมาให้ (Railway, Render, Fly.io, Heroku, Cloud Run)
+   *
+   * ⚠️ **ต้องชนะ `BACKEND_PORT`** — โฮสต์พวกนี้ route ทราฟฟิกมาที่ `$PORT` ที่มันกำหนด
+   *    ถ้า process ไป listen พอร์ตอื่น health check จะล้มและ deploy ถูกมาร์กว่าพัง
+   *    โดยที่ log บอกว่า server เริ่มทำงานแล้ว (หาสาเหตุยาก)
+   * ปล่อยว่างตอน dev เพื่อใช้ `BACKEND_PORT` ตามเดิม
+   */
+  PORT: z.coerce.number().int().min(1).max(65535).optional(),
   BACKEND_URL: z.string().min(1).default('http://localhost:4000'),
   FRONTEND_URL: z.string().min(1).default('http://localhost:3000'),
 
@@ -97,6 +107,12 @@ function loadConfig(): Env {
 }
 
 export const env = loadConfig();
+
+/**
+ * พอร์ตที่ต้อง listen จริง — `PORT` ของโฮสต์ชนะเสมอ (ดูเหตุผลที่ schema)
+ * ประกาศไว้ที่นี่ที่เดียว เพื่อไม่ให้มีที่ไหนเผลอใช้ `BACKEND_PORT` ตรง ๆ ตอน listen
+ */
+export const listenPort = env.PORT ?? env.BACKEND_PORT;
 
 export const isDevelopment = env.NODE_ENV === 'development';
 export const isProduction = env.NODE_ENV === 'production';

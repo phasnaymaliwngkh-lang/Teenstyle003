@@ -39,6 +39,13 @@ npm run db:migrate:deploy
 4. Health check path: `/health` — คืน 503 เมื่อ dependency ล่ม จึงใช้กับ load balancer ได้เลย
 5. ถ้า deploy ด้วย Docker: `docker/backend.Dockerfile` (multi-stage, non-root, มี HEALTHCHECK)
 
+**พอร์ต — ไม่ต้องตั้งเอง** Railway / Render / Fly.io / Cloud Run ฉีด `PORT` มาให้
+และโค้ดให้ `PORT` **ชนะ** `BACKEND_PORT` เสมอ ([config/env.ts](../backend/src/config/env.ts) → `listenPort`)
+พร้อม log `portSource` บอกว่าใช้ค่าจากไหน
+
+> ถ้าไม่มีกลไกนี้ process จะ listen 4000 ขณะที่โฮสต์ route มาที่ `$PORT`
+> → health check ล้ม deploy ถูกมาร์กว่าพัง **ทั้งที่ log บอกว่า server เริ่มแล้ว** (หาสาเหตุยากมาก)
+
 ### 3. Frontend
 
 1. Root directory: `frontend` (หรือใช้ build ที่ root ผ่าน workspace)

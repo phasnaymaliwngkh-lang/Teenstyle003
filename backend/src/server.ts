@@ -3,15 +3,21 @@ import type { Server } from 'node:http';
 import { disconnectDatabase } from '@teenstyle/database';
 
 import { createApp } from './app.ts';
-import { API_VERSION, env } from './config/index.ts';
+import { API_VERSION, env, listenPort } from './config/index.ts';
 import { logger } from './utils/logger.ts';
 
 const app = createApp();
 
-const server: Server = app.listen(env.BACKEND_PORT, () => {
+/**
+ * listen ที่ `listenPort` (= `PORT` ของโฮสต์ ถ้ามี) และไม่ระบุ host
+ * เพื่อให้ Node bind ทุก interface — โฮสต์อย่าง Railway/Render เข้าถึงได้
+ * (ถ้า bind เฉพาะ 127.0.0.1 จะเข้าจากนอก container ไม่ได้)
+ */
+const server: Server = app.listen(listenPort, () => {
   logger.info(
     {
-      port: env.BACKEND_PORT,
+      port: listenPort,
+      portSource: env.PORT !== undefined ? 'PORT (จากโฮสต์)' : 'BACKEND_PORT',
       environment: env.NODE_ENV,
       version: API_VERSION,
       corsOrigin: env.CORS_ORIGIN,

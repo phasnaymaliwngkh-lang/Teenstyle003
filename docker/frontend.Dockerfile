@@ -23,9 +23,14 @@ WORKDIR /app
 ARG NEXT_PUBLIC_API_URL=http://localhost:4000
 ARG NEXT_PUBLIC_SITE_NAME=TeenStyle
 ARG NEXT_PUBLIC_SITE_URL=http://localhost:3000
+# ⚠️ ตอน deploy จริงต้องส่ง --build-arg NEXT_PUBLIC_API_PROXY_PATH=/backend
+#    ไม่งั้นเบราว์เซอร์จะยิง backend คนละโดเมนตรง ๆ แล้ว cookie ถูกบล็อก
+#    (ตะกร้า/สั่งซื้อ/หลังบ้าน พังหมด — ดู docs/06-deployment.md หัวข้อ 3.1)
+ARG NEXT_PUBLIC_API_PROXY_PATH=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_SITE_NAME=$NEXT_PUBLIC_SITE_NAME
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
+ENV NEXT_PUBLIC_API_PROXY_PATH=$NEXT_PUBLIC_API_PROXY_PATH
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=deps /app/node_modules ./node_modules

@@ -62,8 +62,11 @@ USER node
 EXPOSE 4000
 
 # health check ใช้ endpoint เดียวกับ monitoring (STEP 51)
+# ⚠️ ลำดับพอร์ตต้องตรงกับ `listenPort` ใน backend/src/config/env.ts เป๊ะ:
+#    PORT (โฮสต์ฉีดมา) → BACKEND_PORT → 4000
+#    ไม่งั้นเวลา deploy บนโฮสต์ที่ฉีด PORT มา health check จะไปเคาะพอร์ตที่ไม่มีใครฟัง
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.BACKEND_PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||process.env.BACKEND_PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 WORKDIR /app/backend
 CMD ["node", "dist/server.js"]

@@ -1,4 +1,4 @@
-export { env, isDevelopment, isProduction, isTest, type Env } from './env.ts';
+export { env, isDevelopment, isProduction, isTest, listenPort, type Env } from './env.ts';
 
 /** เวอร์ชันของ API ที่ใช้ใน /health และ response header */
 export const API_VERSION = '0.1.0';
