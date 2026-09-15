@@ -1,10 +1,12 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
+  "//": "config ของ service `backend` เท่านั้น — frontend อยู่บน Vercel (ดู docs/06-deployment.md) · preDeployCommand รัน migration จากเครือข่ายของ Railway ซึ่งเป็นวิธีมาตรฐานของ production และจำเป็นด้วยเมื่อเครื่อง dev ต่อฐานข้อมูลด้วย Prisma CLI ไม่ได้",
   "build": {
     "builder": "NIXPACKS",
     "buildCommand": "npm run db:sync && npm run build:backend"
   },
   "deploy": {
+    "preDeployCommand": "npm run db:migrate:deploy",
     "startCommand": "npm run start:backend",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 120,

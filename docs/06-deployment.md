@@ -21,14 +21,31 @@
 ### 1. Database
 
 1. สร้าง PostgreSQL instance แล้วคัดลอก connection string
-2. ตั้ง `DATABASE_URL` บน backend host
-3. รัน migration (**ห้ามใช้ `migrate dev` บน production**)
+2. ตั้ง `DATABASE_URL` บน host (**ห้ามใช้ `migrate dev` บน production**)
+3. **migration รันเองตอน deploy** ผ่าน `deploy.preDeployCommand` ใน [railway.json](../railway.json)
+   → ทุกครั้งที่ deploy Railway จะรัน `db:migrate:deploy` ให้ก่อนเริ่มเวอร์ชันใหม่
 
-```bash
-npm run db:generate
-npm run db:build
-npm run db:migrate:deploy
-```
+**Neon: ใช้ connection string คนละแบบตามผู้ใช้**
+
+| ที่ใช้                    | แบบ                          | เพราะ                                                                                                        |
+| ------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Railway (backend)         | **สายตรง** (ไม่มี `-pooler`) | เป็น process ที่รันยาวและถือ pool ของตัวเองอยู่แล้ว · migration ต้องใช้ session lock ที่ pgBouncer ไม่รองรับ |
+| Vercel (frontend/Auth.js) | **pooled** (`-pooler`)       | serverless เปิด connection ใหม่เยอะ ต้องให้ pooler คุมจำนวน                                                  |
+
+### ⚠️ ถ้ารัน migration จากเครื่อง dev ไม่ได้ (P1001)
+
+เจอจริงบนเครื่องพัฒนาเครื่องนี้: DNS resolve โฮสต์ของ Neon ได้**เฉพาะ IPv6**
+
+| เครื่องมือ                           | ผล                                   |
+| ------------------------------------ | ------------------------------------ |
+| `pg` / Prisma Client (Node)          | ต่อได้ปกติ                           |
+| Prisma **CLI** (`migrate`, `studio`) | `P1001: Can't reach database server` |
+
+engine ของ Prisma CLI เป็น Rust binary แยกตัวและใช้ IPv6 บนเครื่องนี้ไม่ได้ —
+**ลองแล้วไม่ผ่านทั้งหมด:** สายตรง · สาย pooled · ปิด sandbox · วิธีแก้ SNI ของ Neon (`options=endpoint%3D…`)
+
+→ อย่าเสียเวลาแก้ที่เครื่อง **ให้ migration รันจาก Railway** ตามข้อ 3 (ถูกต้องกว่าอยู่แล้ว)
+ส่วน **seed รันจากเครื่อง dev ได้** เพราะไปผ่าน Prisma Client (Node) ไม่ใช่ CLI engine
 
 ### 2. Backend
 
@@ -92,8 +109,12 @@ curl "http://localhost:3000/api/auth/providers"             # ต้องยั
 **RBAC ทั้งหมดเก็บในฐานข้อมูล** (ตาราง `Role` ↔ `Permission`) ถ้าไม่ seed จะไม่มีบทบาทใด ๆ
 → ล็อกอินได้แต่ **เข้า `/admin` ไม่ได้แม้แต่ตัวคุณเอง**
 
-```bash
-SEED_ADMIN_EMAIL=<อีเมล Google ของคุณ> npm run db:seed
+```powershell
+# รันจากเครื่อง dev ได้ (seed ไปผ่าน Prisma Client ไม่ใช่ CLI engine)
+# ⚠️ ต้องรันหลัง migration เสร็จแล้ว ไม่งั้นยังไม่มีตารางให้เขียน
+$env:DATABASE_URL = "<Neon connection string>"
+$env:SEED_ADMIN_EMAIL = "<อีเมล Google ของคุณ>"
+npm run db:seed
 ```
 
 seed เขียนแบบ upsert จึงรันซ้ำได้ · จะสร้างบัญชี `SUPER_ADMIN` ให้อีเมลนั้น
