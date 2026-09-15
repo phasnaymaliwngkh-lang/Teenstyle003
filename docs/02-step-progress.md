@@ -4,7 +4,15 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 14 เสร็จ — Product Management (`/admin/products`, `/new`, `/[productId]`)**
+**ล่าสุด: STEP 15 เสร็จ — Inventory / Stock (`/admin/inventory`, `/movements`, `/[variantId]`)**
+รับของเข้า · ตัดของออก · ปรับยอดตามการตรวจนับ (กรอกยอดที่นับได้ ระบบคำนวณผลต่างเอง) ·
+**ทุกการเปลี่ยนจำนวนต้องมีเหตุผลและถูกบันทึกเป็น `InventoryMovement` — ไม่มี endpoint ให้เซ็ตยอดตรง ๆ** ·
+**ห้ามตัดของที่ลูกค้าจองไว้** (atomic SQL `quantity + delta >= reservedQuantity` → 409) · สต็อกไม่ติดลบ ·
+กดปุ่มซ้ำไม่คูณสอง (idempotencyKey) · ประวัติ append-only ที่ก่อน/หลังต่อกันเป็นลูกโซ่ ·
+**ปิดหนี้จาก STEP 7: การ์ดสินค้า · ตัวกรอง `inStock` · ตัวเลขบน dashboard เปลี่ยนมาคิดจากของที่ขายได้จริง**
+(เพิ่ม [availability.ts](../backend/src/models/availability.ts) เป็นแหล่งความจริงเดียว) · test 235 เคส (เพิ่ม 29)
+
+**STEP 14:** Product Management (`/admin/products`, `/new`, `/[productId]`)
 เพิ่ม/แก้/ลบสินค้าและตัวเลือกได้จริง · **รับเข้าสต็อกครั้งแรกบันทึกเป็น `InventoryMovement` (STOCK_IN) เสมอ —
 ไม่มีช่องแก้จำนวนในคลังตรง ๆ** · ลบเป็น soft delete (หน้าร้านหายทันที ประวัติคำสั่งซื้อยังอ้างอิงได้) ·
 ลบไม่ได้ถ้าของถูกจองในออเดอร์ที่ยังไม่จบ (409) · slug/SKU ซ้ำ → 409 · เปิดขายต้องมีรูป + ตัวเลือกที่ใช้งาน ·
@@ -98,7 +106,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 | ---: | ------------------------------- | :---: |
 |   13 | Admin Dashboard + จัดการออเดอร์ |  ✅   |
 |   14 | Product Management              |  ✅   |
-|   15 | Inventory / Stock               |  ⬜   |
+|   15 | Inventory / Stock               |  ✅   |
 |   16 | Stock Alert                     |  ⬜   |
 |   17 | Barcode / QR                    |  ⬜   |
 |   18 | Import / Export (CSV, Excel)    |  ⬜   |

@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import type {
+  AdjustStockInput,
   AdminOrder,
   AdminProduct,
   CreateProductInput,
@@ -8,16 +9,17 @@ import type {
   UpdateOrderStatusInput,
   UpdateProductInput,
   UpdateVariantInput,
+  VariantInventory,
 } from "@/types/admin";
 
 /**
- * ชั้นเดียวที่เรียก API หลังบ้านจากฝั่ง client (STEP 13–14)
+ * ชั้นเดียวที่เรียก API หลังบ้านจากฝั่ง client (STEP 13–15)
  *
- * ⚠️ backend ตรวจสิทธิ์ (`order:update` / `product:create|update|delete`)
+ * ⚠️ backend ตรวจสิทธิ์ (`order:update` / `product:*` / `inventory:adjust`)
  *    และตรวจกฎธุรกิจทุกข้อเองทุกครั้ง — ปุ่มที่ซ่อน/แสดงใน UI เป็นเพียงความสะดวก
  *    ไม่ใช่การป้องกัน
- * ⚠️ **ไม่มีฟังก์ชันแก้จำนวนสต็อกที่นี่** สต็อกเดินผ่าน InventoryMovement เท่านั้น
- *    (รับเข้าครั้งแรกส่งเป็น `initialStock` ตอนสร้างตัวเลือก · ปรับยอดภายหลังคือ STEP 15)
+ * ⚠️ **ไม่มีฟังก์ชันเซ็ตจำนวนสต็อกตรง ๆ** — `adjustStock` บอกได้แค่ว่า
+ *    รับเข้า/ตัดออกเท่าไร หรือนับได้เท่าไร แล้ว server บันทึกเป็น InventoryMovement
  */
 export function updateOrderStatus(
   orderNumber: string,
@@ -78,5 +80,18 @@ export function updateProductVariant(
   return apiFetch<AdminProduct>(
     `/api/admin/products/${encodeURIComponent(productId)}/variants/${encodeURIComponent(variantId)}`,
     { method: "PATCH", json: input, cache: "no-store", timeoutMs: 30_000 },
+  );
+}
+
+/**
+ * ปรับสต็อก (STEP 15) — รับเข้า / ตัดออก / ปรับตามการตรวจนับ
+ *
+ * `idempotencyKey` ต้องส่งทุกครั้ง (client สร้าง UUID ครั้งเดียวต่อการเปิดฟอร์ม)
+ * เพื่อให้การกดปุ่มซ้ำหรือ retry ไม่ทำให้ยอดขยับสองเท่า
+ */
+export function adjustStock(variantId: string, input: AdjustStockInput): Promise<VariantInventory> {
+  return apiFetch<VariantInventory>(
+    `/api/admin/inventory/${encodeURIComponent(variantId)}/adjust`,
+    { method: "POST", json: input, cache: "no-store", timeoutMs: 30_000 },
   );
 }

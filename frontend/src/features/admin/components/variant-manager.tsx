@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, Check, Loader2, Plus } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -15,7 +16,7 @@ import { formatBaht } from "@/utils/format";
  * จัดการตัวเลือกสินค้าของสินค้าที่มีอยู่แล้ว (STEP 14)
  *
  * ⚠️ **จำนวนในคลังแก้ที่นี่ไม่ได้** — แสดงให้ดูเท่านั้น
- *    สต็อกต้องเดินผ่าน InventoryMovement (รับเข้า/ตัดออก/คืนของ) ซึ่งเป็นงานของ STEP 15
+ *    สต็อกต้องเดินผ่าน InventoryMovement (รับเข้า/ตัดออก/คืนของ) ที่หน้า `/admin/inventory`
  *    ตัวเลือกที่สร้างใหม่กรอก "จำนวนรับเข้าครั้งแรก" ได้ เพราะ backend บันทึกเป็น movement จริง
  * ⚠️ ปิดขายตัวเลือกที่ยังมีของจองอยู่ได้ แต่ของที่จองไว้ยังเป็นของออเดอร์นั้น
  */
@@ -57,8 +58,11 @@ export function VariantManager({
         <div>
           <h2 className="text-lg">ตัวเลือกสินค้า ({product.variants.length})</h2>
           <p className="mt-1 text-sm text-muted">
-            จำนวนในคลังแก้จากหน้านี้ไม่ได้ — ต้องรับเข้า/ปรับยอดผ่านระบบคลังสินค้า (STEP 15)
-            เพื่อให้มีประวัติครบ
+            จำนวนในคลังแก้จากหน้านี้ไม่ได้ — ต้องรับเข้า/ปรับยอดที่{" "}
+            <Link href="/admin/inventory" className="font-semibold text-brand underline">
+              คลังสินค้า
+            </Link>{" "}
+            เพื่อให้มีประวัติครบทุกการเคลื่อนไหว
           </p>
         </div>
 
@@ -176,6 +180,14 @@ function VariantRow({
         <div>
           <dt className="text-xs text-muted">ราคาที่คิดเงินจริง</dt>
           <dd className="font-extrabold text-brand-dark">{formatBaht(variant.finalPrice)}</dd>
+        </div>
+        <div className="sm:col-span-4 sm:order-last">
+          <Link
+            href={`/admin/inventory/${variant.id}`}
+            className="text-xs font-semibold text-brand underline"
+          >
+            รับของเข้า / ปรับยอด / ดูประวัติสต็อกของตัวเลือกนี้ →
+          </Link>
         </div>
         <div>
           <dt className="text-xs text-muted">ในคลัง</dt>

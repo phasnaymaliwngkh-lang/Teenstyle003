@@ -1,12 +1,13 @@
 import { getPrisma, Prisma } from '@teenstyle/database';
 
+import { AVAILABLE_STOCK_SQL } from '../models/availability.ts';
 import { resolveVariantPrice } from '../models/pricing.ts';
 import { toProductDetail, type ProductDetailDto } from '../models/product-detail.model.ts';
-import { toProductCard, type ProductCardDto } from '../models/product.model.ts';
+import { type ProductCardDto } from '../models/product.model.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type { ShopQuery } from '../validators/product.validator.ts';
 
-import { PRODUCT_CARD_SELECT } from './product.service.ts';
+import { PRODUCT_CARD_SELECT, toProductCards } from './product.service.ts';
 
 /**
  * Shop service (STEP 6) — ค้นหา/กรอง/เรียง/แบ่งหน้า + รายละเอียดสินค้า + ตรวจสต็อก
@@ -106,7 +107,12 @@ export async function searchProducts(query: ShopQuery): Promise<ShopResult> {
   }
 
   if (query.inStock) {
-    conditions.push(Prisma.sql`p."totalStock" > 0`);
+    /**
+     * "พร้อมส่ง" ต้องหมายถึงของที่ **ซื้อได้จริง** ไม่ใช่ของที่มีอยู่ในคลัง
+     * เดิมใช้ `p."totalStock" > 0` ซึ่งไม่หักของที่ถูกจองไว้ในออเดอร์ที่ยังไม่จบ
+     * → สินค้าที่ของถูกจองไปหมดแล้วยังโผล่ในตัวกรองนี้ (แก้ใน STEP 15)
+     */
+    conditions.push(Prisma.sql`${AVAILABLE_STOCK_SQL} > 0`);
   }
   if (query.onSale) {
     conditions.push(Prisma.sql`p."salePrice" IS NOT NULL`);
@@ -162,9 +168,8 @@ export async function searchProducts(query: ShopQuery): Promise<ShopResult> {
 
   // findMany ไม่รับประกันลำดับตาม in[] จึงเรียงกลับตามลำดับที่ SQL จัดไว้
   const rank = new Map(ids.map((id, index) => [id, index]));
-  const items = products
-    .map(toProductCard)
-    .sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
+  const cards = await toProductCards(products);
+  const items = cards.sort((a, b) => (rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0));
 
   return {
     items,

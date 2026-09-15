@@ -7,11 +7,14 @@ import type {
   AdminOverview,
   AdminProduct,
   AdminProductListResult,
+  InventoryListResult,
+  MovementListResult,
   ProductFormOptions,
+  VariantInventory,
 } from "@/types/admin";
 
 /**
- * อ่านข้อมูลหลังบ้านจากฝั่ง server (STEP 13–14)
+ * อ่านข้อมูลหลังบ้านจากฝั่ง server (STEP 13–15)
  *
  * ทุก endpoint ต้องล็อกอิน + เป็นพนักงาน + มีสิทธิ์ตรงกับงาน (backend ตรวจ)
  * หน้า admin ตรวจสิทธิ์ซ้ำที่ layout/page ผ่าน DAL อีกชั้น
@@ -54,4 +57,26 @@ export function fetchAdminProductOnServer(productId: string): Promise<AdminProdu
 /** หมวดหมู่/แบรนด์/สี/ไซซ์ ที่มีจริงในฐานข้อมูล — ฟอร์มห้ามฮาร์ดโค้ดตัวเลือกเอง */
 export function fetchProductFormOptionsOnServer(): Promise<ProductFormOptions> {
   return apiFetchAsUser<ProductFormOptions>("/api/admin/products/options", { cache: "no-store" });
+}
+
+export function fetchInventoryOnServer(params: URLSearchParams): Promise<InventoryListResult> {
+  const qs = params.toString();
+
+  return apiFetchAsUser<InventoryListResult>(`/api/admin/inventory${qs ? `?${qs}` : ""}`, {
+    cache: "no-store",
+  });
+}
+
+export function fetchVariantInventoryOnServer(variantId: string): Promise<VariantInventory> {
+  return apiFetchAsUser<VariantInventory>(`/api/admin/inventory/${encodeURIComponent(variantId)}`, {
+    cache: "no-store",
+  });
+}
+
+export function fetchMovementsOnServer(params: URLSearchParams): Promise<MovementListResult> {
+  const qs = params.toString();
+
+  return apiFetchAsUser<MovementListResult>(`/api/admin/inventory/movements${qs ? `?${qs}` : ""}`, {
+    cache: "no-store",
+  });
 }

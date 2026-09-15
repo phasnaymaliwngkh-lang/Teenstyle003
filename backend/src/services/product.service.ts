@@ -1,5 +1,6 @@
 import { getPrisma } from '@teenstyle/database';
 
+import { availableOf, getAvailableStockByProduct } from '../models/availability.ts';
 import { toProductCard, type ProductCardDto } from '../models/product.model.ts';
 
 /**
@@ -7,6 +8,9 @@ import { toProductCard, type ProductCardDto } from '../models/product.model.ts';
  *
  * ทุก query กรอง `deletedAt: null` และ `status: 'ACTIVE'` เสมอ
  * เพราะสินค้าที่ถูก soft delete หรือยังเป็นฉบับร่างต้องไม่โผล่หน้าร้าน
+ *
+ * ⚠️ สถานะสต็อกบนการ์ดคิดจาก **จำนวนที่ขายได้จริง** (STEP 15) จึงต้องยิงคิวรีหาความพร้อมขาย
+ *    เพิ่มอีกหนึ่งครั้งต่อรายการ — ห้ามกลับไปใช้ `Product.totalStock` เพราะมันไม่หักของที่จองไว้
  */
 
 export type ProductSort = 'newest' | 'discount' | 'bestselling' | 'popular';
@@ -20,7 +24,6 @@ export const PRODUCT_CARD_SELECT = {
   shortDescription: true,
   price: true,
   salePrice: true,
-  totalStock: true,
   minimumStock: true,
   tags: true,
   brand: { select: { name: true, slug: true } },
@@ -39,6 +42,38 @@ const STOREFRONT_WHERE = {
   status: 'ACTIVE',
 } as const;
 
+/** แถวที่ `PRODUCT_CARD_SELECT` คืนมา — ใช้ผูก type ของ mapper ให้ตรงกับ select */
+export type ProductCardRow = {
+  id: string;
+  name: string;
+  slug: string;
+  sku: string;
+  shortDescription: string | null;
+  price: unknown;
+  salePrice: unknown;
+  minimumStock: number;
+  tags: string[];
+  brand: { name: string; slug: string } | null;
+  category: { name: string; slug: string };
+  images: { url: string; alt: string }[];
+  _count?: { wishlist?: number };
+};
+
+/**
+ * แปลงแถวสินค้าเป็นการ์ด พร้อมหา "จำนวนที่ขายได้จริง" ให้ทุกแถวในคิวรีเดียว (STEP 15)
+ *
+ * **ทุกที่ที่สร้างการ์ดสินค้าต้องผ่านฟังก์ชันนี้** ห้ามเรียก `toProductCard` ตรง ๆ
+ * เพื่อไม่ให้มีทางลืมส่งค่าความพร้อมขาย แล้วสถานะสต็อกเพี้ยนเฉพาะบางหน้า
+ */
+export async function toProductCards(rows: ProductCardRow[]): Promise<ProductCardDto[]> {
+  const available = await getAvailableStockByProduct(
+    getPrisma(),
+    rows.map((row) => row.id),
+  );
+
+  return rows.map((row) => toProductCard(row, availableOf(available, row.id)));
+}
+
 export interface ProductListResult {
   items: ProductCardDto[];
   /** เกณฑ์ที่ใช้จัดอันดับ — ส่งกลับให้ UI อธิบายผู้ใช้ได้ตรงความจริง */
@@ -55,7 +90,7 @@ async function findNewest(limit: number): Promise<ProductCardDto[]> {
     take: limit,
   });
 
-  return rows.map(toProductCard);
+  return toProductCards(rows);
 }
 
 /** Flash Sale — เฉพาะสินค้าที่มีราคาลดจริง เรียงจากลดมากไปน้อย */
@@ -67,9 +102,9 @@ async function findDiscounted(limit: number): Promise<ProductCardDto[]> {
   });
 
   // เรียงตาม % ส่วนลดจริง ทำในโค้ดเพราะ Postgres เรียงตามนิพจน์ผ่าน Prisma ตรง ๆ ไม่ได้
-  return rows
-    .map(toProductCard)
-    .sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0));
+  const cards = await toProductCards(rows);
+
+  return cards.sort((a, b) => (b.discountPercent ?? 0) - (a.discountPercent ?? 0));
 }
 
 /**
@@ -109,10 +144,9 @@ async function findBestSelling(limit: number): Promise<ProductCardDto[]> {
 
   // เรียงผลลัพธ์ตามอันดับยอดขาย (findMany ไม่รับประกันลำดับตาม in[])
   const rankByProductId = new Map(productIds.map((id, index) => [id, index]));
+  const cards = await toProductCards(rows);
 
-  return rows
-    .map(toProductCard)
-    .sort((a, b) => (rankByProductId.get(a.id) ?? 0) - (rankByProductId.get(b.id) ?? 0));
+  return cards.sort((a, b) => (rankByProductId.get(a.id) ?? 0) - (rankByProductId.get(b.id) ?? 0));
 }
 
 /**
@@ -129,7 +163,7 @@ async function findPopular(limit: number): Promise<ProductCardDto[]> {
     take: limit,
   });
 
-  return rows.map(toProductCard);
+  return toProductCards(rows);
 }
 
 /** ทางเข้าเดียวของการดึงรายการสินค้าสำหรับหน้าร้าน */

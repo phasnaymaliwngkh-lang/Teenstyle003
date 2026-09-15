@@ -1,5 +1,6 @@
 import { getPrisma, Prisma } from '@teenstyle/database';
 
+import { AVAILABLE_STOCK_SQL } from '../models/availability.ts';
 import { toNumber } from '../models/pricing.ts';
 
 /**
@@ -107,12 +108,23 @@ export async function getOverview(): Promise<AdminOverviewDto> {
     prisma.product.count({ where: { deletedAt: null } }),
     prisma.product.count({ where: { deletedAt: null, status: 'ACTIVE' } }),
     prisma.productVariant.count({ where: { deletedAt: null } }),
-    prisma.product.count({ where: { deletedAt: null, status: 'ACTIVE', totalStock: 0 } }),
-    prisma.$queryRaw<Array<{ count: bigint }>>`
+    /**
+     * "ของหมด" และ "สต็อกต่ำ" ต้องคิดจากจำนวนที่ **ขายได้จริง** (STEP 15)
+     * ไม่ใช่ cache `totalStock` ที่ยังไม่หักของที่จองไว้ ไม่งั้นหน้า dashboard
+     * จะบอกว่ามีของขายทั้งที่ของถูกจองไปหมดแล้ว
+     */
+    prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
       SELECT count(*)::bigint AS count
-      FROM "Product"
-      WHERE "deletedAt" IS NULL AND "status" = 'ACTIVE' AND "totalStock" <= "minimumStock"
-    `,
+      FROM "Product" p
+      WHERE p."deletedAt" IS NULL AND p."status" = 'ACTIVE'
+        AND ${AVAILABLE_STOCK_SQL} = 0
+    `),
+    prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
+      SELECT count(*)::bigint AS count
+      FROM "Product" p
+      WHERE p."deletedAt" IS NULL AND p."status" = 'ACTIVE'
+        AND ${AVAILABLE_STOCK_SQL} <= p."minimumStock"
+    `),
     prisma.inventory.aggregate({ _sum: { quantity: true, reservedQuantity: true } }),
     prisma.user.count({ where: { deletedAt: null } }),
     prisma.user.count({ where: { deletedAt: null, createdAt: { gte: since(30) } } }),
@@ -167,7 +179,12 @@ export async function getOverview(): Promise<AdminOverviewDto> {
       toShip: countOf('PACKING'),
       last30Days: orders30,
     },
-    products: { total: products, active: activeProducts, variants, outOfStock },
+    products: {
+      total: products,
+      active: activeProducts,
+      variants,
+      outOfStock: Number(outOfStock[0]?.count ?? 0),
+    },
     inventory: {
       lowStock: Number(lowStock[0]?.count ?? 0),
       totalUnits: inventorySum._sum.quantity ?? 0,

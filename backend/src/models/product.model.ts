@@ -43,7 +43,6 @@ export interface ProductWithRelations {
   shortDescription: string | null;
   price: unknown;
   salePrice: unknown;
-  totalStock: number;
   minimumStock: number;
   tags: string[];
   brand: { name: string; slug: string } | null;
@@ -63,14 +62,27 @@ function toNumber(value: unknown): number {
  *   0                        → OUT_OF_STOCK
  *   <= minimumStock          → LOW_STOCK
  *   อื่น ๆ                    → IN_STOCK
+ *
+ * ⚠️ ค่าที่ส่งเข้ามาต้องเป็น **จำนวนที่ขายได้จริง** (หัก reservedQuantity แล้ว)
+ *    ห้ามส่ง `Product.totalStock` เข้ามา — ดู [availability.ts](./availability.ts)
  */
-export function resolveStockStatus(totalStock: number, minimumStock: number): StockStatus {
-  if (totalStock <= 0) return 'OUT_OF_STOCK';
-  if (totalStock <= minimumStock) return 'LOW_STOCK';
+export function resolveStockStatus(availableStock: number, minimumStock: number): StockStatus {
+  if (availableStock <= 0) return 'OUT_OF_STOCK';
+  if (availableStock <= minimumStock) return 'LOW_STOCK';
   return 'IN_STOCK';
 }
 
-export function toProductCard(product: ProductWithRelations): ProductCardDto {
+/**
+ * แปลงสินค้าเป็นการ์ดสำหรับหน้าร้าน
+ *
+ * `availableStock` เป็นพารามิเตอร์แยก **โดยเจตนา** (ไม่ยัดเป็นฟิลด์ที่มีค่าเริ่มต้น)
+ * เพื่อให้ผู้เรียกทุกรายถูกบังคับให้ไปหาค่าที่ถูกต้องมา — ถ้าลืม จะ error ตอนคอมไพล์
+ * ไม่ใช่เงียบ ๆ แล้วแสดงสถานะสต็อกผิดให้ลูกค้าเห็น (เคยเกิดจริงตั้งแต่ STEP 7)
+ */
+export function toProductCard(
+  product: ProductWithRelations,
+  availableStock: number,
+): ProductCardDto {
   const price = toNumber(product.price);
   const salePrice = product.salePrice === null ? null : toNumber(product.salePrice);
   const finalPrice = salePrice ?? price;
@@ -93,7 +105,7 @@ export function toProductCard(product: ProductWithRelations): ProductCardDto {
     brand: product.brand,
     category: product.category,
     image: mainImage ? { url: mainImage.url, alt: mainImage.alt } : null,
-    stockStatus: resolveStockStatus(product.totalStock, product.minimumStock),
+    stockStatus: resolveStockStatus(availableStock, product.minimumStock),
     wishlistCount: product._count?.wishlist ?? 0,
     tags: product.tags,
   };

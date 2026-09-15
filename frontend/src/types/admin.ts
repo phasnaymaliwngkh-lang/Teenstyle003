@@ -86,7 +86,7 @@ export interface AdminProductVariant {
   isActive: boolean;
   color: { name: string; slug: string; hex: string } | null;
   size: { name: string; code: string } | null;
-  /** จำนวนในคลัง — แก้ได้ที่ระบบคลังสินค้า (STEP 15) เท่านั้น */
+  /** จำนวนในคลัง — แก้ได้ที่ระบบคลังสินค้า (`/admin/inventory`) เท่านั้น */
   quantity: number;
   reserved: number;
   available: number;
@@ -195,3 +195,85 @@ export interface DeleteProductResult {
   id: string;
   orderItemCount: number;
 }
+
+/* ─────────────── คลังสินค้า (STEP 15) ─────────────── */
+
+export interface InventoryRow {
+  variantId: string;
+  sku: string;
+  isActive: boolean;
+  /** ของที่มีอยู่ในคลัง */
+  quantity: number;
+  /** ของที่ลูกค้าจองไว้ในออเดอร์ที่ยังไม่จบ — แตะไม่ได้ */
+  reserved: number;
+  /** ของที่ขายได้จริง */
+  available: number;
+  minimumStock: number;
+  stockStatus: string;
+  location: string | null;
+  color: { name: string; slug: string; hex: string } | null;
+  size: { name: string; code: string } | null;
+  product: {
+    id: string;
+    name: string;
+    slug: string;
+    sku: string;
+    status: string;
+    category: { name: string; slug: string };
+  };
+  updatedAt: string;
+}
+
+export interface InventoryMovement {
+  id: string;
+  type: string;
+  /** จำนวนเป็นบวกเสมอ — ทิศทางอ่านจาก delta */
+  quantity: number;
+  quantityBefore: number;
+  quantityAfter: number;
+  delta: number;
+  reason: string;
+  referenceType: string | null;
+  referenceId: string | null;
+  variant: { id: string; sku: string; productName: string; productId: string | null };
+  /** null = ระบบทำเอง (เช่น ตัดสต็อกตอนชำระเงินสำเร็จ) */
+  actor: { id: string; name: string | null; email: string } | null;
+  createdAt: string;
+}
+
+export interface InventorySummary {
+  variants: number;
+  totalUnits: number;
+  reservedUnits: number;
+  availableUnits: number;
+  outOfStock: number;
+  lowStock: number;
+}
+
+export interface InventoryListResult {
+  items: InventoryRow[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  summary: InventorySummary;
+}
+
+export interface MovementListResult {
+  items: InventoryMovement[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface VariantInventory {
+  inventory: InventoryRow;
+  movements: InventoryMovement[];
+  movementCount: number;
+}
+
+/** ปรับสต็อก — `ADJUSTMENT` ส่งยอดที่นับได้จริง ระบบคำนวณผลต่างเอง */
+export type AdjustStockInput =
+  | { type: "STOCK_IN" | "STOCK_OUT"; quantity: number; reason: string; idempotencyKey?: string }
+  | { type: "ADJUSTMENT"; countedQuantity: number; reason: string; idempotencyKey?: string };

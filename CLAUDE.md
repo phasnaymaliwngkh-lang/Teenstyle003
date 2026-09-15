@@ -4,9 +4,9 @@
 > Full Stack Fashion E-Commerce สำหรับวัยรุ่น — Next.js + Express + PostgreSQL + Prisma + OpenAI
 
 โปรเจกต์นี้เดินตาม **Master Prompt STEP 1–55** ทำทีละ STEP แล้วหยุดรอคำสั่งถัดไป
-สถานะปัจจุบัน: **STEP 1–14 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
+สถานะปัจจุบัน: **STEP 1–15 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
 หน้าร้าน → ตะกร้า → checkout → ชำระเงิน (COD จริง · Stripe รอใส่ key) → ติดตามคำสั่งซื้อ
-→ **หลังบ้าน: ภาพรวมร้าน + อัปเดตสถานะ/ออกเลขพัสดุ/ยกเลิกคืนของ + จัดการสินค้า**
+→ **หลังบ้าน: ภาพรวมร้าน + จัดการคำสั่งซื้อ + จัดการสินค้า + คลังสินค้า**
 → ดู [docs/02-step-progress.md](docs/02-step-progress.md)
 
 ## ⚠️ อ่านก่อน: ไฟล์เก่าที่ root ไม่ใช่ส่วนหนึ่งของแอป
@@ -133,7 +133,8 @@ app/
 │   ├── layout.tsx          แถบ admin + requireStaff() ป้องกันทุกหน้าใต้ /admin
 │   ├── page.tsx            ภาพรวมร้าน (STEP 13)
 │   ├── orders/ orders/[orderNumber]/   จัดการคำสั่งซื้อ (STEP 13)
-│   └── products/ products/new/ products/[productId]/   จัดการสินค้า (STEP 14)
+│   ├── products/ products/new/ products/[productId]/   จัดการสินค้า (STEP 14)
+│   └── inventory/ inventory/movements/ inventory/[variantId]/   คลังสินค้า (STEP 15)
 ├── signin/ after-signin/   อยู่นอกกลุ่ม — ไม่มี navbar (หน้าโฟกัสเดียว)
 └── api/auth/[...nextauth]/
 ```
@@ -368,18 +369,34 @@ Next จะ commit HTTP status ตอนเริ่ม stream ไบต์แ�
 ให้ตั้ง `reservedQuantity = quantity` ชั่วคราวผ่าน SQL แล้วคืนเป็น 0 ทีหลัง —
 ไม่แตะยอดในคลังจริง ไม่ขัด CHECK `reserved <= quantity` และย้อนกลับได้ครบ
 
-### ⚠️ `Product.totalStock` ไม่ใช่ "จำนวนที่ซื้อได้" (เจอตอน STEP 7)
+### ⚠️ `Product.totalStock` ไม่ใช่ "จำนวนที่ซื้อได้" (เจอตอน STEP 7 · ปิดหนี้ตอน STEP 15)
 
-`totalStock` เป็น cache ของ `SUM(Inventory.quantity)` = **ของในคลัง ยังไม่หัก `reservedQuantity`**
-"จำนวนที่ซื้อได้จริง" คือ `SUM(GREATEST(quantity - reservedQuantity, 0))` ต่อสินค้า
+มีสองนิยามที่ต่างกันและห้ามสับสน:
 
-ที่ใช้ค่าถูกต้องแล้ว: หน้ารายละเอียดสินค้า · `POST /api/products/availability` · ลุคทั้งหมด (STEP 7)
-· รายการสินค้าหลังบ้านและตัวกรองสต็อกต่ำ (STEP 14)
-**ยังใช้ `totalStock` อยู่:** `stockStatus` ของการ์ดสินค้า และตัวกรอง `inStock=true` ของ `/shop`
-วันนี้ไม่ต่างกันเพราะยังไม่มีอะไรจองสต็อก (reserved = 0 ทุกแถว) แต่ **STEP 15 (ระบบคลังสินค้า)
-ต้องแก้ให้การ์ดสินค้าและตัวกรองใช้ค่าที่ซื้อได้จริงด้วย** ไม่งั้น `/shop` จะโฆษณาว่า "พร้อมส่ง"
-ทั้งที่ของถูกจองไปหมดแล้ว (ทางที่ดีที่สุดคือเพิ่มคอลัมน์ cache `availableStock`
-ที่อัปเดตใน transaction เดียวกับการจอง — จะได้ไม่ต้อง join Inventory ทุกครั้งที่ query รายการสินค้า)
+| ค่า                                            | ความหมาย                            | ใช้ตอนไหน                              |
+| ---------------------------------------------- | ----------------------------------- | -------------------------------------- |
+| `Product.totalStock`                           | cache ของ `SUM(Inventory.quantity)` | บอก "ของที่มีอยู่ในคลัง" ให้หลังบ้านดู |
+| `SUM(GREATEST(quantity − reservedQuantity,0))` | ของที่ **ขายได้จริง**               | **ทุกการตัดสินใจว่าขายได้/ไม่ได้**     |
+
+**แหล่งความจริงเดียวคือ [backend/src/models/availability.ts](backend/src/models/availability.ts)**
+— `AVAILABLE_STOCK_SQL` (ใช้ในคิวรีที่ alias ตาราง Product เป็น `p`) และ
+`getAvailableStockByProduct()` (ใช้กับ Prisma) ทั้งสองทางต้องให้คำตอบเดียวกัน
+
+**กฎ**
+
+1. **ห้ามใช้ `totalStock` ตัดสินว่าสินค้าขายได้หรือไม่** — เดิม `/shop` ใช้ `p."totalStock" > 0`
+   ทำให้โฆษณาว่า "พร้อมส่ง" ทั้งที่ของถูกจองไปหมด (แก้แล้วใน STEP 15)
+2. **การ์ดสินค้าต้องสร้างผ่าน `toProductCards()`** ใน `services/product.service.ts` เท่านั้น
+   ห้ามเรียก `toProductCard()` ตรง ๆ — mapper บังคับให้ส่งค่าความพร้อมขายเป็นพารามิเตอร์
+   จึงลืมไม่ได้ (ถ้าลืมจะ error ตอนคอมไพล์ ไม่ใช่แสดงผลผิดเงียบ ๆ)
+3. `resolveStockStatus()` รับ **จำนวนที่ขายได้จริง** ไม่ใช่ `totalStock`
+4. ที่ใช้ค่าถูกต้องแล้วทั้งหมด: หน้าแรก · `/shop` (ทั้งการ์ดและตัวกรอง) · หน้ารายละเอียดสินค้า ·
+   `POST /api/products/availability` · ลุคทั้งหมด · ตะกร้า · dashboard (ของหมด/สต็อกต่ำ) ·
+   รายการสินค้าและคลังในหลังบ้าน
+
+> ถ้าแคตตาล็อกโตจนการ join Inventory ทุกครั้งช้าเกินไป ทางแก้คือเพิ่มคอลัมน์ cache
+> `availableStock` ที่อัปเดต **ในทรานแซกชันเดียวกับการจอง/ตัด/คืนสต็อก** (งานของ STEP 34)
+> ห้ามแก้ด้วยการกลับไปอ่าน `totalStock`
 
 ## Look Ideas (STEP 7–8 — สร้างแล้ว)
 
@@ -620,6 +637,49 @@ POST /api/admin/products/:productId/variants · PATCH …/variants/:variantId
    เพราะ Prisma เทียบสองคอลัมน์ไม่ได้) ไม่งั้นจำนวนที่แสดงไม่ตรงกับแถวที่เห็น
 8. **ทุกการสร้าง/แก้/ลบเขียน `AdminLog`** (before/after/ip/userAgent) ในทรานแซกชันเดียวกัน
 
+## Inventory / Stock (STEP 15 — สร้างแล้ว)
+
+```
+/admin/inventory              → รายการสต็อกต่อตัวเลือก + สรุปทั้งคลัง (inventory:read)
+/admin/inventory/movements    → ประวัติการเคลื่อนไหวทั้งร้าน (inventory:read)
+/admin/inventory/[variantId]  → ฟอร์มปรับ + ประวัติของตัวเลือกนั้น (inventory:adjust)
+GET  /api/admin/inventory · /api/admin/inventory/movements · /api/admin/inventory/:variantId
+POST /api/admin/inventory/:variantId/adjust   { type, quantity | countedQuantity, reason, idempotencyKey }
+```
+
+**3 ตัวเลขที่ต้องแยกกันให้เห็นเสมอ** — การยุบเป็นตัวเดียวคือต้นเหตุของบั๊กเรื่องสต็อกทุกครั้ง
+
+| ตัวเลข     | ที่มา                            | ความหมาย                                |
+| ---------- | -------------------------------- | --------------------------------------- |
+| ของในคลัง  | `Inventory.quantity`             | ของที่อยู่ในคลังจริง                    |
+| จองไว้     | `Inventory.reservedQuantity`     | ของในออเดอร์ที่ยังไม่จบ — **แตะไม่ได้** |
+| ขายได้จริง | `quantity − reserved` (ไม่ติดลบ) | ที่หน้าร้านใช้ตัดสินใจ                  |
+
+**กฎที่ห้ามละเมิด**
+
+1. **ห้ามเขียน `Inventory.quantity` โดยไม่มี `InventoryMovement` คู่กันในทรานแซกชันเดียว**
+   พร้อมอัปเดต cache `Product.totalStock` → ผลรวมของ movement ต้องอธิบายยอดในคลังได้ตลอดเวลา
+   **ไม่มี endpoint ใดตั้งค่าจำนวนตรง ๆ** มีแค่ "รับเข้าเท่าไร / ตัดออกเท่าไร / นับได้เท่าไร"
+2. **ทุกรายการต้องมี `reason`** (≥ 3 ตัวอักษร) + `userId` + AdminLog — ของที่หายต้องมีคนรับผิดชอบ
+3. **ห้ามลดยอดจนต่ำกว่าของที่ลูกค้าจองไว้** เงื่อนไขอยู่ใน SQL เดียวกับการอัปเดต:
+   ```sql
+   UPDATE "Inventory" SET "quantity" = "quantity" + $delta, "updatedAt" = now()
+    WHERE "variantId" = $id AND "quantity" + $delta >= "reservedQuantity"
+   RETURNING "quantity" AS after
+   ```
+   ไม่มีแถวกลับมา → 409 (กัน race condition ได้จริง และกันติดลบโดยปริยายเพราะ reserved ≥ 0)
+   ⚠️ `updatedAt` ต้องเซ็ตเอง — `@updatedAt` ของ Prisma **ไม่ทำงานกับ raw SQL**
+4. **`ADJUSTMENT` รับยอดที่นับได้ (`countedQuantity`) ไม่ใช่ผลต่าง** — คนนับของกรอกจำนวนที่เห็น
+   แล้วให้ระบบคำนวณผลต่างเอง · นับได้เท่าเดิม (delta = 0) → **400** ไม่เขียน movement
+   (และ CHECK `InventoryMovement_quantity_positive` ก็ไม่ยอมให้เขียน 0 อยู่แล้ว)
+5. **`InventoryMovement.quantity` เป็นบวกเสมอ** (CHECK) — ทิศทางอ่านจาก `quantityBefore/After`
+   DTO คำนวณ `delta = after − before` ให้ ห้ามเดาทิศทางจาก `type` ที่ฝั่ง UI
+6. **กดปุ่มซ้ำต้องไม่คูณสอง** — `idempotencyKey` (`adjust:<uuid>`) unique ที่ฐานข้อมูล
+   client สร้าง UUID ครั้งเดียวต่อการเปิดฟอร์ม แล้วสร้างใหม่หลังบันทึกสำเร็จ
+7. **ประวัติเป็น append-only** แก้/ลบย้อนหลังไม่ได้ — บันทึกผิดต้องปรับกลับด้วยรายการใหม่
+8. **สิทธิ์ `inventory:read` กับ `inventory:adjust` แยกกัน** (EMPLOYEE มีทั้งคู่ตาม seed)
+   มี test ที่ถอนสิทธิ์ในฐานข้อมูลแล้วยืนยันว่าปรับไม่ได้ทันที — พิสูจน์ว่าไม่ได้ hard-code ตามบทบาท
+
 ### ⚠️ `.partial()` ของ Zod 4 ไม่ลบ `.default()` (เจอจริงตอน STEP 14)
 
 `updateProductSchema.parse({})` คืน `{ status: 'DRAFT', minimumStock: 5, tags: [] }`
@@ -628,6 +688,13 @@ POST /api/admin/products/:productId/variants · PATCH …/variants/:variantId
 
 **กฎ: schema ที่จะเอาไป `.partial()` ห้ามมี `.default()`** — ย้าย default ไปไว้ใน schema ของการ "สร้าง"
 เท่านั้น (ดู `productCore` + `createProductSchema`) และมี test ยืนยันว่า PATCH ชื่อแล้วสถานะ/tag ไม่ขยับ
+
+### ⚠️ ข้อความ error ของ Zod ต้องใส่ที่ระดับชนิดด้วย ไม่ใช่แค่ใน `.min()` (เจอตอน STEP 15)
+
+`z.string().min(3, 'ข้อความไทย')` ครอบแค่กรณี "สั้นเกินไป" — ถ้า **ไม่ส่งฟิลด์นั้นมาเลย**
+Zod จะรายงาน `invalid_type` แล้วตอบข้อความดิบ `expected string, received undefined`
+ซึ่งหลุดไปถึงหน้าจอผู้ใช้ → ต้องเขียนเป็น `z.string({ message: 'ข้อความไทย' }).min(3, '…')`
+(ดู `reason` ใน [inventory.validator.ts](backend/src/validators/inventory.validator.ts) · มี test กันถอยหลัง)
 
 **ตั้งค่า Stripe:** [docs/07-payment-setup.md](docs/07-payment-setup.md) (มี `stripe listen` + บัตรทดสอบ)
 **ทดสอบ webhook ได้โดยไม่มีบัญชี Stripe** — เทสต์เซ็นลายเซ็นเอง (HMAC ของ `timestamp.body`)

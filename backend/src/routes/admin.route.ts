@@ -16,6 +16,12 @@ import {
   updateProductHandler,
   updateVariantHandler,
 } from '../controllers/product-admin.controller.ts';
+import {
+  adjustStockHandler,
+  getVariantInventoryHandler,
+  listInventoryHandler,
+  listMovementsHandler,
+} from '../controllers/inventory.controller.ts';
 import { requireAuth } from '../middlewares/authenticate.ts';
 import { requirePermission, requireStaff } from '../middlewares/authorize.ts';
 import { verifyOrigin } from '../middlewares/verify-origin.ts';
@@ -68,4 +74,23 @@ adminRouter.patch(
   '/products/:productId/variants/:variantId',
   requirePermission('product:update'),
   updateVariantHandler,
+);
+
+/**
+ * คลังสินค้า (STEP 15)
+ * ⚠️ ลำดับสำคัญ: `/inventory/movements` ต้องมาก่อน `/inventory/:variantId`
+ *    ไม่งั้น "movements" จะถูกจับเป็น variantId แล้วไม่ผ่าน validation (422)
+ * แยกสิทธิ์ "ดู" กับ "ปรับ" — พนักงานดูได้ไม่ได้หมายความว่าปรับยอดได้
+ */
+adminRouter.get('/inventory', requirePermission('inventory:read'), listInventoryHandler);
+adminRouter.get('/inventory/movements', requirePermission('inventory:read'), listMovementsHandler);
+adminRouter.get(
+  '/inventory/:variantId',
+  requirePermission('inventory:read'),
+  getVariantInventoryHandler,
+);
+adminRouter.post(
+  '/inventory/:variantId/adjust',
+  requirePermission('inventory:adjust'),
+  adjustStockHandler,
 );

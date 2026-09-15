@@ -1,5 +1,6 @@
 import { getPrisma, Prisma } from '@teenstyle/database';
 
+import { AVAILABLE_STOCK_SQL } from '../models/availability.ts';
 import { resolveProductPrice, resolveVariantPrice, toNumber } from '../models/pricing.ts';
 import { resolveStockStatus } from '../models/product.model.ts';
 import { ApiError } from '../utils/api-error.ts';
@@ -194,17 +195,12 @@ export interface AdminProductListResult {
  * ⚠️ คืนทั้งชุดเพื่อให้การนับและการแบ่งหน้าตรงกัน — แคตตาล็อกใหญ่ขึ้นให้ย้ายไปทำที่ระบบคลัง (STEP 15)
  */
 async function findLowStockProductIds(prisma: ReturnType<typeof getPrisma>): Promise<string[]> {
-  const rows = await prisma.$queryRaw<Array<{ id: string }>>`
+  const rows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
     SELECT p."id"
     FROM "Product" p
     WHERE p."deletedAt" IS NULL
-      AND COALESCE((
-        SELECT sum(GREATEST(i."quantity" - i."reservedQuantity", 0))
-        FROM "ProductVariant" v
-        JOIN "Inventory" i ON i."variantId" = v."id"
-        WHERE v."productId" = p."id" AND v."deletedAt" IS NULL
-      ), 0) <= p."minimumStock"
-  `;
+      AND ${AVAILABLE_STOCK_SQL} <= p."minimumStock"
+  `);
 
   return rows.map((row) => row.id);
 }

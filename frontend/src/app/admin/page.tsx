@@ -73,7 +73,7 @@ export default async function AdminDashboardPage() {
     {
       label: "สินค้าสต็อกต่ำ",
       count: data.inventory.lowStock,
-      href: "/admin/products?lowStock=true",
+      href: "/admin/inventory?stockStatus=LOW_STOCK",
       icon: <AlertTriangle className="size-5 text-danger" aria-hidden />,
     },
   ];
@@ -93,6 +93,12 @@ export default async function AdminDashboardPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/inventory"
+            className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            คลังสินค้า
+          </Link>
           <Link
             href="/admin/products"
             className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
@@ -245,8 +251,8 @@ export default async function AdminDashboardPage() {
       </section>
 
       <p className="mt-8 text-xs text-muted">
-        คลังสินค้า (STEP 15) · รายงานเชิงลึกและกราฟ (STEP 26) · ประวัติการแก้ไขของแอดมิน (STEP 27)
-        จะเพิ่มในลำดับถัดไป
+        การแจ้งเตือนสต็อกอัตโนมัติ (STEP 16) · รายงานเชิงลึกและกราฟ (STEP 26) ·
+        ประวัติการแก้ไขของแอดมิน (STEP 27) จะเพิ่มในลำดับถัดไป
       </p>
     </main>
   );
