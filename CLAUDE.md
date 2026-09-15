@@ -230,11 +230,41 @@ Rounded cards · soft shadows · smooth animation · white space เยอะ ·
     `aria-live` สำหรับเนื้อหาที่เปลี่ยนเอง, เคารพ `prefers-reduced-motion`
 13. **แก้ error สำคัญให้จบก่อนสร้าง feature ใหม่**
 
-## ทุกครั้งที่ทำ STEP เสร็จ ต้องรายงาน
+## ทุกครั้งที่ทำ STEP เสร็จ ต้องทำ 3 อย่างนี้ตามลำดับ
 
-Files Created · Files Modified · Dependencies Added · Database Changes · API Changes ·
+**1. รายงาน:** Files Created · Files Modified · Dependencies Added · Database Changes · API Changes ·
 Environment Variables · วิธี Run · วิธี Test · Errors Found · Errors Fixed · Remaining Tasks
-แล้วอัปเดต [docs/02-step-progress.md](docs/02-step-progress.md) — **จากนั้นหยุด รอคำสั่ง STEP ถัดไป**
+**2. อัปเดต** [docs/02-step-progress.md](docs/02-step-progress.md) (+ CLAUDE.md ถ้ามีกฎใหม่)
+**3. commit & push ขึ้น GitHub** — ผู้ใช้สั่งไว้ว่า **ทุก STEP ที่เสร็จต้อง push ทุกครั้ง**
+
+```powershell
+# git อยู่ที่ C:\Program Files\Git\cmd (ไม่อยู่ใน PATH ของ shell ที่ Claude ใช้)
+$env:Path = "$env:Path;C:\Program Files\Git\cmd"
+git add -A
+# ข้อความ commit หลายบรรทัด (หรือมีภาษาไทย) ให้เขียนเป็นไฟล์แล้วใช้ -F
+[System.IO.File]::WriteAllText($msgPath, $message, (New-Object System.Text.UTF8Encoding($false)))
+git commit -F $msgPath
+git push
+```
+
+⚠️ **ห้ามส่งข้อความ commit ที่มี `"` ผ่าน `-m` หรือ here-string** — PowerShell 5.1 re-quote
+argument ของ native exe พลาด ทำให้ข้อความถูกตัดกลางแล้ว git อ่านส่วนที่เหลือเป็น pathspec
+(`error: pathspec '…' did not match any file(s)`) · ใช้ `git commit -F <ไฟล์>` เสมอเมื่อข้อความ
+มีหลายบรรทัด มีเครื่องหมายคำพูด หรือมีภาษาไทย (เจอจริงตอนปิด STEP 14)
+
+remote: `origin` → https://github.com/phasnaymaliwngkh-lang/Teenstyle003.git (branch `main`)
+
+**กฎของการ commit**
+
+1. **ตรวจก่อน commit ว่าไม่มี secret หลุด** — `git status` แล้วดูว่า `.env` / `frontend/.env.local`
+   ไม่อยู่ในรายการ (ทั้งคู่ถูก ignore อยู่แล้ว · ยืนยันด้วย `git check-ignore -v .env frontend/.env.local`)
+   ถ้าเพิ่ม env var ใหม่ ให้ใส่ **ชื่อ** ลง `.env.example` ห้ามใส่ค่าจริง
+2. **commit เฉพาะตอน typecheck / lint / test ผ่านหมดแล้ว** — ห้าม push โค้ดที่ build ไม่ผ่าน
+3. **หนึ่ง STEP = หนึ่ง commit** ข้อความขึ้นต้นด้วย `STEP <n>:` เพื่อให้ไล่ประวัติตาม Master Prompt ได้
+4. **ห้าม `push --force`** และห้าม commit ไฟล์ชั่วคราวที่สร้างไว้ตรวจงาน (`tmp-*`) — ลบก่อนเสมอ
+5. ถ้า push แล้วติดเรื่องยืนยันตัวตน ดูหัวข้อ git ในส่วน "ข้อควรระวังเรื่องเครื่องมือ" ด้านล่าง
+
+**จากนั้นหยุด รอคำสั่ง STEP ถัดไป**
 
 ## สภาพแวดล้อมจริงของเครื่องนี้ (สำคัญ — อย่าเดา)
 
@@ -634,7 +664,21 @@ POST /api/admin/products/:productId/variants · PATCH …/variants/:variantId
   - `HttpClientHandler` + `CookieContainer` ทำค่า cookie เพี้ยน เพราะ `Set-Cookie` มี comma ใน `Expires`
   - วิธีที่ใช้ได้: `HttpClientHandler` ที่ตั้ง `UseCookies = $false` แล้วส่ง header `Cookie` เองจากค่า
     `Set-Cookie` ที่ตัดเอาเฉพาะส่วนหน้า `;` (หรือใช้ `WebRequestSession` ให้ PowerShell จัดการทั้งหมด)
-- **ไม่มี git ในเครื่อง** — `git init` / commit ยังทำไม่ได้ จนกว่าจะติดตั้ง Git
+- **git ติดตั้งแล้ว** (2.55.0.3 ผ่าน winget) ที่ `C:\Program Files\Git\cmd` — แต่ **ไม่อยู่ใน PATH
+  ของ shell ที่ Claude ใช้** ต้องเติมเองทุกคำสั่ง: `$env:Path = "$env:Path;C:\Program Files\Git\cmd"`
+- **Claude push เองไม่ได้ถ้า credential หมดอายุ** — Git Credential Manager ต้องมี terminal
+  จริง ๆ แต่ shell ของ Claude เป็น non-interactive → ขึ้น
+  `fatal: Cannot prompt because user interactivity has been disabled`
+  วิธีที่ใช้ได้ (ทำสำเร็จตอน push ครั้งแรก): บังคับให้ GCM เปิดเบราว์เซอร์แล้วให้ผู้ใช้กด Authorize
+  ```powershell
+  $env:GIT_TERMINAL_PROMPT = "1"; $env:GCM_INTERACTIVE = "always"; $env:GCM_GUI_PROMPT = "1"
+  git -c credential.interactive=true -c credential.guiPrompt=true -c credential.gitHubAuthModes=browser push
+  ```
+  รันเป็น background task แล้วบอกผู้ใช้ให้มองหาหน้าต่างเบราว์เซอร์ (ชื่อ "ยืนยันการเข้าถึง")
+  ปกติ credential ถูกเก็บไว้แล้ว `git push` เฉย ๆ จึงผ่านเลย
+- **`.gitattributes` บังคับ `eol=lf` ทั้งโปรเจกต์** เพราะ Git for Windows ตั้ง `autocrlf=true`
+  ซึ่งจะแปลงไฟล์เป็น CRLF ตอน checkout แล้ว `prettier --check` ล้มในเครื่องอื่น
+  (`*.ps1` ยกเว้นเป็น CRLF เพราะ PowerShell 5.1)
 - npm 11 บล็อก install script โดยค่าเริ่มต้น (prisma, esbuild ฯลฯ) — ตรวจแล้วว่าไม่กระทบ
   เพราะ `schema-engine-windows.exe` และ `@esbuild/win32-x64` ถูกติดตั้งมาแล้ว
 - เลี่ยง `2>&1` กับ native exe ใน PowerShell 5.1 — จะขึ้น `NativeCommandError` ทั้งที่ exit code เป็น 0
