@@ -45,8 +45,61 @@ npm run db:migrate:deploy
 2. Build command: `npm run build:frontend`
 3. Environment variable:
    - `NEXT_PUBLIC_API_URL=https://<backend-domain>` ← **ต้องตั้งก่อน build** เพราะถูกฝังลง bundle
+   - **`NEXT_PUBLIC_API_PROXY_PATH=/backend`** ← **ห้ามลืม** อ่านเหตุผลที่หัวข้อถัดไป
    - `NEXT_PUBLIC_SITE_URL=https://<frontend-domain>`
    - `AUTH_SECRET`, `AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+
+### ⚠️ 3.1 cookie ข้ามโดเมน — เรื่องที่ทำงานได้บน dev แต่พังบน production
+
+**อาการถ้าพลาด:** เว็บเปิดได้ หน้าตาปกติ แต่ **เพิ่มลงตะกร้าไม่ได้ · สั่งซื้อไม่ได้ · จ่ายเงินไม่ได้ ·
+หลังบ้านแก้ข้อมูลอะไรไม่ได้เลย** (ทุกคำขอได้ 401) และหา error ไม่เจอในโค้ด
+
+**สาเหตุ:** 12 คอมโพเนนต์ยิง backend ตรงจากเบราว์เซอร์ด้วย `credentials: "include"`
+ตอน dev ใช้ได้เพราะ `localhost:3000` กับ `:4000` ถือเป็นโดเมนเดียวกัน (cookie ไม่แยกตาม port)
+แต่บน production ถ้าเป็น `xxx.vercel.app` กับ `yyy.railway.app` → Chrome/Safari
+**บล็อก third-party cookie** ทั้ง session cookie และ `cart-token` จึงไม่ถูกส่งไปเลย
+
+**วิธีแก้ (เลือกอย่างใดอย่างหนึ่ง)**
+
+| สถานการณ์            | วิธี                                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **ยังไม่มีโดเมน**    | ตั้ง `NEXT_PUBLIC_API_PROXY_PATH=/backend` → เบราว์เซอร์คุยกับโดเมน frontend เท่านั้น แล้ว Next rewrite ต่อไป backend ให้ |
+| **มีโดเมนของตัวเอง** | ใช้ `app.<domain>` + `api.<domain>` ซึ่งเป็น same-site อยู่แล้ว (ยังตั้ง proxy path ไว้ก็ได้ ไม่เสียหาย)                  |
+
+กลไก: [frontend/src/lib/api.ts](../frontend/src/lib/api.ts) เลือกฐาน URL ตามที่รัน —
+เบราว์เซอร์ใช้ path สัมพัทธ์ (`/backend/api/...`) ส่วน Server Component ใช้ URL เต็มยิงตรงไป backend
+(เร็วกว่าและไม่ต้องอ้อม) · rewrite ประกาศใน [frontend/next.config.ts](../frontend/next.config.ts)
+
+**ห้ามใช้ prefix `/api`** เพราะ Next เป็นเจ้าของ `/api/auth/*` (Auth.js) และ `/api/cart/merge` อยู่แล้ว
+ถ้าทับกันการล็อกอินจะพัง
+
+**ทดสอบก่อนเชื่อ** (ทำได้บนเครื่อง dev: ตั้ง `NEXT_PUBLIC_API_PROXY_PATH=/backend` แล้วรีสตาร์ต Next):
+
+```bash
+curl "http://localhost:3000/backend/api/products?limit=1"   # ต้องได้ข้อมูลสินค้า
+curl "http://localhost:3000/api/auth/providers"             # ต้องยังได้ config ของ Google (ไม่ถูก proxy ทับ)
+```
+
+### 3.2 ต้องรัน seed บน production ครั้งแรก
+
+**RBAC ทั้งหมดเก็บในฐานข้อมูล** (ตาราง `Role` ↔ `Permission`) ถ้าไม่ seed จะไม่มีบทบาทใด ๆ
+→ ล็อกอินได้แต่ **เข้า `/admin` ไม่ได้แม้แต่ตัวคุณเอง**
+
+```bash
+SEED_ADMIN_EMAIL=<อีเมล Google ของคุณ> npm run db:seed
+```
+
+seed เขียนแบบ upsert จึงรันซ้ำได้ · จะสร้างบัญชี `SUPER_ADMIN` ให้อีเมลนั้น
+และ**ไม่ใส่ชื่อ/รูปปลอม** เพื่อให้ข้อมูลจริงจาก Google เติมเข้ามาตอนล็อกอินครั้งแรก
+
+### 3.3 งานตามกำหนดเวลายังไม่มีคนสั่งให้รัน
+
+บน production **ยังไม่มีอะไรเรียก `expireOverdueOrders()`** → ออเดอร์ที่ลูกค้าไม่จ่าย
+จะ **จองสต็อกค้างไว้ตลอดไป** ทำให้ของขายไม่ได้ทั้งที่ยังอยู่ในคลัง
+(`runStockAlertScan()` ก็ตรวจเฉพาะตอนสต็อกขยับ)
+
+ทางออกชั่วคราวก่อนถึง STEP 52: ตั้ง cron ของ host ยิง endpoint ที่มีอยู่แล้ววันละครั้ง
+หรือใส่ `node-cron` ในตัว backend — **ข้อนี้ต้องแก้ก่อนเปิดร้านจริง ไม่ใช่เรื่องรอได้**
 
 ### 4. ค่าที่ต้องตั้งกับบริการภายนอก
 
@@ -65,6 +118,10 @@ npm run db:migrate:deploy
 - [ ] รหัส Postgres ไม่ใช่ค่า dev จาก `.env.example`
 - [ ] `CORS_ORIGIN` เจาะจง domain ไม่ใช่ `*`
 - [ ] HTTPS ทำงาน · cookie เป็น `secure` + `httpOnly` + `sameSite`
+- [ ] **ตั้ง `NEXT_PUBLIC_API_PROXY_PATH` แล้ว** และทดสอบเพิ่มลงตะกร้า + แก้ข้อมูลหลังบ้านบน production
+      ได้จริง (ดูหัวข้อ 3.1 — พลาดข้อนี้เว็บจะดูปกติแต่ใช้งานไม่ได้)
+- [ ] **รัน `npm run db:seed` แล้ว** และเข้า `/admin` ได้ (ดูหัวข้อ 3.2)
+- [ ] **มีคนสั่งให้ `expireOverdueOrders()` รันตามเวลาแล้ว** (ดูหัวข้อ 3.3)
 - [ ] rate limit เปิดอยู่ (STEP 28)
 - [ ] error 500 ไม่ส่ง stack trace ออกไป (ทำแล้วใน `errorHandler`)
 - [ ] ไม่มี raw card data ในระบบ

@@ -45,6 +45,31 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  /**
+   * ส่งต่อคำขอของ **เบราว์เซอร์** ไป backend ผ่านโดเมนของ frontend (STEP deploy)
+   *
+   * ทำไมต้องมี: ถ้าเบราว์เซอร์ยิงไป backend คนละโดเมนตรง ๆ Chrome/Safari จะบล็อก
+   * cookie แบบ third-party → ตะกร้า สั่งซื้อ จ่ายเงิน และทุกการแก้ข้อมูลหลังบ้านพังหมด
+   * เมื่อคำขอวิ่งผ่านโดเมนเดียวกัน cookie เป็น first-party จึงถูกส่งไปตามปกติ
+   *
+   * ⚠️ **ห้ามใช้ prefix `/api`** เพราะ Next เป็นเจ้าของ `/api/auth/*` (Auth.js)
+   *    และ `/api/cart/merge` อยู่แล้ว — ถ้าทับกัน การล็อกอินจะพัง
+   * ⚠️ ปิดอยู่โดยปริยาย (ไม่ตั้ง env = ไม่มี rewrite) ตอน dev จึงยิงตรงไป :4000 เหมือนเดิม
+   */
+  async rewrites() {
+    const prefix = process.env.NEXT_PUBLIC_API_PROXY_PATH;
+    const target = process.env.NEXT_PUBLIC_API_URL;
+
+    if (!prefix || !target) return [];
+
+    return [
+      {
+        source: `${prefix.replace(/\/$/, "")}/:path*`,
+        destination: `${target.replace(/\/$/, "")}/:path*`,
+      },
+    ];
+  },
+
   async headers() {
     return [
       {

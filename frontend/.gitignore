@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...แต่ไฟล์ตัวอย่างต้องขึ้น repo ไม่งั้นคนที่ clone ไปจะไม่รู้ว่าต้องตั้ง env อะไร
+# (.gitignore ในโฟลเดอร์นี้ทับกฎ !*.example ของ root จึงต้องยกเว้นซ้ำที่นี่)
+!.env*.example
 
 # vercel
 .vercel

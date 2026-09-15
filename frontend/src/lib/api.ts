@@ -36,6 +36,22 @@ export interface ApiRequestOptions extends Omit<RequestInit, "body"> {
  * - แปลง response ที่ไม่สำเร็จเป็น ApiClientError เสมอ เพื่อให้ทุกหน้าจัด error ได้แบบเดียวกัน
  * - มี timeout กัน request ค้าง
  */
+/**
+ * ฐานของ URL ที่จะใช้เรียก backend — **ต่างกันระหว่างเบราว์เซอร์กับ server**
+ *
+ * เบราว์เซอร์: ถ้าตั้ง `NEXT_PUBLIC_API_PROXY_PATH` ไว้ ให้ยิงไปโดเมนตัวเอง
+ *   (Next rewrite ต่อไป backend) → cookie เป็น first-party จึงไม่ถูกเบราว์เซอร์บล็อก
+ * server: ต้องเป็น URL เต็มเสมอ เพราะ `fetch` ของ Node แปลง path สัมพัทธ์ไม่ได้
+ *   (และการยิงตรงจาก server ไป backend เร็วกว่า ไม่ต้องอ้อมผ่าน proxy)
+ */
+function apiBase(): string {
+  if (typeof window !== "undefined" && publicEnv.apiProxyPath !== "") {
+    return publicEnv.apiProxyPath;
+  }
+
+  return publicEnv.apiUrl;
+}
+
 export async function apiFetch<TData>(
   path: string,
   options: ApiRequestOptions = {},
@@ -44,7 +60,7 @@ export async function apiFetch<TData>(
 
   const url = path.startsWith("http")
     ? path
-    : `${publicEnv.apiUrl}${path.startsWith("/") ? path : `/${path}`}`;
+    : `${apiBase()}${path.startsWith("/") ? path : `/${path}`}`;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
