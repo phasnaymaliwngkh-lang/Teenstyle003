@@ -1,0 +1,59 @@
+# ─── Dependencies ───────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+
+# ─── Environment / Secrets (ห้าม commit เด็ดขาด) ────────────────
+.env
+.env.*
+!.env.example
+!.env.local.example
+!*.example
+*.pem
+*.key
+
+# ─── Build output ───────────────────────────────────────────────
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# ─── Prisma generated client ────────────────────────────────────
+database/generated/
+**/.prisma/
+
+# ─── Test / coverage ────────────────────────────────────────────
+coverage/
+.nyc_output/
+
+# ─── Logs ───────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ─── Cache ──────────────────────────────────────────────────────
+.cache/
+.turbo/
+.eslintcache
+.vercel/
+
+# ─── Uploads / Backups (STEP 47, 50) ────────────────────────────
+uploads/
+backups/
+*.dump
+*.sql.gz
+
+# ─── OS / Editor ────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json

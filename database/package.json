@@ -1,0 +1,47 @@
+{
+  "name": "@teenstyle/database",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TEENSTYLE AI — Prisma schema, migrations, seed และ PrismaClient singleton",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/src/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "prisma"
+  ],
+  "scripts": {
+    "generate": "prisma generate",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "node scripts/check-connection.mjs",
+    "validate": "prisma validate",
+    "format": "prisma format",
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:status": "prisma migrate status",
+    "reset": "prisma migrate reset",
+    "seed": "prisma db seed",
+    "studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "@types/pg": "^8.23.1",
+    "dotenv": "^17.4.2",
+    "prisma": "7.10.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+
+    /* จำเป็นสำหรับ Prisma 7: generated client เป็น TypeScript ที่ import ด้วยนามสกุล .ts
+       - allowImportingTsExtensions  : ยอมให้ import "./x.ts"
+       - rewriteRelativeImportExtensions : ตอน emit จะเขียน .ts -> .js ให้อัตโนมัติ */
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+
+    "rootDir": ".",
+    "outDir": "dist",
+    "declaration": false,
+    "sourceMap": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "generated/**/*", "seed/**/*", "prisma.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}

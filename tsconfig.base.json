@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "TEENSTYLE AI — shared strict base",
+  "compilerOptions": {
+    /* Strict mode (UNIVERSAL RULE #7: TypeScript ต้อง Strict) */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "forceConsistentCasingInFileNames": true,
+    /* หมายเหตุ: ไม่เปิด exactOptionalPropertyTypes เพราะชนกับ type ของ React / Express libs บ่อย */
+
+    /* Interop */
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true
+  }
+}

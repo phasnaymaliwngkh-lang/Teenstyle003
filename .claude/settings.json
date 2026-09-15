@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(node --check script.js; if \\($?\\) { \"JS syntax OK\" }; \\(Get-Item index.html,style.css,script.js,CLAUDE.md,assets\\\\icons\\\\favicon.svg,assets\\\\images\\\\README.md | Select-Object Name, @{n='KB';e={[math]::Round\\($_.Length/1KB,1\\)}} | Format-Table -AutoSize | Out-String\\).Trim\\(\\))"
+    ]
+  }
+}

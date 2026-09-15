@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TeenStyle ✧ — Find Your Style, Be You 💜 | ร้านแฟชั่นวัยรุ่นพร้อม AI Stylist</title>
+<meta name="description" content="TEENSTYLE AI ร้านค้าออนไลน์แฟชั่นวัยรุ่น เสื้อผ้าหลากหลายสไตล์ พร้อม AI Stylist ช่วยแนะนำการแต่งตัวและ AI Customer Service ตอบทุกคำถาม ค้นหาสไตล์ที่ใช่สำหรับคุณ">
+<meta name="theme-color" content="#7C3AED">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="TeenStyle ✧ — Find Your Style, Be You 💜">
+<meta property="og:description" content="ค้นหาสไตล์ที่ใช่สำหรับคุณ พร้อมคำแนะนำแฟชั่นจาก AI">
+<meta property="og:locale" content="th_TH">
+
+<link rel="icon" type="image/svg+xml" href="assets/icons/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<a class="skip-link" href="#home">ข้ามไปที่เนื้อหาหลัก</a>
+
+<!-- ===== SVG sprite ===== -->
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20.3 4.6 13a4.8 4.8 0 0 1 6.8-6.8l.6.6.6-.6A4.8 4.8 0 0 1 19.4 13Z"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20a7.2 7.2 0 0 1 14.4 0"/></symbol>
+  <symbol id="i-cart" viewBox="0 0 24 24"><path d="M3 4h2.2l2.3 11.2h10.2L20 7.4H6"/><circle cx="9.5" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h13m-5-5 5 5-5 5"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12 20 4l-8 16-2-6z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4.8h6V7m-8 0 1 13h8l1-13"/></symbol>
+</svg>
+
+<!-- ===== NAVBAR ===== -->
+<header class="nav" id="nav">
+  <div class="nav__inner">
+    <a class="nav__logo" href="#home" aria-label="TeenStyle หน้าแรก">
+      TeenStyle <span class="nav__logo-mark">✧</span>
+    </a>
+
+    <nav class="nav__links" aria-label="เมนูหลัก">
+      <a class="nav__link is-active" href="#home">Home</a>
+      <a class="nav__link" href="#shop">Shop</a>
+      <a class="nav__link" href="#looks">Looks</a>
+      <a class="nav__link" href="#services">AI Stylist</a>
+      <a class="nav__link" href="#about">About</a>
+    </nav>
+
+    <div class="nav__actions">
+      <button class="icon-btn" type="button" data-open="search" aria-label="ค้นหาสินค้า">
+        <svg class="icon"><use href="#i-search"></use></svg>
+      </button>
+      <button class="icon-btn" type="button" data-open="wishlist" aria-label="รายการที่ถูกใจ">
+        <svg class="icon"><use href="#i-heart"></use></svg>
+        <span class="badge" data-badge="wishlist" hidden>0</span>
+      </button>
+      <button class="icon-btn icon-btn--hide-sm" type="button" data-open="account" aria-label="บัญชีของฉัน">
+        <svg class="icon"><use href="#i-user"></use></svg>
+      </button>
+      <button class="icon-btn" type="button" data-open="cart" aria-label="ตะกร้าสินค้า">
+        <svg class="icon"><use href="#i-cart"></use></svg>
+        <span class="badge" data-badge="cart" hidden>0</span>
+      </button>
+      <button class="icon-btn nav__burger" type="button" data-open="menu" aria-label="เปิดเมนู" aria-expanded="false">
+        <svg class="icon"><use href="#i-menu"></use></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ===== 1. HERO ===== -->
+<section class="hero" id="home">
+  <div class="hero__glow" aria-hidden="true"></div>
+  <div class="container hero__inner">
+
+    <div class="hero__copy">
+      <span class="pill-tag reveal">✨ AI Fashion Assistant สำหรับวัยรุ่น</span>
+      <h1 class="hero__title reveal">Find Your Style,<br>Be You <span class="hero__emoji">💜</span></h1>
+      <p class="hero__sub reveal">ค้นหาสไตล์ที่ใช่สำหรับคุณ พร้อมคำแนะนำแฟชั่นจาก AI</p>
+
+      <div class="hero__cta reveal">
+        <a class="btn btn--primary btn--lg" href="#shop">Shop Now</a>
+        <button class="btn btn--ghost btn--lg" type="button" data-ai="stylist">
+          Try AI Stylist <span aria-hidden="true">✧</span>
+        </button>
+      </div>
+
+      <ul class="hero__trust reveal">
+        <li><strong>4.9</strong><span>★ คะแนนรีวิว</span></li>
+        <li><strong>12,000+</strong><span>ออเดอร์ที่ส่งแล้ว</span></li>
+        <li><strong>ส่งฟรี</strong><span>เมื่อซื้อครบ 690.-</span></li>
+      </ul>
+    </div>
+
+    <div class="hero__visual reveal">
+      <div class="hero__frame hero__frame--main">
+        <img src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=800&q=80&auto=format&fit=crop"
+             alt="วัยรุ่นแต่งตัวสไตล์แฟชั่นถือถุงช้อปปิ้ง" width="800" height="1000"
+             fetchpriority="high" data-fallback="Style">
+      </div>
+      <div class="hero__frame hero__frame--sub">
+        <img src="https://images.unsplash.com/photo-1492707892479-7bc8d5a4ee93?w=600&q=80&auto=format&fit=crop"
+             alt="ผู้หญิงวัยรุ่นใส่แจ็คเก็ตยีนส์สไตล์สตรีท" width="600" height="700"
+             loading="lazy" data-fallback="Look">
+      </div>
+
+      <div class="float-card float-card--ai">
+        <span class="float-card__avatar">✧</span>
+        <div>
+          <strong>AI Stylist</strong>
+          <p>กำลังจัดลุคให้คุณ<span class="dots"><i></i><i></i><i></i></span></p>
+        </div>
+      </div>
+
+      <div class="float-card float-card--rate">
+        <span class="stars" aria-hidden="true">★★★★★</span>
+        <p><strong>ตรงสไตล์มาก!</strong><br>แนะนำได้ดีจริง ๆ</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===== 2. PROBLEMS ===== -->
+<section class="section section--soft" id="problems">
+  <div class="container">
+    <header class="section__head reveal">
+      <span class="eyebrow">ปัญหาที่เจอบ่อย</span>
+      <h2 class="section__title">เลือกเสื้อผ้าทีไร ก็ยืนงงหน้าตู้ทุกที?</h2>
+      <p class="section__sub">ถ้าคุณเคยเจอข้อใดข้อหนึ่งนี้ — TeenStyle AI ออกแบบมาเพื่อคุณเลย</p>
+    </header>
+
+    <div class="grid grid-3 problems">
+      <article class="card problem reveal">
+        <span class="problem__icon">🤔</span>
+        <h3>ไม่รู้ว่าตัวเองเหมาะกับสไตล์ไหน</h3>
+        <p>อยากลองหลายแนว แต่ไม่แน่ใจว่าแบบไหนคือตัวเราจริง ๆ</p>
+      </article>
+      <article class="card problem reveal">
+        <span class="problem__icon">🧩</span>
+        <h3>จับคู่เสื้อผ้าให้เข้ากันยาก</h3>
+        <p>มีเสื้อผ้าอยู่เยอะ แต่มิกซ์แอนด์แมตช์ออกมาแล้วไม่ปิ๊ง</p>
+      </article>
+      <article class="card problem reveal">
+        <span class="problem__icon">🌀</span>
+        <h3>สินค้าเยอะจนตัดสินใจไม่ถูก</h3>
+        <p>เลื่อนดูเป็นชั่วโมง สุดท้ายก็ยังไม่ได้กดสั่งอะไรเลย</p>
+      </article>
+      <article class="card problem reveal">
+        <span class="problem__icon">📅</span>
+        <h3>ไม่ชัวร์ว่าใส่ไปงานนี้ได้ไหม</h3>
+        <p>ไปเรียน ไปเดท ไปปาร์ตี้ ควรใส่แบบไหนถึงจะพอดี ไม่มากไม่น้อย</p>
+      </article>
+      <article class="card problem reveal">
+        <span class="problem__icon">⏱️</span>
+        <h3>อยากได้คำแนะนำที่เร็วและเข้าใจง่าย</h3>
+        <p>ไม่อยากอ่านบทความยาว ๆ ขอคำตอบที่ใช้ได้ทันทีดีกว่า</p>
+      </article>
+      <article class="card problem problem--answer reveal">
+        <span class="problem__icon">💜</span>
+        <h3>ให้ AI ช่วยคิดแทน</h3>
+        <p>ตอบไม่กี่คำถาม แล้วรับลุคที่เหมาะกับคุณได้เลย</p>
+        <button class="link-btn" type="button" data-ai="stylist">
+          เริ่มใช้ AI Stylist <svg class="icon icon--xs"><use href="#i-arrow"></use></svg>
+        </button>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 3. FEATURES ===== -->
+<section class="section" id="features">
+  <div class="container">
+    <header class="section__head reveal">
+      <span class="eyebrow">จุดเด่นของเรา</span>
+      <h2 class="section__title">ทุกอย่างที่ช่วยให้การช้อปสนุกขึ้น</h2>
+      <p class="section__sub">ร้านแฟชั่นวัยรุ่นที่รวมทุกฟีเจอร์ไว้ในที่เดียว</p>
+    </header>
+
+    <div class="grid grid-3">
+      <article class="card feature reveal">
+        <span class="feature__icon">🛍️</span>
+        <h3>Fashion Store สำหรับวัยรุ่น</h3>
+        <p>คัดเสื้อผ้าและแอคเซสซอรี่ที่วัยรุ่นใส่จริง อัปเดตตามเทรนด์ทุกสัปดาห์</p>
+      </article>
+      <article class="card feature feature--hl reveal">
+        <span class="feature__icon">✧</span>
+        <h3>AI Stylist</h3>
+        <p>บอกสไตล์ สี โอกาส และงบ แล้ว AI จัดลุคให้ครบเซ็ตในไม่กี่วินาที</p>
+      </article>
+      <article class="card feature reveal">
+        <span class="feature__icon">💬</span>
+        <h3>AI Customer Service</h3>
+        <p>ถามเรื่องสินค้า การสั่งซื้อ ชำระเงิน จัดส่ง คืนสินค้า ได้ตลอด 24 ชม.</p>
+      </article>
+      <article class="card feature reveal">
+        <span class="feature__icon">🎯</span>
+        <h3>AI Recommendation</h3>
+        <p>ยิ่งใช้ ยิ่งแม่น ระบบเรียนรู้ความชอบแล้วแนะนำสินค้าและ Look ที่ใช่</p>
+      </article>
+      <article class="card feature reveal">
+        <span class="feature__icon">🎨</span>
+        <h3>สินค้าหลากหลายสไตล์</h3>
+        <p>Street, Minimal, Y2K, Korean, Sporty, Cute — เลือกได้ตามมู้ดของวันนั้น</p>
+      </article>
+      <article class="card feature reveal">
+        <span class="feature__icon">💖</span>
+        <h3>Wishlist</h3>
+        <p>เก็บสิ่งที่ถูกใจไว้ก่อน แล้วกลับมาตัดสินใจทีหลังได้ ไม่มีหลุด</p>
+      </article>
+      <article class="card feature reveal">
+        <span class="feature__icon">🎁</span>
+        <h3>โปรโมชั่นและคูปอง</h3>
+        <p>ดีลใหม่ทุกเดือน พร้อมโค้ดส่วนลดสำหรับสมาชิกและลูกค้าใหม่</p>
+      </article>
+      <article class="card feature reveal">
+        <span class="feature__icon">⭐</span>
+        <h3>สมาชิกและ Loyalty Points</h3>
+        <p>ทุกการสั่งซื้อสะสมแต้ม แลกเป็นส่วนลดในออเดอร์ถัดไปได้เลย</p>
+      </article>
+      <article class="card feature reveal">
+        <span class="feature__icon">🚚</span>
+        <h3>ระบบติดตามคำสั่งซื้อ</h3>
+        <p>รู้ทุกสถานะตั้งแต่ยืนยันออเดอร์ แพ็กของ จนถึงพัสดุถึงหน้าบ้าน</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 4. SERVICES ===== -->
+<section class="section section--soft" id="services">
+  <div class="container">
+    <header class="section__head reveal">
+      <span class="eyebrow">บริการของเรา</span>
+      <h2 class="section__title">5 บริการหลักของ TeenStyle AI</h2>
+      <p class="section__sub">ตั้งแต่เลือกของ จนถึงพัสดุถึงมือคุณ</p>
+    </header>
+
+    <!-- Fashion Store -->
+    <div class="service reveal">
+      <div class="service__text">
+        <span class="service__no">บริการที่ 01</span>
+        <h3>Fashion Store</h3>
+        <p>เลือกซื้อเสื้อผ้าแฟชั่นผ่านระบบออนไลน์ได้ทุกที่ทุกเวลา ดูรายละเอียดสินค้า ไซซ์ สี และรีวิวจริงก่อนตัดสินใจ</p>
+        <ul class="ticks">
+          <li>เสื้อผ้าและแอคเซสซอรี่ครบทุกหมวด</li>
+          <li>ตารางไซซ์ชัดเจน ลดปัญหาสั่งผิดไซซ์</li>
+          <li>กรองสินค้าตามสไตล์ สี และราคาได้</li>
+        </ul>
+        <a class="btn btn--primary" href="#shop">ดูสินค้าทั้งหมด</a>
+      </div>
+      <div class="service__visual">
+        <div class="mock mock--store">
+          <div class="mock__bar"><span></span><span></span><span></span></div>
+          <div class="mock__chips"><b>ทั้งหมด</b><span>Street</span><span>Minimal</span><span>Y2K</span></div>
+          <div class="mock__grid">
+            <div class="mock__item"><i>👕</i><b>390.-</b></div>
+            <div class="mock__item"><i>👖</i><b>890.-</b></div>
+            <div class="mock__item"><i>👗</i><b>990.-</b></div>
+            <div class="mock__item"><i>🧥</i><b>1,290.-</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Stylist -->
+    <div class="service service--flip reveal">
+      <div class="service__text">
+        <span class="service__no">บริการที่ 02</span>
+        <h3>AI Stylist</h3>
+        <p>ตอบคำถามสั้น ๆ เกี่ยวกับสไตล์ สี โอกาสใช้งาน งบประมาณ และประเภทเสื้อผ้า แล้ว AI จะช่วยคัดสินค้าและจัดลุคที่เหมาะกับคุณที่สุด</p>
+        <ul class="ticks">
+          <li>แนะนำเป็นลุคครบเซ็ต ไม่ใช่แค่ชิ้นเดียว</li>
+          <li>เลือกตามงบที่ตั้งไว้ ไม่บานปลาย</li>
+          <li>เพิ่มลงตะกร้าจากคำแนะนำได้ทันที</li>
+        </ul>
+        <button class="btn btn--primary" type="button" data-ai="stylist">Try AI Stylist ✧</button>
+      </div>
+      <div class="service__visual">
+        <div class="mock mock--chat">
+          <div class="mock__chat-head"><span class="mock__avatar">✧</span><b>AI Stylist</b><em>ออนไลน์</em></div>
+          <div class="bubble bubble--ai">ชอบสไตล์ไหนมากที่สุดคะ 💜</div>
+          <div class="bubble bubble--me">Minimal</div>
+          <div class="bubble bubble--ai">ใส่ไปโอกาสอะไรดี?</div>
+          <div class="bubble bubble--me">ไปเดท</div>
+          <div class="bubble bubble--ai">จัดลุคนี้ให้เลย — เดรสสายเดี่ยวซาติน + สนีกเกอร์ชังกี้ ✨</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Customer Service -->
+    <div class="service reveal">
+      <div class="service__text">
+        <span class="service__no">บริการที่ 03</span>
+        <h3>AI Customer Service</h3>
+        <p>ช่วยตอบคำถามเกี่ยวกับสินค้า คำสั่งซื้อ การชำระเงิน การจัดส่ง และนโยบายของร้าน ถ้าเรื่องไหนต้องใช้คน ระบบจะส่งต่อให้เจ้าหน้าที่ทันที</p>
+        <ul class="ticks">
+          <li>ตอบไว ตลอด 24 ชั่วโมง</li>
+          <li>เช็คสถานะพัสดุและเงื่อนไขการคืนสินค้าได้</li>
+          <li>ส่งต่อเจ้าหน้าที่เมื่อจำเป็น</li>
+        </ul>
+        <button class="btn btn--ghost" type="button" data-ai="support">ถาม AI Customer Service</button>
+      </div>
+      <div class="service__visual">
+        <div class="mock mock--chat">
+          <div class="mock__chat-head"><span class="mock__avatar">💬</span><b>Customer Service</b><em>ตอบใน 1 วินาที</em></div>
+          <div class="bubble bubble--me">ส่งของกี่วันถึงคะ</div>
+          <div class="bubble bubble--ai">กรุงเทพฯ 1–2 วัน ต่างจังหวัด 2–4 วันทำการค่ะ 🚚</div>
+          <div class="bubble bubble--me">คืนสินค้าได้ไหม</div>
+          <div class="bubble bubble--ai">คืนได้ภายใน 7 วัน ตามเงื่อนไขของร้านค่ะ</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Recommendation -->
+    <div class="service service--flip reveal">
+      <div class="service__text">
+        <span class="service__no">บริการที่ 04</span>
+        <h3>AI Recommendation</h3>
+        <p>แนะนำสินค้าและ Look ที่เหมาะกับความสนใจของคุณ จากสไตล์ที่คุณกดดู กดถูกใจ และเคยสั่งซื้อ</p>
+        <ul class="ticks">
+          <li>แนะนำสินค้าใกล้เคียงจากสิ่งที่คุณชอบ</li>
+          <li>เสนอชิ้นที่ใส่เข้ากับของในตะกร้า</li>
+          <li>อัปเดตคำแนะนำใหม่ทุกครั้งที่เข้าเว็บ</li>
+        </ul>
+      </div>
+      <div class="service__visual">
+        <div class="mock mock--reco">
+          <p class="mock__reco-title">เพราะคุณชอบ <b>Street Style</b></p>
+          <div class="mock__reco-row">
+            <div class="mock__reco-item"><i>🧢</i><span>Bucket Hat</span><b>290.-</b></div>
+            <div class="mock__reco-item"><i>👟</i><span>Chunky Sneakers</span><b>1,490.-</b></div>
+          </div>
+          <p class="mock__reco-title">Look ที่น่าจะถูกใจ</p>
+          <div class="mock__reco-row">
+            <div class="mock__reco-item"><i>🔥</i><span>Y2K Party</span><b>3 ชิ้น</b></div>
+            <div class="mock__reco-item"><i>🎒</i><span>Campus Day</span><b>4 ชิ้น</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order & Shipping -->
+    <div class="service reveal">
+      <div class="service__text">
+        <span class="service__no">บริการที่ 05</span>
+        <h3>Order &amp; Shipping</h3>
+        <p>รองรับการสั่งซื้อ การชำระเงินหลายช่องทาง และติดตามสถานะการจัดส่งได้ทุกขั้นตอนจนพัสดุถึงหน้าบ้าน</p>
+        <ul class="ticks">
+          <li>ชำระเงินผ่านโอน พร้อมเพย์ บัตรเครดิต และปลายทาง</li>
+          <li>แจ้งเลขพัสดุอัตโนมัติทันทีที่ส่งของ</li>
+          <li>ส่งฟรีเมื่อสั่งครบ 690 บาท</li>
+        </ul>
+      </div>
+      <div class="service__visual">
+        <div class="mock mock--track">
+          <p class="mock__track-id">ออเดอร์ <b>#TS-24081</b></p>
+          <ol class="track">
+            <li class="is-done"><span>ยืนยันคำสั่งซื้อ</span><em>09:12</em></li>
+            <li class="is-done"><span>ชำระเงินสำเร็จ</span><em>09:15</em></li>
+            <li class="is-done"><span>แพ็กสินค้าเรียบร้อย</span><em>14:30</em></li>
+            <li class="is-now"><span>กำลังจัดส่ง</span><em>วันนี้</em></li>
+            <li><span>ถึงหน้าบ้าน</span><em>พรุ่งนี้</em></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ===== 5. HOW IT WORKS ===== -->
+<section class="section" id="how">
+  <div class="container">
+    <header class="section__head reveal">
+      <span class="eyebrow">ขั้นตอนการใช้งาน</span>
+      <h2 class="section__title">ใช้งานง่ายใน 5 ขั้นตอน</h2>
+      <p class="section__sub">จากไม่รู้จะใส่อะไร กลายเป็นลุคที่พร้อมใส่ออกจากบ้าน</p>
+    </header>
+
+    <ol class="steps">
+      <li class="step reveal">
+        <span class="step__no">1</span>
+        <h3>ค้นหาสไตล์</h3>
+        <p>เลือกดูเสื้อผ้าและสไตล์ที่คุณสนใจจากหน้าร้าน</p>
+      </li>
+      <li class="step reveal">
+        <span class="step__no">2</span>
+        <h3>บอกความต้องการ</h3>
+        <p>ระบุสไตล์ สี งบประมาณ และโอกาสใช้งานที่ต้องการ</p>
+      </li>
+      <li class="step reveal">
+        <span class="step__no">3</span>
+        <h3>ให้ AI ช่วยแนะนำ</h3>
+        <p>AI Stylist วิเคราะห์ความต้องการและค้นหาสินค้าที่เหมาะสม</p>
+      </li>
+      <li class="step reveal">
+        <span class="step__no">4</span>
+        <h3>เลือกสินค้า</h3>
+        <p>ดูรายละเอียดสินค้า เลือกไซซ์ สี และจำนวนที่ต้องการ</p>
+      </li>
+      <li class="step reveal">
+        <span class="step__no">5</span>
+        <h3>สั่งซื้อ</h3>
+        <p>เพิ่มลงตะกร้าและดำเนินการชำระเงินได้ทันที</p>
+      </li>
+    </ol>
+
+    <div class="how__cta reveal">
+      <button class="btn btn--primary btn--lg" type="button" data-ai="stylist">ลองใช้ AI Stylist ฟรี</button>
+      <span class="how__note">ไม่ต้องสมัครสมาชิก ใช้ได้เลย</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 6. SHOP ===== -->
+<section class="section section--soft" id="shop">
+  <div class="container">
+    <header class="section__head reveal">
+      <span class="eyebrow">สินค้าขายดี</span>
+      <h2 class="section__title">Best Sellers &amp; สินค้าแนะนำ</h2>
+      <p class="section__sub">คัดมาแล้วว่าวัยรุ่นชอบที่สุดในเดือนนี้</p>
+    </header>
+
+    <div class="promo-bar reveal">
+      <span class="promo-bar__tag">🎁 โปรโมชั่นเดือนนี้</span>
+      <p>ลดเพิ่ม 15% เมื่อซื้อครบ 2 ชิ้น ใส่โค้ด <b>TEEN15</b> · ส่งฟรีเมื่อครบ 690.-</p>
+    </div>
+
+    <div class="filters reveal" role="group" aria-label="กรองสินค้าตามสไตล์">
+      <button class="chip is-active" type="button" data-filter="all">ทั้งหมด</button>
+      <button class="chip" type="button" data-filter="street">Street</button>
+      <button class="chip" type="button" data-filter="minimal">Minimal</button>
+      <button class="chip" type="button" data-filter="y2k">Y2K</button>
+      <button class="chip" type="button" data-filter="korean">Korean</button>
+      <button class="chip" type="button" data-filter="sporty">Sporty</button>
+      <button class="chip" type="button" data-filter="cute">Cute</button>
+    </div>
+
+    <div class="grid grid-4" id="productGrid" aria-live="polite"></div>
+    <p class="empty" id="productEmpty" hidden>ยังไม่มีสินค้าในสไตล์นี้ ลองเลือกสไตล์อื่นดูนะ 💜</p>
+  </div>
+</section>
+
+<!-- ===== 7. LOOKS ===== -->
+<section class="section" id="looks">
+  <div class="container">
+    <header class="section__head reveal">
+      <span class="eyebrow">Popular Looks</span>
+      <h2 class="section__title">Look ที่ได้รับความนิยม</h2>
+      <p class="section__sub">ลุคที่ AI จัดไว้แล้ว พร้อมใส่ตามได้ทันที</p>
+    </header>
+
+    <div class="grid grid-4 looks">
+      <article class="look reveal">
+        <div class="look__img">
+          <img src="https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=600&q=80&auto=format&fit=crop"
+               alt="ลุคสตรีทแคชวลสำหรับไปเรียน" width="600" height="760" loading="lazy" data-fallback="Campus">
+          <span class="look__badge">🔥 ฮิตสุด</span>
+        </div>
+        <div class="look__body">
+          <h3>Campus Day</h3>
+          <p class="look__meta">Street · ไปเรียน · 3 ชิ้น</p>
+          <div class="look__tags"><span>Oversize Tee</span><span>Baggy Jeans</span><span>Bucket Hat</span></div>
+          <button class="link-btn" type="button" data-ai="stylist">ดูลุคนี้ <svg class="icon icon--xs"><use href="#i-arrow"></use></svg></button>
+        </div>
+      </article>
+
+      <article class="look reveal">
+        <div class="look__img">
+          <img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&q=80&auto=format&fit=crop"
+               alt="ลุคเกาหลีน่ารักสำหรับไปเดท" width="600" height="760" loading="lazy" data-fallback="Sweet">
+          <span class="look__badge">💜 มาใหม่</span>
+        </div>
+        <div class="look__body">
+          <h3>Sweet Date</h3>
+          <p class="look__meta">Korean · ไปเดท · 3 ชิ้น</p>
+          <div class="look__tags"><span>Crop Knit</span><span>Mini Skirt</span><span>Sneakers</span></div>
+          <button class="link-btn" type="button" data-ai="stylist">ดูลุคนี้ <svg class="icon icon--xs"><use href="#i-arrow"></use></svg></button>
+        </div>
+      </article>
+
+      <article class="look reveal">
+        <div class="look__img">
+          <img src="https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=600&q=80&auto=format&fit=crop"
+               alt="ลุค Y2K สำหรับไปปาร์ตี้กลางคืน" width="600" height="760" loading="lazy" data-fallback="Party">
+          <span class="look__badge">✨ ปาร์ตี้</span>
+        </div>
+        <div class="look__body">
+          <h3>Y2K Party</h3>
+          <p class="look__meta">Y2K · ปาร์ตี้ · 3 ชิ้น</p>
+          <div class="look__tags"><span>Mesh Top</span><span>Slip Dress</span><span>Chunky Sneakers</span></div>
+          <button class="link-btn" type="button" data-ai="stylist">ดูลุคนี้ <svg class="icon icon--xs"><use href="#i-arrow"></use></svg></button>
+        </div>
+      </article>
+
+      <article class="look reveal">
+        <div class="look__img">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=600&q=80&auto=format&fit=crop"
+               alt="ลุคมินิมอลเรียบหรูใส่ได้ทุกวัน" width="600" height="760" loading="lazy" data-fallback="Minimal">
+          <span class="look__badge">🤍 มินิมอล</span>
+        </div>
+        <div class="look__body">
+          <h3>Clean Minimal</h3>
+          <p class="look__meta">Minimal · ทุกวัน · 3 ชิ้น</p>
+          <div class="look__tags"><span>Shirt Dress</span><span>Cotton Tee</span><span>Cargo Pants</span></div>
+          <button class="link-btn" type="button" data-ai="stylist">ดูลุคนี้ <svg class="icon icon--xs"><use href="#i-arrow"></use></svg></button>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ===== 8. REVIEWS ===== -->
+<section class="section section--soft" id="reviews">
+  <div class="container">
+    <header class="section__head reveal">
+      <span class="eyebrow">รีวิวจากลูกค้า</span>
+      <h2 class="section__title">วัยรุ่นกว่า 12,000 คนใช้แล้วบอกว่า…</h2>
+    </header>
+
+    <div class="stats reveal">
+      <div class="stat"><b>4.9<span>/5</span></b><p>คะแนนรีวิวเฉลี่ย</p></div>
+      <div class="stat"><b>12,000+</b><p>ออเดอร์ที่ส่งแล้ว</p></div>
+      <div class="stat"><b>98%</b><p>ลูกค้าแนะนำต่อ</p></div>
+      <div class="stat"><b>24 ชม.</b><p>AI พร้อมตอบทุกคำถาม</p></div>
+    </div>
+
+    <div class="grid grid-3">
+      <article class="card review reveal">
+        <span class="stars" aria-label="5 จาก 5 ดาว">★★★★★</span>
+        <blockquote>"เลือกชุดง่ายขึ้นมาก เพราะ AI ช่วยแนะนำได้ตรงสไตล์"</blockquote>
+        <footer class="review__who">
+          <span class="avatar">ม</span>
+          <div><strong>มายด์</strong><small>นักศึกษา · ซื้อแล้ว 6 ครั้ง</small></div>
+        </footer>
+      </article>
+      <article class="card review reveal">
+        <span class="stars" aria-label="5 จาก 5 ดาว">★★★★★</span>
+        <blockquote>"เว็บไซต์ใช้งานง่ายและมีเสื้อผ้าให้เลือกหลายแบบ"</blockquote>
+        <footer class="review__who">
+          <span class="avatar">ป</span>
+          <div><strong>ปาล์ม</strong><small>ม.6 · ซื้อแล้ว 3 ครั้ง</small></div>
+        </footer>
+      </article>
+      <article class="card review reveal">
+        <span class="stars" aria-label="5 จาก 5 ดาว">★★★★★</span>
+        <blockquote>"ชอบระบบแนะนำ Look เพราะช่วยคิดชุดได้เร็วขึ้น"</blockquote>
+        <footer class="review__who">
+          <span class="avatar">น</span>
+          <div><strong>เนย</strong><small>First Jobber · ซื้อแล้ว 9 ครั้ง</small></div>
+        </footer>
+      </article>
+    </div>
+
+    <div class="gallery reveal">
+      <img src="https://images.unsplash.com/photo-1445205170230-053b83016050?w=500&q=80&auto=format&fit=crop"
+           alt="กลุ่มวัยรุ่นแต่งตัวสไตล์แฟชั่นถ่ายรูปด้วยกัน" width="500" height="500" loading="lazy" data-fallback="Crew">
+      <img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500&q=80&auto=format&fit=crop"
+           alt="บรรยากาศร้านเสื้อผ้าแฟชั่น" width="500" height="500" loading="lazy" data-fallback="Store">
+      <img src="https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=500&q=80&auto=format&fit=crop"
+           alt="เสื้อยืดหลายสีวางเรียงกัน" width="500" height="500" loading="lazy" data-fallback="Tees">
+      <img src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=500&q=80&auto=format&fit=crop"
+           alt="นางแบบสองคนในลุคแฟชั่นทันสมัย" width="500" height="500" loading="lazy" data-fallback="Look">
+    </div>
+  </div>
+</section>
+
+<!-- ===== 9. FAQ ===== -->
+<section class="section" id="faq">
+  <div class="container container--narrow">
+    <header class="section__head reveal">
+      <span class="eyebrow">FAQ</span>
+      <h2 class="section__title">คำถามที่พบบ่อย</h2>
+      <p class="section__sub">ไม่เจอคำตอบที่ต้องการ? ถาม AI Customer Service ได้เลย</p>
+    </header>
+
+    <div class="faq reveal">
+      <div class="faq__item">
+        <button class="faq__q" type="button" aria-expanded="false" aria-controls="faq1" id="faq1-btn">
+          <span>AI Stylist คืออะไร?</span>
+          <svg class="icon faq__chev"><use href="#i-chevron"></use></svg>
+        </button>
+        <div class="faq__a" id="faq1" role="region" aria-labelledby="faq1-btn" hidden>
+          <p>ระบบ AI ที่ช่วยแนะนำเสื้อผ้าและการแต่งตัวตามความต้องการของผู้ใช้ โดยถามข้อมูลสั้น ๆ เช่น สไตล์ที่ชอบ สี โอกาสใช้งาน และงบประมาณ แล้วคัดสินค้ากับจัดลุคที่เหมาะกับคุณให้</p>
+        </div>
+      </div>
+
+      <div class="faq__item">
+        <button class="faq__q" type="button" aria-expanded="false" aria-controls="faq2" id="faq2-btn">
+          <span>สามารถเลือกไซซ์และสีสินค้าได้หรือไม่?</span>
+          <svg class="icon faq__chev"><use href="#i-chevron"></use></svg>
+        </button>
+        <div class="faq__a" id="faq2" role="region" aria-labelledby="faq2-btn" hidden>
+          <p>สามารถเลือกไซซ์และสีที่มีอยู่ในระบบได้ ในหน้าสินค้าจะแสดงไซซ์และสีที่พร้อมส่ง พร้อมตารางไซซ์ให้เทียบก่อนสั่งซื้อ</p>
+        </div>
+      </div>
+
+      <div class="faq__item">
+        <button class="faq__q" type="button" aria-expanded="false" aria-controls="faq3" id="faq3-btn">
+          <span>สามารถติดตามคำสั่งซื้อได้หรือไม่?</span>
+          <svg class="icon faq__chev"><use href="#i-chevron"></use></svg>
+        </button>
+        <div class="faq__a" id="faq3" role="region" aria-labelledby="faq3-btn" hidden>
+          <p>สามารถติดตามสถานะคำสั่งซื้อและข้อมูลการจัดส่งได้ ตั้งแต่ยืนยันออเดอร์ ชำระเงิน แพ็กสินค้า จนถึงสถานะพัสดุระหว่างจัดส่ง</p>
+        </div>
+      </div>
+
+      <div class="faq__item">
+        <button class="faq__q" type="button" aria-expanded="false" aria-controls="faq4" id="faq4-btn">
+          <span>สามารถคืนสินค้าได้หรือไม่?</span>
+          <svg class="icon faq__chev"><use href="#i-chevron"></use></svg>
+        </button>
+        <div class="faq__a" id="faq4" role="region" aria-labelledby="faq4-btn" hidden>
+          <p>สามารถส่งคำขอคืนสินค้าตามเงื่อนไขและนโยบายของร้าน โดยสินค้าต้องอยู่ในสภาพสมบูรณ์และยังไม่ผ่านการใช้งาน ระบบจะแจ้งขั้นตอนถัดไปให้ทราบ</p>
+        </div>
+      </div>
+
+      <div class="faq__item">
+        <button class="faq__q" type="button" aria-expanded="false" aria-controls="faq5" id="faq5-btn">
+          <span>สามารถติดต่อเจ้าหน้าที่ได้หรือไม่?</span>
+          <svg class="icon faq__chev"><use href="#i-chevron"></use></svg>
+        </button>
+        <div class="faq__a" id="faq5" role="region" aria-labelledby="faq5-btn" hidden>
+          <p>สามารถใช้ AI Customer Service ได้ตลอด 24 ชั่วโมง และระบบจะส่งต่อให้เจ้าหน้าที่เมื่อจำเป็น เช่น กรณีที่ต้องตรวจสอบข้อมูลเฉพาะของคำสั่งซื้อ</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="faq__more reveal">
+      ยังมีคำถามอยู่?
+      <button class="link-btn" type="button" data-ai="support">คุยกับ AI Customer Service <svg class="icon icon--xs"><use href="#i-arrow"></use></svg></button>
+    </p>
+  </div>
+</section>
+
+<!-- ===== 10. CTA ===== -->
+<section class="cta" id="cta">
+  <div class="container cta__inner reveal">
+    <span class="cta__spark" aria-hidden="true">✧</span>
+    <h2>พร้อมค้นหาสไตล์ของคุณแล้วหรือยัง?</h2>
+    <p>ให้ TeenStyle AI ช่วยคุณค้นหาสไตล์ที่ใช่</p>
+    <div class="cta__btns">
+      <a class="btn btn--white btn--lg" href="#shop">Shop Now</a>
+      <button class="btn btn--outline-white btn--lg" type="button" data-ai="stylist">Try AI Stylist</button>
+    </div>
+    <p class="cta__note">ใช้งานฟรี · ไม่ต้องสมัครสมาชิก · ส่งฟรีเมื่อครบ 690.-</p>
+  </div>
+</section>
+
+</main>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer" id="about">
+  <div class="container footer__top">
+    <div class="footer__brand">
+      <a class="nav__logo nav__logo--footer" href="#home">TeenStyle <span class="nav__logo-mark">✧</span></a>
+      <p class="footer__tagline">Find your style, be you 💜</p>
+      <p class="footer__about">TEENSTYLE AI คือร้านค้าออนไลน์แฟชั่นสำหรับวัยรุ่น จำหน่ายเสื้อผ้าและสินค้าแฟชั่นหลากหลายสไตล์ พร้อมระบบ AI Stylist และ AI Customer Service ที่ช่วยให้การเลือกซื้อง่ายขึ้นกว่าเดิม</p>
+      <div class="footer__social" aria-label="โซเชียลมีเดีย">
+        <a href="#" aria-label="Instagram ของ TeenStyle">IG</a>
+        <a href="#" aria-label="TikTok ของ TeenStyle">TikTok</a>
+        <a href="#" aria-label="LINE ของ TeenStyle">LINE</a>
+        <a href="#" aria-label="Facebook ของ TeenStyle">FB</a>
+      </div>
+    </div>
+
+    <nav class="footer__col" aria-label="เกี่ยวกับเรา">
+      <h3>About TeenStyle AI</h3>
+      <a href="#features">จุดเด่นของเรา</a>
+      <a href="#services">บริการทั้งหมด</a>
+      <a href="#looks">Popular Looks</a>
+      <a href="#reviews">รีวิวจากลูกค้า</a>
+    </nav>
+
+    <nav class="footer__col" aria-label="ช่วยเหลือลูกค้า">
+      <h3>Customer Service</h3>
+      <button class="footer__btn" type="button" data-ai="support">ถาม AI Customer Service</button>
+      <a href="#faq">คำถามที่พบบ่อย</a>
+      <a href="#">Shipping — การจัดส่ง</a>
+      <a href="#">Return Policy — การคืนสินค้า</a>
+    </nav>
+
+    <nav class="footer__col" aria-label="ข้อกำหนดและการติดต่อ">
+      <h3>Contact</h3>
+      <a href="mailto:hello@teenstyle.ai">hello@teenstyle.ai</a>
+      <a href="tel:+6620000000">02-000-0000 (จ.–ส. 9:00–18:00)</a>
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+    </nav>
+  </div>
+
+  <div class="container footer__bottom">
+    <p>© 2026 TEENSTYLE AI. All rights reserved.</p>
+    <p>Find your style, be you 💜</p>
+  </div>
+</footer>
+
+<!-- ===== OVERLAYS ===== -->
+<div class="backdrop" id="backdrop" hidden></div>
+
+<!-- Mobile menu -->
+<aside class="panel panel--menu" id="panel-menu" role="dialog" aria-modal="true" aria-label="เมนู" hidden>
+  <div class="panel__head">
+    <span class="panel__title">เมนู</span>
+    <button class="icon-btn" type="button" data-close aria-label="ปิดเมนู"><svg class="icon"><use href="#i-close"></use></svg></button>
+  </div>
+  <nav class="panel__menu">
+    <a href="#home">Home</a>
+    <a href="#shop">Shop</a>
+    <a href="#looks">Looks</a>
+    <a href="#services">AI Stylist</a>
+    <a href="#about">About</a>
+  </nav>
+  <div class="panel__foot">
+    <button class="btn btn--primary btn--block" type="button" data-ai="stylist">Try AI Stylist ✧</button>
+    <button class="btn btn--ghost btn--block" type="button" data-open="account">Account</button>
+  </div>
+</aside>
+
+<!-- Search -->
+<aside class="panel panel--search" id="panel-search" role="dialog" aria-modal="true" aria-label="ค้นหาสินค้า" hidden>
+  <div class="panel__head">
+    <label class="search-field">
+      <svg class="icon"><use href="#i-search"></use></svg>
+      <input type="search" id="searchInput" placeholder="ค้นหาเสื้อผ้า สไตล์ หรือโอกาสใช้งาน…" autocomplete="off" aria-label="ค้นหาสินค้า">
+    </label>
+    <button class="icon-btn" type="button" data-close aria-label="ปิดการค้นหา"><svg class="icon"><use href="#i-close"></use></svg></button>
+  </div>
+  <div class="panel__body">
+    <div class="search-sugg">
+      <span>ยอดนิยม:</span>
+      <button class="chip chip--sm" type="button" data-q="oversize">oversize</button>
+      <button class="chip chip--sm" type="button" data-q="เดท">เดท</button>
+      <button class="chip chip--sm" type="button" data-q="y2k">y2k</button>
+      <button class="chip chip--sm" type="button" data-q="ยีนส์">ยีนส์</button>
+      <button class="chip chip--sm" type="button" data-q="เดรส">เดรส</button>
+    </div>
+    <div id="searchResults" class="search-results" aria-live="polite"></div>
+  </div>
+</aside>
+
+<!-- Cart -->
+<aside class="panel panel--right" id="panel-cart" role="dialog" aria-modal="true" aria-label="ตะกร้าสินค้า" hidden>
+  <div class="panel__head">
+    <span class="panel__title">ตะกร้าสินค้า <small id="cartCount">(0)</small></span>
+    <button class="icon-btn" type="button" data-close aria-label="ปิดตะกร้า"><svg class="icon"><use href="#i-close"></use></svg></button>
+  </div>
+  <div class="panel__body" id="cartBody"></div>
+  <div class="panel__foot panel__foot--cart" id="cartFoot" hidden>
+    <div class="sum"><span>ยอดรวมสินค้า</span><b id="cartSubtotal">0.-</b></div>
+    <div class="sum sum--muted"><span>ค่าจัดส่ง</span><b id="cartShip">0.-</b></div>
+    <div class="sum sum--total"><span>ยอดที่ต้องชำระ</span><b id="cartTotal">0.-</b></div>
+    <p class="sum__hint" id="cartHint"></p>
+    <button class="btn btn--primary btn--block btn--lg" type="button" id="checkoutBtn">ดำเนินการชำระเงิน</button>
+  </div>
+</aside>
+
+<!-- Wishlist -->
+<aside class="panel panel--right" id="panel-wishlist" role="dialog" aria-modal="true" aria-label="รายการที่ถูกใจ" hidden>
+  <div class="panel__head">
+    <span class="panel__title">Wishlist <small id="wishCount">(0)</small></span>
+    <button class="icon-btn" type="button" data-close aria-label="ปิด Wishlist"><svg class="icon"><use href="#i-close"></use></svg></button>
+  </div>
+  <div class="panel__body" id="wishBody"></div>
+</aside>
+
+<!-- Account -->
+<aside class="panel panel--right" id="panel-account" role="dialog" aria-modal="true" aria-label="บัญชีของฉัน" hidden>
+  <div class="panel__head">
+    <span class="panel__title">บัญชีของฉัน</span>
+    <button class="icon-btn" type="button" data-close aria-label="ปิด"><svg class="icon"><use href="#i-close"></use></svg></button>
+  </div>
+  <div class="panel__body">
+    <div class="member">
+      <span class="member__spark">⭐</span>
+      <h3>เข้าสู่ระบบเพื่อรับสิทธิพิเศษ</h3>
+      <p>สะสม Loyalty Points ทุกการสั่งซื้อ ติดตามคำสั่งซื้อ และรับคูปองเฉพาะสมาชิก</p>
+      <ul class="ticks ticks--sm">
+        <li>รับ 100 แต้มทันทีเมื่อสมัครใหม่</li>
+        <li>ทุก 25 บาท = 1 แต้ม แลกเป็นส่วนลดได้</li>
+        <li>ดูประวัติและสถานะการจัดส่งย้อนหลัง</li>
+      </ul>
+      <button class="btn btn--primary btn--block" type="button" data-demo>เข้าสู่ระบบ / สมัครสมาชิก</button>
+      <p class="member__note">* หน้านี้เป็น Landing Page ตัวอย่าง ระบบสมาชิกจริงจะเชื่อมต่อในขั้นถัดไป</p>
+    </div>
+  </div>
+</aside>
+
+<!-- AI modal -->
+<div class="modal" id="panel-ai" role="dialog" aria-modal="true" aria-label="ผู้ช่วย AI" hidden>
+  <div class="modal__box">
+    <div class="modal__head">
+      <div class="modal__id">
+        <span class="modal__avatar" id="aiAvatar">✧</span>
+        <div>
+          <strong id="aiTitle">AI Stylist</strong>
+          <small><i class="dot-live"></i> ออนไลน์ พร้อมช่วยคุณ</small>
+        </div>
+      </div>
+      <button class="icon-btn" type="button" data-close aria-label="ปิดแชท"><svg class="icon"><use href="#i-close"></use></svg></button>
+    </div>
+
+    <div class="modal__tabs" role="tablist" aria-label="เลือกผู้ช่วย">
+      <button class="tab is-active" type="button" role="tab" aria-selected="true" data-tab="stylist">✧ AI Stylist</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="support">💬 Customer Service</button>
+    </div>
+
+    <div class="chat" id="chatLog" aria-live="polite"></div>
+
+    <div class="chat__quick" id="chatQuick"></div>
+
+    <form class="chat__form" id="chatForm" autocomplete="off">
+      <input type="text" id="chatInput" placeholder="พิมพ์ข้อความ…" aria-label="พิมพ์ข้อความถึง AI">
+      <button class="icon-btn icon-btn--send" type="submit" aria-label="ส่งข้อความ">
+        <svg class="icon"><use href="#i-send"></use></svg>
+      </button>
+    </form>
+    <p class="chat__disclaimer">ผู้ช่วย AI ตัวอย่างสำหรับสาธิตบนหน้า Landing Page</p>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="script.js"></script>
+</body>
+</html>

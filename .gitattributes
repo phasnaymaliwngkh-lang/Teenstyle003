@@ -1,0 +1,18 @@
+# ไฟล์ในโปรเจกต์นี้ใช้ LF ทั้งหมด (prettier ตั้งค่า endOfLine: lf เป็นค่าเริ่มต้น)
+# บังคับ eol=lf เพื่อให้ Windows ไม่แปลงเป็น CRLF ตอน checkout แล้วทำให้ format:check ล้ม
+* text=auto eol=lf
+
+# ไฟล์ไบนารี — ห้ามแปลง
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.exe binary
+*.dump binary
+
+# สคริปต์ PowerShell ต้องเป็น CRLF (PowerShell 5.1 บน Windows)
+*.ps1 text eol=crlf

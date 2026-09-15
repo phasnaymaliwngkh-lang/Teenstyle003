@@ -1,0 +1,122 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ============================================================================
+   TEENSTYLE AI — Design Tokens (Tailwind CSS v4 — CSS-first config)
+   ใช้ token เท่านั้น ห้าม hardcode ค่าสีในคอมโพเนนต์
+   สีชุดนี้ตรงกับ Landing Page prototype เพื่อให้ภาพลักษณ์แบรนด์ต่อเนื่อง
+   ============================================================================ */
+@theme {
+  /* Brand — Purple */
+  --color-brand: #7c3aed;
+  --color-brand-light: #8b5cf6;
+  --color-brand-soft: #a78bfa;
+  --color-brand-dark: #5b21b6;
+
+  /* Light purple — พื้นหลังและ highlight */
+  --color-lilac: #ede9fe;
+  --color-lilac-50: #f7f5ff;
+
+  /* Neutral */
+  --color-ink: #111114;
+  --color-ink-soft: #2b2b33;
+  --color-muted: #6b7280;
+  --color-muted-light: #9ca3af;
+  --color-line: #e9e7f0;
+
+  /* Semantic */
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+
+  /* Typography — ตัวแปรฟอนต์มาจาก next/font ใน layout.tsx */
+  --font-sans:
+    var(--font-jakarta), var(--font-noto-thai), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-thai:
+    var(--font-noto-thai), var(--font-jakarta), system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* Radius */
+  --radius-card: 20px;
+  --radius-pill: 999px;
+
+  /* Soft shadows */
+  --shadow-soft: 0 2px 10px rgb(17 17 20 / 0.05);
+  --shadow-lift: 0 10px 30px rgb(88 28 135 / 0.09);
+  --shadow-float: 0 24px 60px rgb(88 28 135 / 0.16);
+  --shadow-brand: 0 10px 24px rgb(124 58 237 / 0.28);
+
+  /* Layout */
+  --spacing-nav: 72px;
+}
+
+:root {
+  /* แบรนด์เป็นธีมสว่าง — ไม่สลับตาม prefers-color-scheme เพื่อให้สีม่วงคุมโทนได้จริง */
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: var(--color-ink);
+}
+
+@layer base {
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-thai);
+    /* ป้องกัน horizontal overflow ตาม STEP 31 */
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-sans);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  /* focus ring ที่มองเห็นได้ทุกที่ (STEP 54 — Accessibility) */
+  :focus-visible {
+    outline: 3px solid var(--color-brand-soft);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  ::selection {
+    background: var(--color-lilac);
+    color: var(--color-brand-dark);
+  }
+}
+
+@layer components {
+  /* ปุ่มหลัก — purple gradient ตาม design direction */
+  .btn-brand {
+    background-image: linear-gradient(135deg, var(--color-brand-light), var(--color-brand));
+    color: #fff;
+    box-shadow: var(--shadow-brand);
+  }
+
+  .btn-brand:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px rgb(124 58 237 / 0.38);
+  }
+
+  /* ข้อความไล่สีสำหรับหัวข้อ/โลโก้ */
+  .text-brand-gradient {
+    background-image: linear-gradient(135deg, var(--color-brand-light), var(--color-brand));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* เคารพการตั้งค่าของผู้ใช้ที่ขอลด animation (STEP 54) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

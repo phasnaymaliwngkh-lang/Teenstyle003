@@ -1,0 +1,49 @@
+{
+  "name": "teenstyle-ai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TEENSTYLE AI — Full Stack Fashion E-Commerce (Find your style, be you 💜)",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "database"
+  ],
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "dev": "npm run db:sync && concurrently -n api,web -c magenta,cyan \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "dev:backend": "npm run dev --workspace backend",
+    "build": "npm run db:sync && npm run build --workspace backend && npm run build --workspace frontend",
+    "build:frontend": "npm run build --workspace frontend",
+    "build:backend": "npm run build --workspace backend",
+    "start": "concurrently -n api,web -c magenta,cyan \"npm:start:backend\" \"npm:start:frontend\"",
+    "start:frontend": "npm run start --workspace frontend",
+    "start:backend": "npm run start --workspace backend",
+    "typecheck": "npm run typecheck --workspace database && npm run typecheck --workspace backend && npm run typecheck --workspace frontend",
+    "lint": "npm run lint --workspace backend && npm run lint --workspace frontend",
+    "test": "npm run test --workspace backend",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,css,md,yml,yaml}\"",
+    "db:check": "npm run check --workspace database",
+    "db:generate": "npm run generate --workspace database",
+    "db:build": "npm run build --workspace database",
+    "db:sync": "npm run db:generate && npm run db:build",
+    "db:migrate": "npm run migrate --workspace database",
+    "db:migrate:deploy": "npm run migrate:deploy --workspace database",
+    "db:seed": "npm run seed --workspace database",
+    "db:studio": "npm run studio --workspace database",
+    "db:reset": "npm run reset --workspace database",
+    "docker:up": "docker compose up -d",
+    "docker:up:infra": "docker compose up -d postgres redis",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "docker:config": "docker compose config"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3"
+  }
+}

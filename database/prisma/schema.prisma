@@ -1,0 +1,1064 @@
+// ============================================================================
+// TEENSTYLE AI — Prisma Schema (STEP 2)
+//
+// หมายเหตุ Prisma 7:
+//   - `url` ของ datasource ย้ายไปอยู่ที่ ../prisma.config.ts แล้ว (ใส่ในไฟล์นี้ไม่ได้)
+//   - generator ชื่อ `prisma-client` และต้องระบุ `output`
+//   - output เป็น TypeScript source ที่คอมไพล์รวมกับโปรเจกต์เรา
+//
+// กฎของ schema นี้
+//   1. ทุกตาราง id เป็น UUID v7 (เรียงตามเวลา → index มีประสิทธิภาพกว่า uuid v4)
+//   2. ตารางที่เป็นข้อมูลหลักมี createdAt / updatedAt และ deletedAt (soft delete)
+//      ตารางที่เป็น audit trail (InventoryMovement, AdminLog, AIChatMessage) เป็น append-only
+//      จึงไม่มี soft delete
+//   3. เงินทุกก้อนเป็น Decimal(12,2) — ห้ามใช้ Float กับเงิน
+//   4. Stock จริงอยู่ที่ Inventory (ต่อ 1 variant) เท่านั้น = single source of truth
+//   5. ฟิลด์ที่เป็น cache (Product.totalStock, Order.trackingNumber) ต้องอัปเดต
+//      ใน transaction เดียวกับต้นทางเสมอ ห้ามเขียนตรง — ดูหัวข้อ "Denormalized cache" ใน README
+//   6. ข้อมูลที่เปลี่ยนได้ในอนาคตต้อง snapshot ไว้ตอนสั่งซื้อ (OrderItem, Order.shippingAddress)
+//      เพื่อให้ประวัติคำสั่งซื้อไม่เปลี่ยนตามการแก้สินค้า/ที่อยู่ภายหลัง
+// ============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum RoleName {
+  CUSTOMER
+  EMPLOYEE
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+/// ระดับสมาชิก (STEP 42 — Loyalty)
+enum LoyaltyTier {
+  MEMBER
+  SILVER
+  GOLD
+  VIP
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+/// สไตล์ของ Look (STEP 7)
+enum LookStyle {
+  CASUAL
+  STREET
+  MINIMAL
+  KOREAN
+  VINTAGE
+  SPORT
+  DAILY
+  PARTY
+}
+
+/// ประเภทการเคลื่อนไหวของ stock (STEP 15)
+enum InventoryMovementType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+  RETURN
+  TRANSFER
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  PROCESSING
+  PACKING
+  SHIPPING
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentProvider {
+  PROMPTPAY
+  BANK_TRANSFER
+  CREDIT_CARD
+  STRIPE
+  COD
+}
+
+enum ShippingMethod {
+  STANDARD
+  EXPRESS
+  SAME_DAY
+  PICKUP
+}
+
+enum ShipmentStatus {
+  PENDING
+  PREPARING
+  SHIPPED
+  IN_TRANSIT
+  DELIVERED
+  FAILED
+  RETURNED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  FREE_SHIPPING
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  HIDDEN
+  REJECTED
+}
+
+enum NotificationType {
+  ORDER_CREATED
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  SHIPPING
+  DELIVERED
+  LOW_STOCK
+  PROMOTION
+  PRICE_DROP
+  WISHLIST_UPDATE
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum AIConversationType {
+  STYLIST
+  CUSTOMER_SERVICE
+  RECOMMENDATION
+}
+
+enum AIConversationStatus {
+  ACTIVE
+  ESCALATED
+  CLOSED
+}
+
+enum AIMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  AGENT
+}
+
+// ============================================================================
+// AUTH / RBAC  (STEP 3)
+// ============================================================================
+
+model Role {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  name        RoleName @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  permissions Permission[]
+}
+
+model Permission {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  /// รูปแบบ "<resource>:<action>" เช่น product:create, order:refund
+  key         String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles Role[]
+}
+
+model User {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  /// null ได้ เพราะ STEP 3 เข้าสู่ระบบด้วย Google OAuth (ไม่มีรหัสผ่าน)
+  /// ถ้าเพิ่ม credentials login ภายหลังให้เก็บเป็น hash เท่านั้น — ห้ามเก็บรหัสผ่านดิบ
+  passwordHash  String?
+  phone         String?
+  birthDate     DateTime? @db.Date
+
+  roleId String @db.Uuid
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  status      UserStatus  @default(ACTIVE)
+  loyaltyTier LoyaltyTier @default(MEMBER)
+  /// แต้มคงเหลือ — ห้ามติดลบ (บังคับด้วย CHECK constraint ระดับฐานข้อมูล)
+  points      Int         @default(0)
+  totalSpent  Decimal     @default(0) @db.Decimal(12, 2)
+
+  /// STEP 46 / 53 — ผู้ใช้ปิดการแนะนำแบบ personalized ได้
+  allowPersonalization Boolean @default(true)
+
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  accounts           Account[]
+  sessions           Session[]
+  addresses          Address[]
+  orders             Order[]
+  cart               Cart?
+  reviews            Review[]
+  wishlist           Wishlist[]
+  savedLooks         SavedLook[]
+  notifications      Notification[]
+  aiConversations    AIConversation[]    @relation("AIConversationUser")
+  assignedAiChats    AIConversation[]    @relation("AIConversationAgent")
+  adminLogs          AdminLog[]
+  inventoryMovements InventoryMovement[]
+
+  @@index([roleId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([deletedAt])
+}
+
+/// ─────────────────────────────────────────────────────────────────────────────
+/// Auth.js (NextAuth v5) — 3 model ด้านล่างนี้ **ชื่อฟิลด์ถูกกำหนดโดย adapter**
+/// (`@auth/prisma-adapter`) จึงเป็น snake_case ต่างจากส่วนอื่นของ schema
+/// ห้ามเปลี่ยนชื่อฟิลด์ ไม่งั้น adapter จะพัง — ดู @auth/core/adapters.d.ts
+/// เราใช้ session แบบเก็บในฐานข้อมูล (ไม่ใช่ JWT) เพราะ:
+///   1. เพิกถอน session ได้ทันที เมื่อ admin ระงับบัญชี (User.status)
+///   2. backend ตรวจ session จากตาราง Session เดียวกันได้ ไม่ต้องแชร์ secret
+/// ─────────────────────────────────────────────────────────────────────────────
+
+model Account {
+  userId            String  @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String   @db.Uuid
+  expires      DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([sessionToken])
+  @@index([userId])
+  /// ใช้ลบ session ที่หมดอายุแบบเป็นชุด (STEP 52 — cron job)
+  @@index([expires])
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@unique([identifier, token])
+}
+
+model Address {
+  id            String  @id @default(uuid(7)) @db.Uuid
+  userId        String  @db.Uuid
+  user          User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label         String?
+  recipientName String
+  phone         String
+  line1         String
+  line2         String?
+  subDistrict   String
+  district      String
+  province      String
+  postalCode    String
+  country       String  @default("TH")
+  isDefault     Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  orders Order[]
+
+  @@index([userId])
+  @@index([userId, isDefault])
+}
+
+// ============================================================================
+// CATALOG  (STEP 6, 48)
+// ============================================================================
+
+model Category {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  name        String
+  slug        String  @unique
+  description String?
+  imageUrl    String?
+  sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
+
+  /// รองรับ Parent Category / Sub Category
+  parentId String?    @db.Uuid
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  products Product[]
+  coupons  Coupon[]
+
+  @@index([parentId])
+  @@index([isActive])
+  @@index([slug])
+}
+
+model Brand {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  name        String  @unique
+  slug        String  @unique
+  logoUrl     String?
+  description String?
+  isActive    Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  products Product[]
+
+  @@index([isActive])
+}
+
+model Size {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  /// เช่น XS, S, M, L, XL, XXL, 36–40, Free
+  name      String  @unique
+  code      String  @unique
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  variants ProductVariant[]
+
+  @@index([isActive, sortOrder])
+}
+
+model Color {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String   @unique
+  slug      String   @unique
+  /// ค่าสีสำหรับแสดงวงกลมสีบนหน้าเว็บ เช่น #111114
+  hex       String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  variants ProductVariant[]
+
+  @@index([isActive, sortOrder])
+}
+
+model Product {
+  id               String  @id @default(uuid(7)) @db.Uuid
+  name             String
+  slug             String  @unique
+  description      String
+  shortDescription String?
+  sku              String  @unique
+
+  price     Decimal  @db.Decimal(12, 2)
+  /// ราคาลด — ต้องน้อยกว่า price (บังคับด้วย CHECK constraint)
+  salePrice Decimal? @db.Decimal(12, 2)
+
+  categoryId String   @db.Uuid
+  category   Category @relation(fields: [categoryId], references: [id])
+  brandId    String?  @db.Uuid
+  brand      Brand?   @relation(fields: [brandId], references: [id])
+
+  status       ProductStatus @default(DRAFT)
+  /// ค่าต่ำสุดที่จะเตือน LOW STOCK (STEP 16)
+  minimumStock Int           @default(5)
+  /// cache ของผลรวม Inventory.quantity ทุก variant — อัปเดตใน transaction เดียวกับ
+  /// InventoryMovement เท่านั้น (source of truth อยู่ที่ Inventory)
+  totalStock   Int           @default(0)
+
+  /// คำค้นเพิ่มเติมสำหรับ search (STEP 45)
+  tags String[] @default([])
+
+  /// ใช้ใน AI Recommendation (STEP 46)
+  viewCount Int @default(0)
+
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  images     ProductImage[]
+  variants   ProductVariant[]
+  reviews    Review[]
+  wishlist   Wishlist[]
+  orderItems OrderItem[]
+  lookItems  LookItem[]
+  coupons    Coupon[]
+
+  @@index([categoryId])
+  @@index([brandId])
+  @@index([status])
+  @@index([status, publishedAt])
+  @@index([price])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@index([totalStock])
+}
+
+model ProductImage {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  url       String
+  /// public_id ของ Cloudinary ใช้ตอนลบไฟล์จริง (STEP 47)
+  publicId  String?
+  alt       String
+  sortOrder Int     @default(0)
+  isMain    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([productId, sortOrder])
+  @@index([productId, isMain])
+}
+
+model ProductVariant {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  sku     String  @unique
+  /// บาร์โค้ด/QR ที่สแกนได้ (STEP 17)
+  barcode String? @unique
+
+  colorId String? @db.Uuid
+  color   Color?  @relation(fields: [colorId], references: [id])
+  sizeId  String? @db.Uuid
+  size    Size?   @relation(fields: [sizeId], references: [id])
+
+  /// ถ้า null ให้ใช้ราคาของ Product
+  price     Decimal? @db.Decimal(12, 2)
+  salePrice Decimal? @db.Decimal(12, 2)
+
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  inventory  Inventory?
+  movements  InventoryMovement[]
+  orderItems OrderItem[]
+  lookItems  LookItem[]
+  cartItems  CartItem[]
+
+  /// หนึ่งสินค้ามีได้เพียงหนึ่ง variant ต่อคู่ (สี, ไซซ์)
+  @@unique([productId, colorId, sizeId])
+  @@index([productId])
+  @@index([isActive])
+}
+
+// ============================================================================
+// INVENTORY  (STEP 15, 16)
+// ============================================================================
+
+model Inventory {
+  id        String         @id @default(uuid(7)) @db.Uuid
+  variantId String         @unique @db.Uuid
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  /// จำนวนที่มีอยู่จริงในคลัง — ห้ามติดลบ (CHECK constraint)
+  quantity         Int @default(0)
+  /// จำนวนที่ถูกจองไว้ให้คำสั่งซื้อที่ยังไม่ตัดสต็อก — ห้ามติดลบและห้ามเกิน quantity
+  reservedQuantity Int @default(0)
+
+  location  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([quantity])
+}
+
+model InventoryMovement {
+  id        String         @id @default(uuid(7)) @db.Uuid
+  variantId String         @db.Uuid
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  type           InventoryMovementType
+  /// จำนวนเป็นบวกเสมอ ทิศทางดูจาก type
+  quantity       Int
+  /// audit trail: จำนวนก่อน/หลัง เพื่อตรวจย้อนหลังได้ว่า stock เดินอย่างไร
+  quantityBefore Int
+  quantityAfter  Int
+
+  reason        String
+  referenceType String?
+  referenceId   String? @db.Uuid
+
+  /// กัน movement ซ้ำ (เช่น webhook หรือ retry ยิงซ้ำ)
+  idempotencyKey String? @unique
+
+  userId String? @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([variantId, createdAt])
+  @@index([type])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// LOOKS  (STEP 7, 8)
+// ============================================================================
+
+model Look {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  name        String
+  slug        String    @unique
+  description String?
+  style       LookStyle
+  imageUrl    String?
+  imageAlt    String?
+
+  isActive   Boolean @default(true)
+  isFeatured Boolean @default(false)
+  viewCount  Int     @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  items      LookItem[]
+  savedLooks SavedLook[]
+
+  @@index([style])
+  @@index([isActive, isFeatured])
+  @@index([slug])
+}
+
+model LookItem {
+  id     String @id @default(uuid(7)) @db.Uuid
+  lookId String @db.Uuid
+  look   Look   @relation(fields: [lookId], references: [id], onDelete: Cascade)
+
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// variant ที่แนะนำ (สี/ไซซ์) — null ได้ถ้าให้ผู้ใช้เลือกเอง
+  variantId String?         @db.Uuid
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
+  sortOrder Int     @default(0)
+  note      String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([lookId, productId])
+  @@index([lookId, sortOrder])
+  @@index([productId])
+}
+
+model SavedLook {
+  id     String @id @default(uuid(7)) @db.Uuid
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lookId String @db.Uuid
+  look   Look   @relation(fields: [lookId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, lookId])
+  @@index([userId, createdAt])
+}
+
+// ============================================================================
+// CART  (STEP 9)
+// ============================================================================
+
+/// ตะกร้าสินค้า — หนึ่งใบต่อผู้ใช้ที่ล็อกอิน หรือหนึ่งใบต่อ guest token
+///
+/// เจ้าของตะกร้าต้องเป็นอย่างใดอย่างหนึ่งเท่านั้น (CHECK `Cart_owner_exclusive`):
+///   - `userId` ไม่ null  → ตะกร้าของผู้ใช้ที่ล็อกอินแล้ว (ไม่หมดอายุ)
+///   - `guestToken` ไม่ null → ตะกร้าของ guest ที่อ้างอิงด้วย cookie (มีวันหมดอายุ)
+/// ตอนล็อกอินจะรวมตะกร้า guest เข้าตะกร้าของผู้ใช้แล้วลบใบของ guest ทิ้ง (ใน transaction)
+model Cart {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  userId String? @unique @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// token ที่เก็บใน cookie httpOnly ของ guest (ไม่ใช่ข้อมูลที่เดาได้)
+  guestToken String? @unique
+
+  items CartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  /// ตะกร้าของ guest หมดอายุเมื่อถึงเวลานี้ (job ลบทิ้งใน STEP 52)
+  expiresAt DateTime?
+
+  @@index([guestToken])
+  @@index([expiresAt])
+}
+
+model CartItem {
+  id     String @id @default(uuid(7)) @db.Uuid
+  cartId String @db.Uuid
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  variantId String         @db.Uuid
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  /// ห้าม 0 หรือติดลบ และไม่เกิน 99 ต่อรายการ (CHECK `CartItem_quantity_range`)
+  quantity Int @default(1)
+
+  /// ผู้ใช้เลือกสั่งรายการนี้ไหม — เลือกบางชิ้นไป checkout ได้
+  selected Boolean @default(true)
+
+  /// ราคาต่อชิ้นตอนที่หยิบใส่ตะกร้า
+  /// ⚠️ ใช้เพื่อ **แจ้งเตือนเมื่อราคาเปลี่ยน** เท่านั้น ห้ามใช้คิดเงิน
+  ///    ราคาที่คิดเงินต้องอ่านจาก Product/ProductVariant ใหม่ทุกครั้ง
+  addedPrice Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// หนึ่ง variant มีได้แถวเดียวต่อตะกร้า — เพิ่มซ้ำให้บวกจำนวน (กันรายการซ้ำ)
+  @@unique([cartId, variantId])
+  @@index([cartId])
+  @@index([variantId])
+}
+
+// ============================================================================
+// ORDER / PAYMENT / SHIPPING  (STEP 10, 11, 12, 44)
+// ============================================================================
+
+model Order {
+  id          String @id @default(uuid(7)) @db.Uuid
+  /// เลขคำสั่งซื้อที่ลูกค้าเห็น เช่น TS-20260913-0001
+  orderNumber String @unique
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
+
+  status        OrderStatus   @default(PENDING_PAYMENT)
+  paymentStatus PaymentStatus @default(PENDING)
+
+  subtotal      Decimal @db.Decimal(12, 2)
+  discountTotal Decimal @default(0) @db.Decimal(12, 2)
+  shippingFee   Decimal @default(0) @db.Decimal(12, 2)
+  total         Decimal @db.Decimal(12, 2)
+
+  couponId   String? @db.Uuid
+  coupon     Coupon? @relation(fields: [couponId], references: [id])
+  couponCode String?
+
+  /// เก็บทั้ง relation (อ้างอิงกลับได้) และ snapshot (ประวัติไม่เปลี่ยนตามการแก้ที่อยู่)
+  shippingAddressId String?  @db.Uuid
+  shippingAddress   Address? @relation(fields: [shippingAddressId], references: [id])
+  addressSnapshot   Json
+
+  shippingMethod ShippingMethod @default(STANDARD)
+  /// cache ของ trackingNumber จาก Shipment ล่าสุด — อัปเดตพร้อมกันใน transaction เดียว
+  trackingNumber String?
+
+  customerNote String?
+  adminNote    String?
+
+  /// กันสร้างคำสั่งซื้อซ้ำจากการกดปุ่มสองครั้ง / retry
+  idempotencyKey String? @unique
+
+  /// timeline ของคำสั่งซื้อ (STEP 12) — ไม่ต้องมีตาราง history แยก
+  paidAt      DateTime?
+  processedAt DateTime?
+  packedAt    DateTime?
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+  cancelledAt DateTime?
+  refundedAt  DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  items     OrderItem[]
+  payments  Payment[]
+  shipments Shipment[]
+  reviews   Review[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
+  @@index([couponId])
+}
+
+model OrderItem {
+  id      String @id @default(uuid(7)) @db.Uuid
+  orderId String @db.Uuid
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// อ้างอิงกลับได้ แต่ข้อมูลที่แสดงต้องใช้ snapshot ด้านล่าง
+  productId String?         @db.Uuid
+  product   Product?        @relation(fields: [productId], references: [id])
+  variantId String?         @db.Uuid
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
+  /// snapshot ตอนสั่งซื้อ — สินค้าเปลี่ยนชื่อ/ราคา/ถูกลบ ประวัติต้องไม่เปลี่ยน
+  productName String
+  variantSku  String
+  colorName   String?
+  sizeName    String?
+  imageUrl    String?
+
+  unitPrice Decimal @db.Decimal(12, 2)
+  quantity  Int
+  lineTotal Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([variantId])
+}
+
+model Payment {
+  id      String @id @default(uuid(7)) @db.Uuid
+  orderId String @db.Uuid
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  provider PaymentProvider
+  status   PaymentStatus   @default(PENDING)
+  amount   Decimal         @db.Decimal(12, 2)
+  currency String          @default("THB")
+
+  /// id ของรายการชำระเงินฝั่ง provider
+  providerPaymentId String? @unique
+  providerRef       String?
+
+  /// กัน process การชำระเงินซ้ำ
+  idempotencyKey String? @unique
+  /// กัน webhook เดิมถูกประมวลผลซ้ำ (STEP 11)
+  webhookEventId String? @unique
+
+  /// payload จาก provider — ⚠️ ห้ามเก็บ raw card data (เลขบัตร/CVV) เด็ดขาด
+  rawPayload Json?
+
+  failureReason String?
+  paidAt        DateTime?
+  failedAt      DateTime?
+  refundedAt    DateTime?
+  refundAmount  Decimal?  @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+  @@index([provider])
+  @@index([createdAt])
+}
+
+model Shipment {
+  id      String @id @default(uuid(7)) @db.Uuid
+  orderId String @db.Uuid
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// ผู้ให้บริการขนส่ง เช่น Thailand Post, Flash, J&T, Kerry
+  carrier        String
+  method         ShippingMethod @default(STANDARD)
+  trackingNumber String?
+  trackingUrl    String?
+  status         ShipmentStatus @default(PENDING)
+  fee            Decimal        @default(0) @db.Decimal(12, 2)
+
+  estimatedDelivery DateTime?
+  shippedAt         DateTime?
+  deliveredAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+  @@index([trackingNumber])
+}
+
+// ============================================================================
+// PROMOTION  (STEP 41)
+// ============================================================================
+
+model Coupon {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  code        String  @unique
+  name        String
+  description String?
+
+  type  DiscountType
+  /// PERCENTAGE = เปอร์เซ็นต์ (0–100) · FIXED_AMOUNT = บาท · FREE_SHIPPING = ไม่ใช้ค่านี้
+  value Decimal      @db.Decimal(12, 2)
+
+  minOrderAmount    Decimal? @db.Decimal(12, 2)
+  maxDiscountAmount Decimal? @db.Decimal(12, 2)
+
+  /// null = ใช้ได้ไม่จำกัด
+  usageLimit   Int?
+  usedCount    Int  @default(0)
+  perUserLimit Int?
+
+  startsAt DateTime
+  endsAt   DateTime
+  isActive Boolean  @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  /// จำกัดเฉพาะสินค้า/หมวดที่ระบุ — ถ้าว่างทั้งคู่คือใช้ได้กับทุกอย่าง
+  products   Product[]
+  categories Category[]
+  orders     Order[]
+
+  @@index([isActive, startsAt, endsAt])
+  @@index([code])
+}
+
+// ============================================================================
+// REVIEW / WISHLIST  (STEP 22, 23)
+// ============================================================================
+
+model Review {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String  @db.Uuid
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// ผูกกับคำสั่งซื้อ เพื่อยืนยันว่าซื้อจริงก่อนรีวิว (STEP 23)
+  orderId String? @db.Uuid
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  /// 1–5 (บังคับด้วย CHECK constraint)
+  rating  Int
+  title   String?
+  comment String
+  images  String[] @default([])
+
+  isVerifiedPurchase Boolean      @default(false)
+  status             ReviewStatus @default(PENDING)
+  helpfulCount       Int          @default(0)
+  adminNote          String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  /// รีวิวได้ 1 ครั้งต่อสินค้าต่อคำสั่งซื้อ — กัน spam review
+  @@unique([userId, productId, orderId])
+  @@index([productId, status])
+  @@index([userId])
+  @@index([status])
+  @@index([rating])
+}
+
+model Wishlist {
+  id        String  @id @default(uuid(7)) @db.Uuid
+  userId    String  @db.Uuid
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String  @db.Uuid
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// ราคาตอนกดถูกใจ — ใช้เทียบเพื่อแจ้งเตือนเมื่อราคาลด (STEP 22)
+  priceWhenAdded    Decimal @db.Decimal(12, 2)
+  notifyOnPriceDrop Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId, createdAt])
+  @@index([productId])
+}
+
+// ============================================================================
+// NOTIFICATION  (STEP 24)
+// ============================================================================
+
+model Notification {
+  id     String  @id @default(uuid(7)) @db.Uuid
+  /// null = ประกาศถึงทุกคน
+  userId String? @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type    NotificationType
+  channel NotificationChannel @default(IN_APP)
+  status  NotificationStatus  @default(PENDING)
+
+  title String
+  body  String
+  /// ข้อมูลเพิ่มเติม เช่น { "orderId": "...", "productSlug": "..." } ใช้ทำลิงก์
+  data  Json?
+
+  sentAt DateTime?
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+  @@index([status])
+  @@index([type])
+}
+
+// ============================================================================
+// AI  (STEP 19, 20, 21, 46)
+// ============================================================================
+
+model AIConversation {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  /// null ได้ เพราะผู้ใช้ที่ยังไม่ล็อกอินก็คุยกับ AI ได้ (ใช้ sessionId แทน)
+  userId    String? @db.Uuid
+  user      User?   @relation("AIConversationUser", fields: [userId], references: [id], onDelete: SetNull)
+  /// id ฝั่ง client สำหรับ guest
+  sessionId String?
+
+  type   AIConversationType
+  status AIConversationStatus @default(ACTIVE)
+
+  /// เจ้าหน้าที่ที่รับเรื่องต่อ เมื่อ AI ส่งต่อให้คน (STEP 20 — Human handoff)
+  assignedToId String?   @db.Uuid
+  assignedTo   User?     @relation("AIConversationAgent", fields: [assignedToId], references: [id], onDelete: SetNull)
+  escalatedAt  DateTime?
+
+  title   String?
+  summary String?
+
+  lastMessageAt DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  messages AIChatMessage[]
+
+  @@index([userId, createdAt])
+  @@index([sessionId])
+  @@index([status])
+  @@index([type])
+  @@index([assignedToId])
+}
+
+model AIChatMessage {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  conversationId String         @db.Uuid
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role    AIMessageRole
+  content String
+
+  /// id ของสินค้าที่ AI อ้างอิงในคำตอบนี้ — ใช้ตรวจย้อนหลังได้ว่า AI แนะนำจากข้อมูลจริง
+  /// ไม่ได้แต่งขึ้นเอง (AI REQUIREMENT)
+  referencedProductIds String[] @default([])
+
+  model      String?
+  tokensUsed Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+// ============================================================================
+// AUDIT  (STEP 27)
+// ============================================================================
+
+model AdminLog {
+  id     String  @id @default(uuid(7)) @db.Uuid
+  userId String? @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  /// เช่น product.create, inventory.adjust, order.refund, permission.change
+  action     String
+  targetType String?
+  targetId   String?
+
+  /// ค่าก่อน/หลัง เพื่อตรวจย้อนหลังว่าใครแก้อะไร
+  before Json?
+  after  Json?
+
+  /// เก็บเฉพาะเมื่อจำเป็นตามนโยบายความเป็นส่วนตัว (STEP 53)
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}

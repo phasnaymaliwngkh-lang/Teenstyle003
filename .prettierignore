@@ -1,0 +1,16 @@
+# build output / deps
+node_modules/
+.next/
+dist/
+build/
+coverage/
+database/generated/
+
+# lock files
+package-lock.json
+
+# Landing Page prototype เดิม (STEP 0) — ฟอร์แมตด้วยสไตล์ของตัวเอง ไม่ให้ prettier แก้
+index.html
+style.css
+script.js
+assets/
