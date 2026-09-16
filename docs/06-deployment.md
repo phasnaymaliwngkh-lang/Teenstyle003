@@ -51,10 +51,28 @@ engine ของ Prisma CLI เป็น Rust binary แยกตัวและ
 
 1. ตั้ง environment variable ทุกตัวจาก [03-environment.md](03-environment.md)
    → `NODE_ENV=production`, `CORS_ORIGIN=https://<frontend-domain>`
-2. Build command: `npm install && npm run db:sync && npm run build:backend`
+2. Build command: **`npm ci --include=dev && npm run db:sync && npm run build:backend`**
+   (ตั้งไว้ใน [railway.json](../railway.json) แล้ว)
 3. Start command: `npm run start:backend` (หรือ `node backend/dist/server.js`)
 4. Health check path: `/health` — คืน 503 เมื่อ dependency ล่ม จึงใช้กับ load balancer ได้เลย
 5. ถ้า deploy ด้วย Docker: `docker/backend.Dockerfile` (multi-stage, non-root, มี HEALTHCHECK)
+
+### ⚠️ 2.1 ทำไมต้อง `npm ci --include=dev` ไม่ใช่ `npm install`
+
+`NODE_ENV=production` เป็น variable ที่ต้องตั้งบนโฮสต์ ซึ่งทำให้ **npm ข้าม devDependencies**
+→ `tsc` หา `@types/express` ของ workspace `backend` ไม่เจอ แล้ว build ล้มด้วย
+`TS7016: Could not find a declaration file for module 'express'` (เจอจริงตอน deploy ครั้งที่ 3)
+
+`--include=dev` บังคับให้ติดตั้งครบแม้ `NODE_ENV=production`
+**ตรวจได้จากเครื่อง dev** โดย clone repo ไปโฟลเดอร์ใหม่แล้วรันคำสั่งเดียวกับโฮสต์:
+
+```bash
+git clone <repo> /tmp/buildtest && cd /tmp/buildtest
+NODE_ENV=production npm ci --include=dev && npm run db:sync && npm run build:backend
+PORT=4999 node backend/dist/server.js     # ต้องขึ้น portSource: "PORT (จากโฮสต์)"
+```
+
+ทำแบบนี้ก่อน push ประหยัดรอบ deploy ที่ล้มไปหลายรอบ (ยืนยันแล้วกับ commit ของ STEP 17)
 
 **พอร์ต — ไม่ต้องตั้งเอง** Railway / Render / Fly.io / Cloud Run ฉีด `PORT` มาให้
 และโค้ดให้ `PORT` **ชนะ** `BACKEND_PORT` เสมอ ([config/env.ts](../backend/src/config/env.ts) → `listenPort`)
@@ -65,13 +83,18 @@ engine ของ Prisma CLI เป็น Rust binary แยกตัวและ
 
 ### 3. Frontend
 
-1. Root directory: `frontend` (หรือใช้ build ที่ root ผ่าน workspace)
-2. Build command: `npm run build:frontend`
+1. Root directory: `frontend`
+2. Build command: **`cd .. && npm run db:sync && cd frontend && next build`**
+   ต้อง override เพราะ `@teenstyle/database` ไม่ได้ commit ผลลัพธ์ที่ generate/build ไว้
+   (`generated/prisma` + `dist/`) ถ้าไม่รัน `db:sync` ก่อน `next build` จะหา module ไม่เจอ
 3. Environment variable:
    - `NEXT_PUBLIC_API_URL=https://<backend-domain>` ← **ต้องตั้งก่อน build** เพราะถูกฝังลง bundle
    - **`NEXT_PUBLIC_API_PROXY_PATH=/backend`** ← **ห้ามลืม** อ่านเหตุผลที่หัวข้อถัดไป
    - `NEXT_PUBLIC_SITE_URL=https://<frontend-domain>`
    - `AUTH_SECRET`, `AUTH_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+   - **`DATABASE_URL` (สาย pooled)** ← **ห้ามลืม** Auth.js เก็บ session ในฐานข้อมูล
+     ผ่าน Prisma adapter จึงต้องต่อ database ได้จากฝั่ง frontend ด้วย
+     ถ้าไม่ตั้ง หน้าเว็บจะเปิดได้แต่ **ล็อกอินไม่ได้เลย**
 
 ### ⚠️ 3.1 cookie ข้ามโดเมน — เรื่องที่ทำงานได้บน dev แต่พังบน production
 
@@ -128,6 +151,22 @@ seed เขียนแบบ upsert จึงรันซ้ำได้ · จ
 
 ทางออกชั่วคราวก่อนถึง STEP 52: ตั้ง cron ของ host ยิง endpoint ที่มีอยู่แล้ววันละครั้ง
 หรือใส่ `node-cron` ในตัว backend — **ข้อนี้ต้องแก้ก่อนเปิดร้านจริง ไม่ใช่เรื่องรอได้**
+
+### ⚠️ 3.4 ลำดับที่ต้องทำ 2 รอบ เพราะแต่ละฝั่งต้องรู้ domain ของอีกฝั่ง
+
+backend ต้องมี `CORS_ORIGIN` เป็น domain ของ frontend และ frontend ต้องมี
+`NEXT_PUBLIC_API_URL` เป็น domain ของ backend → ต้องไล่ตามลำดับนี้ ห้ามพยายามทำครบในรอบเดียว
+
+| รอบ | ที่          | ทำอะไร                                                                       |
+| --: | ------------ | ---------------------------------------------------------------------------- |
+|   1 | Railway      | ตั้ง `DATABASE_URL` (สายตรง) + `BACKEND_URL` → deploy → migration รันเอง     |
+|   2 | เครื่อง dev  | รัน seed ชี้ไป production (ดูหัวข้อ 3.2) — ต้องหลัง migration                |
+|   3 | Vercel       | สร้างโปรเจกต์ + ตั้ง env ทุกตัว (`NEXT_PUBLIC_API_URL` = domain ของ Railway) |
+|   4 | Railway      | เติม `CORS_ORIGIN` + `FRONTEND_URL` = domain ของ Vercel → redeploy           |
+|   5 | Google Cloud | เพิ่ม redirect URI ของ domain จริง แล้วจึงทดสอบล็อกอิน                       |
+
+**ก่อนถึงรอบ 4 การล็อกอินและตะกร้าจะยังพัง** (`verifyOrigin` ปฏิเสธเพราะยังไม่รู้จัก domain)
+— เป็นเรื่องปกติของลำดับนี้ ไม่ใช่บั๊ก
 
 ### 4. ค่าที่ต้องตั้งกับบริการภายนอก
 
