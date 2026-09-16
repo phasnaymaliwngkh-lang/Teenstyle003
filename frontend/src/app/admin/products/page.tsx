@@ -1,4 +1,4 @@
-import { AlertTriangle, PackageOpen, Plus, Search } from "lucide-react";
+import { AlertTriangle, PackageOpen, Plus, Printer, ScanBarcode, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -76,6 +76,13 @@ export default async function AdminProductsPage({
             className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
           >
             ภาพรวมร้าน
+          </Link>
+          <Link
+            href="/admin/barcodes"
+            className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            <ScanBarcode className="size-4" aria-hidden />
+            บาร์โค้ด / QR
           </Link>
           <Link
             href="/admin/products/new"
@@ -271,7 +278,18 @@ function ProductRow({ product }: { product: AdminProduct }) {
           ในคลัง {product.totalStock} · จอง {product.reservedStock}
         </span>
       </td>
-      <td className="py-3 pr-3 text-xs">{product.variants.length} รายการ</td>
+      <td className="py-3 pr-3 text-xs">
+        {product.variants.length} รายการ
+        {product.variants.length > 0 && (
+          <Link
+            href={`/admin/barcodes/labels?productId=${product.id}`}
+            className="mt-1 flex items-center gap-1 font-semibold text-brand underline"
+          >
+            <Printer className="size-3" aria-hidden />
+            พิมพ์ป้าย
+          </Link>
+        )}
+      </td>
       <td className="py-3 text-xs text-muted">{product.category.name}</td>
     </tr>
   );

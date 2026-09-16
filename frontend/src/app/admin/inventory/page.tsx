@@ -1,4 +1,4 @@
-import { AlertTriangle, Boxes, History, PackageOpen, Search } from "lucide-react";
+import { AlertTriangle, Boxes, History, PackageOpen, ScanBarcode, Search } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -64,6 +64,13 @@ export default async function AdminInventoryPage({
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/barcodes"
+            className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            <ScanBarcode className="size-4" aria-hidden />
+            สแกนบาร์โค้ด
+          </Link>
           <Link
             href="/admin/alerts"
             className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"

@@ -3,6 +3,7 @@ import type {
   AdjustStockInput,
   AdminOrder,
   AdminProduct,
+  AssignBarcodeResult,
   CreateProductInput,
   DeleteProductResult,
   ProductVariantInput,
@@ -116,4 +117,19 @@ export function acknowledgeStockAlert(notificationId: string): Promise<{ acknowl
     `/api/admin/stock-alerts/${encodeURIComponent(notificationId)}/ack`,
     { method: "PATCH", cache: "no-store", timeoutMs: 30_000 },
   );
+}
+
+/**
+ * ออกบาร์โค้ดของร้านให้ตัวเลือกที่ยังไม่มี (STEP 17)
+ *
+ * ⚠️ ไม่เขียนทับเลขเดิม — ถ้ามีอยู่แล้ว backend ตอบ 409
+ *    ต้องล้างค่าเดิม (ส่ง `barcode: null` ผ่าน `updateProductVariant`) ก่อน
+ */
+export function assignBarcode(variantId: string): Promise<AssignBarcodeResult> {
+  return apiFetch<AssignBarcodeResult>("/api/admin/barcodes/assign", {
+    method: "POST",
+    json: { variantId },
+    cache: "no-store",
+    timeoutMs: 30_000,
+  });
 }

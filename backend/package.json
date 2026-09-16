@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@teenstyle/database": "*",
+    "bwip-js": "^4.11.4",
     "compression": "^1.8.2",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

@@ -5,6 +5,12 @@ import { PrismaClient } from '../generated/prisma/client.ts';
 export * from '../generated/prisma/client.ts';
 
 /**
+ * กฎบาร์โค้ด GTIN (STEP 17) — อยู่ที่ workspace นี้เพราะ seed และ backend
+ * ต้องใช้กฎชุดเดียวกัน (เหตุผลเต็มอยู่ใน src/gtin.ts)
+ */
+export * from './gtin.ts';
+
+/**
  * PrismaClient singleton
  *
  * Prisma 7 ต้องส่ง driver adapter เข้า constructor (ไม่มี `url` ใน schema แล้ว)

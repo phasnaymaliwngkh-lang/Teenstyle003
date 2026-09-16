@@ -55,6 +55,7 @@ const ADMIN_PRODUCT_SELECT = {
     select: {
       id: true,
       sku: true,
+      barcode: true,
       price: true,
       salePrice: true,
       isActive: true,
@@ -96,6 +97,8 @@ export interface AdminProductDto {
   variants: {
     id: string;
     sku: string;
+    /** บาร์โค้ดสินค้า (GTIN) — null = ยังไม่มี (พิมพ์ป้ายเป็น Code 128 ของ SKU ได้) */
+    barcode: string | null;
     price: number;
     salePrice: number | null;
     finalPrice: number;
@@ -129,6 +132,7 @@ function toAdminProduct(product: AdminProductRow): AdminProductDto {
       return {
         id: variant.id,
         sku: variant.sku,
+        barcode: variant.barcode,
         price: variantPrice.price,
         salePrice: variantPrice.salePrice,
         finalPrice: variantPrice.finalPrice,
@@ -394,6 +398,8 @@ async function createVariantRow(
     data: {
       productId,
       sku: variant.sku,
+      // บาร์โค้ด (STEP 17) — ไม่ส่งมา = ยังไม่มี · ออกเลขของร้านให้ทีหลังได้ที่ /admin/barcodes
+      barcode: variant.barcode ?? null,
       price: variant.price ?? null,
       salePrice: variant.salePrice ?? null,
       colorId: color?.id ?? null,
@@ -792,53 +798,66 @@ export async function updateVariant(
 ): Promise<AdminProductDto> {
   const prisma = getPrisma();
 
-  await prisma.$transaction(async (tx) => {
-    const variant = await tx.productVariant.findFirst({
-      where: { id: variantId, productId, deletedAt: null },
-      select: { id: true, sku: true, price: true, salePrice: true, isActive: true },
-    });
+  await prisma
+    .$transaction(async (tx) => {
+      const variant = await tx.productVariant.findFirst({
+        where: { id: variantId, productId, deletedAt: null },
+        select: {
+          id: true,
+          sku: true,
+          barcode: true,
+          price: true,
+          salePrice: true,
+          isActive: true,
+        },
+      });
 
-    if (!variant) throw ApiError.notFound('ไม่พบตัวเลือกสินค้านี้');
+      if (!variant) throw ApiError.notFound('ไม่พบตัวเลือกสินค้านี้');
 
-    // ตรวจกับค่าที่จะเป็นจริงหลังแก้ ไม่ใช่เฉพาะค่าที่ส่งมาในคำขอนี้
-    const nextPrice =
-      input.price !== undefined
-        ? input.price
-        : variant.price === null
-          ? null
-          : toNumber(variant.price);
-    const nextSale =
-      input.salePrice !== undefined
-        ? input.salePrice
-        : variant.salePrice === null
-          ? null
-          : toNumber(variant.salePrice);
+      // ตรวจกับค่าที่จะเป็นจริงหลังแก้ ไม่ใช่เฉพาะค่าที่ส่งมาในคำขอนี้
+      const nextPrice =
+        input.price !== undefined
+          ? input.price
+          : variant.price === null
+            ? null
+            : toNumber(variant.price);
+      const nextSale =
+        input.salePrice !== undefined
+          ? input.salePrice
+          : variant.salePrice === null
+            ? null
+            : toNumber(variant.salePrice);
 
-    assertVariantPriceShape(nextPrice, nextSale);
+      assertVariantPriceShape(nextPrice, nextSale);
 
-    await tx.productVariant.update({
-      where: { id: variantId },
-      data: {
-        ...(input.price !== undefined ? { price: input.price } : {}),
-        ...(input.salePrice !== undefined ? { salePrice: input.salePrice } : {}),
-        ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
-      },
-    });
+      await tx.productVariant.update({
+        where: { id: variantId },
+        data: {
+          ...(input.price !== undefined ? { price: input.price } : {}),
+          ...(input.salePrice !== undefined ? { salePrice: input.salePrice } : {}),
+          // `null` = ล้างบาร์โค้ด · ไม่ส่งมา = ไม่แตะ (STEP 17)
+          ...(input.barcode !== undefined ? { barcode: input.barcode } : {}),
+          ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+        },
+      });
 
-    await writeLog(
-      tx,
-      actor,
-      'product.variant.update',
-      productId,
-      {
-        variantId,
-        sku: variant.sku,
-        price: variant.price === null ? null : toNumber(variant.price),
-        isActive: variant.isActive,
-      },
-      { variantId, ...input },
-    );
-  });
+      await writeLog(
+        tx,
+        actor,
+        'product.variant.update',
+        productId,
+        {
+          variantId,
+          sku: variant.sku,
+          barcode: variant.barcode,
+          price: variant.price === null ? null : toNumber(variant.price),
+          isActive: variant.isActive,
+        },
+        { variantId, ...input },
+      );
+      // `barcode` เป็นคอลัมน์ unique (STEP 17) → เลขซ้ำต้องกลายเป็น 409 ไม่ใช่ 500
+    })
+    .catch(rethrowUnique);
 
   return getAdminProduct(productId);
 }

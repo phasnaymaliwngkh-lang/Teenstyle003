@@ -24,20 +24,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: path.resolve(here, '..', '.env'), quiet: true });
 loadEnv({ path: path.resolve(here, '..', '..', '.env'), quiet: true });
 
-const { getPrisma, disconnectDatabase } = await import('../src/index.ts');
+const { getPrisma, disconnectDatabase, internalGtin13FromSeed } = await import('../src/index.ts');
 const { BRANDS, CATEGORIES, COLORS, COUPONS, LOOKS, PERMISSIONS, PRODUCTS, ROLES, SIZES } =
   await import('./data.ts');
 
 const prisma = getPrisma();
-
-/** สร้างบาร์โค้ด 13 หลักแบบคงที่จาก SKU เพื่อให้ seed ซ้ำได้ค่าเดิม (STEP 17) */
-function barcodeFromSku(sku: string): string {
-  let hash = 0;
-  for (const char of sku) {
-    hash = (hash * 31 + char.charCodeAt(0)) % 1_000_000_000_00;
-  }
-  return `88${String(hash).padStart(11, '0')}`.slice(0, 13);
-}
 
 function log(step: string, detail: string): void {
   console.log(`  ${step.padEnd(22)} ${detail}`);
@@ -221,6 +212,19 @@ async function seedProducts(): Promise<{ products: number; variants: number; uni
         for (const size of sizes) {
           const variantSku = `${item.sku}-${color.slug.toUpperCase().slice(0, 3)}-${size.code}`;
 
+          /**
+           * บาร์โค้ด (STEP 17) — เลขของร้าน (prefix 20 = restricted circulation)
+           * ที่คำนวณ check digit จริง จึงสแกนติดกับเครื่องอ่านทั่วไป
+           *
+           * seed เป็น **เจ้าของข้อมูลของสินค้าตัวอย่าง** (เหมือนที่เขียนราคาและยอดในคลังทับ)
+           * จึงตั้งค่าให้ตรงกับสูตรทุกครั้ง → รัน seed ซ้ำได้เลขเดิม และล้างเลขจาก
+           * เวอร์ชันเก่าที่ check digit ไม่ผ่านหรือใช้ prefix ที่ไม่ใช่ของร้านออกไปด้วย
+           *
+           * ⚠️ บาร์โค้ดของสินค้าจริงต้องออกผ่าน /admin/barcodes หรือกรอกที่หน้าจัดการสินค้า
+           *    **ไม่ใช่ผ่าน seed** (seed ใช้กับฐานข้อมูล dev/demo เท่านั้น)
+           */
+          const barcode = internalGtin13FromSeed(variantSku);
+
           const variant = await tx.productVariant.upsert({
             where: { sku: variantSku },
             update: {
@@ -228,11 +232,12 @@ async function seedProducts(): Promise<{ products: number; variants: number; uni
               colorId: color.id,
               sizeId: size.id,
               isActive: true,
+              barcode,
             },
             create: {
               productId: product.id,
               sku: variantSku,
-              barcode: barcodeFromSku(variantSku),
+              barcode,
               colorId: color.id,
               sizeId: size.id,
             },

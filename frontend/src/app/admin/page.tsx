@@ -94,6 +94,12 @@ export default async function AdminDashboardPage() {
 
         <div className="flex flex-wrap gap-2">
           <Link
+            href="/admin/barcodes"
+            className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            บาร์โค้ด / QR
+          </Link>
+          <Link
             href="/admin/inventory"
             className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
           >

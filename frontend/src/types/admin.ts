@@ -78,6 +78,8 @@ export type ProductStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 export interface AdminProductVariant {
   id: string;
   sku: string;
+  /** บาร์โค้ดสินค้า (GTIN) — null = ยังไม่มี · ป้ายจะใช้ Code 128 ของ SKU แทน (STEP 17) */
+  barcode: string | null;
   price: number;
   salePrice: number | null;
   finalPrice: number;
@@ -150,6 +152,8 @@ export interface ProductImageInput {
 
 export interface ProductVariantInput {
   sku: string;
+  /** บาร์โค้ด GTIN 8/12/13 หลัก (check digit ต้องถูก) — null = ล้างค่า */
+  barcode?: string | null;
   /** null = ใช้ราคาของสินค้าแม่ (ตั้งราคาลดของตัวเลือกได้เฉพาะเมื่อกำหนดราคานี้ด้วย) */
   price?: number | null;
   salePrice?: number | null;
@@ -188,6 +192,8 @@ export type UpdateProductInput = Partial<Omit<CreateProductInput, "variants" | "
 export interface UpdateVariantInput {
   price?: number | null;
   salePrice?: number | null;
+  /** null = ล้างบาร์โค้ด (ต่างจากไม่ส่งมาเลย = ไม่แก้) */
+  barcode?: string | null;
   isActive?: boolean;
 }
 
@@ -318,4 +324,90 @@ export interface StockAlertScanResult {
   resolved: number;
   alerts: number;
   scannedAt: string;
+}
+
+/* ─────────────── บาร์โค้ด / QR (STEP 17) ─────────────── */
+
+/** ชื่อมาตรฐานของบาร์โค้ดที่เก็บไว้ — null = ยังไม่มี หรือเลขที่เก็บไว้ใช้ไม่ได้จริง */
+export type BarcodeKind = "EAN-8" | "UPC-A" | "EAN-13";
+
+/** สัญลักษณ์ที่วาดจริง (ต่างจากที่ผู้ใช้เลือกได้ เมื่อเลือก "auto") */
+export type Symbology = "code128" | "ean13" | "ean8" | "upca" | "qrcode";
+
+/** ตัวเลือกที่ผู้ใช้กดได้บนหน้าเว็บ */
+export type RequestedSymbology = "auto" | "code128" | "qrcode";
+
+export interface BarcodeProduct {
+  id: string;
+  name: string;
+  slug: string;
+  sku: string;
+  status: string;
+  minimumStock: number;
+  category: { name: string; slug: string };
+  imageUrl: string | null;
+  /** ลิงก์หน้าสินค้าบนหน้าร้าน — ค่าเดียวกับที่ QR เข้ารหัส */
+  storefrontUrl: string;
+}
+
+export interface BarcodeVariant {
+  variantId: string;
+  sku: string;
+  barcode: string | null;
+  barcodeKind: BarcodeKind | null;
+  isActive: boolean;
+  color: { name: string; slug: string; hex: string } | null;
+  size: { name: string; code: string } | null;
+  finalPrice: number;
+  quantity: number;
+  reserved: number;
+  available: number;
+  stockStatus: string;
+  location: string | null;
+}
+
+export interface BarcodeLookupResult {
+  code: string;
+  matchedBy: "BARCODE" | "VARIANT_SKU" | "PRODUCT_SKU";
+  product: BarcodeProduct;
+  /** null = ตรงกับ SKU ของสินค้า จึงยังไม่รู้ว่าตัวเลือกไหน */
+  variant: BarcodeVariant | null;
+  variantCount: number;
+}
+
+export interface LabelItem {
+  variantId: string;
+  productId: string;
+  productName: string;
+  productSlug: string;
+  sku: string;
+  barcode: string | null;
+  isActive: boolean;
+  colorName: string | null;
+  sizeName: string | null;
+  finalPrice: number;
+  symbology: Symbology;
+  /** ค่าที่ถูกเข้ารหัสไว้ในภาพ — สแกนแล้วต้องได้ค่านี้ */
+  encodedValue: string;
+  encodes: "GTIN" | "SKU" | "PRODUCT_URL";
+  /** SVG ที่ backend วาดมาแล้ว (ไม่มี <text> — ตัวหนังสือถูกวาดเป็นเส้น) */
+  svg: string;
+  width: number;
+  height: number;
+}
+
+export interface LabelSheet {
+  requested: RequestedSymbology;
+  copies: number;
+  items: LabelItem[];
+  /** ตัวเลือกที่ขอมาแต่ใช้ไม่ได้ — ต้องบอกผู้ใช้ ไม่ใช่พิมพ์ให้น้อยกว่าที่ขอเงียบ ๆ */
+  missingVariantIds: string[];
+}
+
+export interface AssignBarcodeResult {
+  variantId: string;
+  sku: string;
+  barcode: string;
+  barcodeKind: "EAN-13";
+  attempts: number;
 }

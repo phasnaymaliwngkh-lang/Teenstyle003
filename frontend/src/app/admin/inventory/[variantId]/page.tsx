@@ -1,4 +1,4 @@
-import { ArrowLeft, History, Package } from "lucide-react";
+import { ArrowLeft, History, Package, Printer } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -84,6 +84,13 @@ export default async function VariantInventoryPage({
           >
             {stockStatusLabel(row.stockStatus)}
           </span>
+          <Link
+            href={`/admin/barcodes/labels?variantId=${row.variantId}`}
+            className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            <Printer className="size-4" aria-hidden />
+            พิมพ์ป้ายบาร์โค้ด
+          </Link>
           <Link
             href={`/admin/products/${row.product.id}`}
             className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"

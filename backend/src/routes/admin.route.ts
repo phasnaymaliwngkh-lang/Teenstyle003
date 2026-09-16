@@ -27,6 +27,11 @@ import {
   listStockAlertsHandler,
   scanStockAlertsHandler,
 } from '../controllers/stock-alert.controller.ts';
+import {
+  assignBarcodeHandler,
+  buildLabelsHandler,
+  lookupBarcodeHandler,
+} from '../controllers/barcode.controller.ts';
 import { requireAuth } from '../middlewares/authenticate.ts';
 import { requirePermission, requireStaff } from '../middlewares/authorize.ts';
 import { verifyOrigin } from '../middlewares/verify-origin.ts';
@@ -115,3 +120,15 @@ adminRouter.patch(
   requirePermission('inventory:adjust'),
   acknowledgeStockAlertHandler,
 );
+
+/**
+ * บาร์โค้ด / QR (STEP 17)
+ *
+ * - `lookup` และ `labels` เป็นการ **อ่าน** ข้อมูลสินค้ามาแสดง/พิมพ์ → `product:read`
+ *   ทั้งคู่เป็น GET เพราะหน้า admin เป็น Server Component ที่เรียก backend แบบ
+ *   server-to-server ซึ่งไม่มี header `Origin` → `verifyOrigin` บล็อก POST แบบนั้นตอน production
+ * - `assign` เขียนค่า `ProductVariant.barcode` จริง → `product:update`
+ */
+adminRouter.get('/barcodes/lookup', requirePermission('product:read'), lookupBarcodeHandler);
+adminRouter.get('/barcodes/labels', requirePermission('product:read'), buildLabelsHandler);
+adminRouter.post('/barcodes/assign', requirePermission('product:update'), assignBarcodeHandler);

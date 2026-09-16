@@ -7,7 +7,9 @@ import type {
   AdminOverview,
   AdminProduct,
   AdminProductListResult,
+  BarcodeLookupResult,
   InventoryListResult,
+  LabelSheet,
   MovementListResult,
   ProductFormOptions,
   StockAlertListResult,
@@ -86,6 +88,26 @@ export function fetchMovementsOnServer(params: URLSearchParams): Promise<Movemen
   const qs = params.toString();
 
   return apiFetchAsUser<MovementListResult>(`/api/admin/inventory/movements${qs ? `?${qs}` : ""}`, {
+    cache: "no-store",
+  });
+}
+
+/**
+ * ค้นหาจากบาร์โค้ด/SKU ที่สแกนหรือพิมพ์มา (STEP 17)
+ *
+ * เรียกจากฝั่ง server ได้เพราะเป็น GET — หน้าสแกนจึงเป็นฟอร์ม GET ธรรมดา
+ * ที่ทำงานได้แม้ JS ยังไม่โหลด (เครื่องสแกนแบบ keyboard wedge พิมพ์โค้ดแล้วกด Enter)
+ */
+export function fetchBarcodeLookupOnServer(code: string): Promise<BarcodeLookupResult> {
+  return apiFetchAsUser<BarcodeLookupResult>(
+    `/api/admin/barcodes/lookup?code=${encodeURIComponent(code)}`,
+    { cache: "no-store" },
+  );
+}
+
+/** ป้ายบาร์โค้ด/QR ที่ backend วาดเป็น SVG มาแล้ว — ข้อความทุกตัวมาจากฐานข้อมูล */
+export function fetchBarcodeLabelsOnServer(params: URLSearchParams): Promise<LabelSheet> {
+  return apiFetchAsUser<LabelSheet>(`/api/admin/barcodes/labels?${params.toString()}`, {
     cache: "no-store",
   });
 }

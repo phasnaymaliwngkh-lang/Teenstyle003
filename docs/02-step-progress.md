@@ -4,7 +4,18 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 16 เสร็จ — Stock Alert (`/admin/alerts` + ป้ายแจ้งเตือนบนแถบหลังบ้าน)**
+**ล่าสุด: STEP 17 เสร็จ — Barcode / QR (`/admin/barcodes` + `/admin/barcodes/labels`)**
+สแกนบาร์โค้ดหรือ SKU แล้วเจอของชิ้นนั้นทันที (ฟอร์ม GET ธรรมดา — เครื่องสแกน USB/บลูทูธ
+ใช้ได้เลยเพราะทำงานเหมือนคีย์บอร์ด) → กดต่อไปปรับสต็อก แก้สินค้า หรือพิมพ์ป้ายได้ ·
+**ป้ายที่พิมพ์สแกนได้จริง** — มีเทสต์ถอดรหัส EAN-13 กลับเป็นเลข 13 หลักด้วยตารางจากมาตรฐาน
+แล้วเทียบกับค่าในฐานข้อมูล · **ไม่รับบาร์โค้ดที่ check digit ผิด** (เลขแบบนั้นสแกนไม่ติด) ·
+ออกบาร์โค้ดของร้านให้ได้ (EAN-13 prefix 20 = ช่วงที่ GS1 สงวนให้ใช้ภายในองค์กร)
+แต่ **ห้ามเขียนทับเลขเดิม** · ตัวเลือกที่ยังไม่มีบาร์โค้ดใช้ Code 128 ของ SKU
+**ไม่กุเลขขึ้นมาให้** · ข้อความบนป้ายทุกตัวอักษรอ่านจากฐานข้อมูล (ค่าที่ client แนบมาถูกเมิน) ·
+พนักงาน (`product:read`) สแกน/พิมพ์ป้ายได้ แต่ออกเลขใหม่ต้อง `product:update` ·
+**ยังไม่รองรับการสแกนด้วยกล้อง** และบอกไว้ในหน้าเว็บตรง ๆ · test 293 เคส (เพิ่ม 38)
+
+**STEP 16:** Stock Alert (`/admin/alerts` + ป้ายแจ้งเตือนบนแถบหลังบ้าน)
 **สถานะเตือนคำนวณสดจากฐานข้อมูลทุกครั้ง** (ของกลับมาเต็ม = หายจากรายการทันที ไม่มีการเตือนค้าง) ·
 แถว `Notification` ทำหน้าที่เดียวคือจำว่าเคยบอกร้านไปแล้ว → **ไม่ยิงซ้ำ · แย่ลงเตือนใหม่ ·
 ดีขึ้นไม่เตือน · ของกลับมาปกติระบบปิดรายการให้เอง** · ระบบตรวจเองทุกครั้งที่สต็อกขยับ
@@ -117,7 +128,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 |   14 | Product Management              |  ✅   |
 |   15 | Inventory / Stock               |  ✅   |
 |   16 | Stock Alert                     |  ✅   |
-|   17 | Barcode / QR                    |  ⬜   |
+|   17 | Barcode / QR                    |  ✅   |
 |   18 | Import / Export (CSV, Excel)    |  ⬜   |
 |   25 | Customer Management             |  ⬜   |
 |   26 | Analytics                       |  ⬜   |
@@ -144,7 +155,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 | ---: | --------------------------------- | :---: | -------------------------------------------------------------------------------------------------------------- |
 |   24 | Notifications                     |  ⬜   |                                                                                                                |
 |   28 | Security                          |  🚧   | helmet · cors · rate limit · Zod env · CSRF (Origin) · IDOR · STEP 11: ตรวจลายเซ็น webhook + ไม่เก็บ card data |
-|   29 | REST API                          |  🚧   | +6..12 storefront/orders · +13 `admin/overview` `admin/orders` `admin/orders/:n/status`                        |
+|   29 | REST API                          |  🚧   | +6..12 storefront/orders · +13..16 admin · +17 `admin/barcodes/{lookup,labels,assign}`                         |
 |   30 | Error Handling                    |  ✅   | global errorHandler + `{ success, message, errorCode }` + 400/401/403/404/409/422/429/500                      |
 |   31 | Responsive                        |  🚧   | จะครบเมื่อมีหน้าจริงตั้งแต่ STEP 4                                                                             |
 |   32 | Loading / Empty / Error / Retry   |  ✅   | โครงใช้ซ้ำได้ใน components/shared/section.tsx · ทดสอบ error state แล้วตอน backend ล่ม                          |
@@ -152,7 +163,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 |   34 | Performance (cache, index, Redis) |  ⬜   |                                                                                                                |
 |   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                    |
 |   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                  |
-|   37 | Testing                           |  🚧   | vitest + supertest 171 เคส: +admin (RBAC · state machine · restock · AdminLog)                                 |
+|   37 | Testing                           |  🚧   | vitest + supertest 293 เคส · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                  |
 |   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                  |
 |   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                |
 |   40 | Final Audit                       |  ⬜   |                                                                                                                |

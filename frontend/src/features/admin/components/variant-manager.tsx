@@ -1,11 +1,13 @@
 "use client";
 
-import { AlertTriangle, Check, Loader2, Plus } from "lucide-react";
+import { AlertTriangle, Check, Loader2, Plus, Printer } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { describeApiError } from "../lib/api-error-text";
+
+import { AssignBarcodeButton } from "./assign-barcode-button";
 
 import { cn } from "@/lib/utils";
 import { addProductVariant, updateProductVariant } from "@/services/admin.service";
@@ -153,6 +155,8 @@ function VariantRow({
   const [salePrice, setSalePrice] = useState(
     variant.overridesPrice && variant.salePrice !== null ? String(variant.salePrice) : "",
   );
+  /** บาร์โค้ด (STEP 17) — เว้นว่าง = ล้างค่า เหมือนช่องราคา */
+  const [barcode, setBarcode] = useState(variant.barcode ?? "");
 
   const label = [variant.color?.name, variant.size?.name].filter(Boolean).join(" · ") || "ไม่ระบุ";
 
@@ -229,6 +233,24 @@ function VariantRow({
             className={inputClass}
           />
         </label>
+
+        <label className="block text-sm sm:col-span-2">
+          <span className="mb-1 block font-semibold">บาร์โค้ดสินค้า (GTIN)</span>
+          <input
+            value={barcode}
+            onChange={(event) => setBarcode(event.target.value)}
+            inputMode="numeric"
+            placeholder="เว้นว่าง = ยังไม่มี (ป้ายจะใช้ Code 128 ของ SKU)"
+            disabled={disabled}
+            className={inputClass}
+          />
+          <span className="mt-1 block text-xs text-muted">
+            ตัวเลข 8, 12 หรือ 13 หลักที่หลักตรวจสอบถูกต้อง (พิมพ์ขีดกลางคั่นได้) ·{" "}
+            {variant.barcode === null
+              ? "ยังไม่มีบาร์โค้ด — ให้ระบบออกเลขของร้านให้ได้ที่ปุ่มด้านล่าง"
+              : "เว้นว่างแล้วบันทึก = ล้างบาร์โค้ดออก"}
+          </span>
+        </label>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -241,16 +263,25 @@ function VariantRow({
                 updateProductVariant(product.id, variant.id, {
                   price: price.trim() === "" ? null : Number(price),
                   salePrice: salePrice.trim() === "" ? null : Number(salePrice),
+                  barcode: barcode.trim() === "" ? null : barcode.trim(),
                 }),
-              "บันทึกราคาของตัวเลือกแล้ว",
+              "บันทึกราคาและบาร์โค้ดของตัวเลือกแล้ว",
             )
           }
           disabled={disabled}
           className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-brand bg-brand px-4 text-sm font-bold text-white transition disabled:opacity-50"
         >
           {busy && <Loader2 className="size-4 animate-spin" aria-hidden />}
-          บันทึกราคา
+          บันทึกราคา / บาร์โค้ด
         </button>
+
+        <Link
+          href={`/admin/barcodes/labels?variantId=${variant.id}`}
+          className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+        >
+          <Printer className="size-4" aria-hidden />
+          พิมพ์ป้าย
+        </Link>
 
         <button
           type="button"
@@ -267,6 +298,12 @@ function VariantRow({
           {variant.isActive ? "ปิดขายตัวเลือกนี้" : "เปิดขายตัวเลือกนี้"}
         </button>
       </div>
+
+      {variant.barcode === null && (
+        <div className="mt-3 border-t border-line pt-3">
+          <AssignBarcodeButton variantId={variant.id} />
+        </div>
+      )}
     </li>
   );
 }

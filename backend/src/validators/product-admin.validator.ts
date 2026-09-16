@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 import { allowedImageHostsText, isAllowedImageUrl } from '../config/media.ts';
 
+import { gtinSchema } from './barcode.validator.ts';
+
 /**
  * Validator ของการจัดการสินค้าในหลังบ้าน (STEP 14)
  *
@@ -54,6 +56,11 @@ export const productImageSchema = z.object({
 
 export const productVariantSchema = z.object({
   sku,
+  /**
+   * บาร์โค้ดสินค้า (GTIN) — `null` = ล้างค่า · ไม่ส่ง = ไม่แก้ (STEP 17)
+   * ไม่บังคับ เพราะสินค้าที่ร้านผลิตเองอาจยังไม่มีเลข และ SKU พิมพ์เป็น Code 128 ได้อยู่แล้ว
+   */
+  barcode: gtinSchema.nullable().optional(),
   /** ถ้าไม่ส่ง = ใช้ราคาของสินค้าแม่ */
   price: clearableMoney.optional(),
   salePrice: clearableMoney.optional(),
@@ -183,7 +190,7 @@ export const productIdParamsSchema = z.object({
 export const addVariantSchema = productVariantSchema;
 
 /**
- * แก้ตัวเลือกสินค้า — แก้ได้แค่ราคาและสถานะเปิด/ปิดขาย
+ * แก้ตัวเลือกสินค้า — แก้ได้แค่ราคา บาร์โค้ด และสถานะเปิด/ปิดขาย
  * **ไม่มีฟิลด์จำนวนสต็อกโดยเจตนา** ฟิลด์อย่าง `quantity` ที่ส่งมาจะถูกตัดทิ้ง
  * แล้วกลายเป็นคำขอว่าง → 422 (สต็อกเดินผ่าน InventoryMovement เท่านั้น)
  */
@@ -193,6 +200,8 @@ export const updateVariantSchema = z
     price: clearableMoney.optional(),
     /** `null` = เลิกโปรโมชันของตัวเลือกนี้ */
     salePrice: clearableMoney.optional(),
+    /** `null` = ล้างบาร์โค้ด (เช่น กรอกผิด หรือจะออกเลขใหม่ของร้าน) */
+    barcode: gtinSchema.nullable().optional(),
     isActive: z.boolean().optional(),
   })
   .refine((value) => Object.keys(value).length > 0, { message: 'ไม่มีข้อมูลที่จะแก้ไข' });
