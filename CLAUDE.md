@@ -4,9 +4,9 @@
 > Full Stack Fashion E-Commerce สำหรับวัยรุ่น — Next.js + Express + PostgreSQL + Prisma + OpenAI
 
 โปรเจกต์นี้เดินตาม **Master Prompt STEP 1–55** ทำทีละ STEP แล้วหยุดรอคำสั่งถัดไป
-สถานะปัจจุบัน: **STEP 1–17 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
+สถานะปัจจุบัน: **STEP 1–18 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
 หน้าร้าน → ตะกร้า → checkout → ชำระเงิน (COD จริง · Stripe รอใส่ key) → ติดตามคำสั่งซื้อ
-→ **หลังบ้าน: ภาพรวมร้าน + จัดการคำสั่งซื้อ + จัดการสินค้า + คลังสินค้า + แจ้งเตือนสต็อก + บาร์โค้ด/QR**
+→ **หลังบ้าน: ภาพรวมร้าน + จัดการคำสั่งซื้อ + จัดการสินค้า + คลังสินค้า + แจ้งเตือนสต็อก + บาร์โค้ด/QR + นำเข้า/ส่งออก (CSV, Excel)**
 → ดู [docs/02-step-progress.md](docs/02-step-progress.md)
 
 ## ⚠️ อ่านก่อน: ไฟล์เก่าที่ root ไม่ใช่ส่วนหนึ่งของแอป
@@ -136,7 +136,8 @@ app/
 │   ├── products/ products/new/ products/[productId]/   จัดการสินค้า (STEP 14)
 │   ├── inventory/ inventory/movements/ inventory/[variantId]/   คลังสินค้า (STEP 15)
 │   ├── alerts/             แจ้งเตือนสต็อก (STEP 16)
-│   └── barcodes/ barcodes/labels/   สแกนบาร์โค้ด + พิมพ์ป้าย (STEP 17)
+│   ├── barcodes/ barcodes/labels/   สแกนบาร์โค้ด + พิมพ์ป้าย (STEP 17)
+│   └── import-export/      นำเข้าและส่งออกสินค้า/สต็อก/คำสั่งซื้อ (STEP 18)
 ├── signin/ after-signin/   อยู่นอกกลุ่ม — ไม่มี navbar (หน้าโฟกัสเดียว)
 └── api/auth/[...nextauth]/
 ```

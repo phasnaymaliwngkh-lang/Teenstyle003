@@ -48,6 +48,24 @@ function normalize(error: unknown): NormalizedError {
     };
   }
 
+  // Multer error (เช่น ขนาดไฟล์เกิน 5MB)
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    (error as { name: string }).name === 'MulterError'
+  ) {
+    const multerErr = error as unknown as { code: string; message: string };
+    return {
+      statusCode: 400,
+      message:
+        multerErr.code === 'LIMIT_FILE_SIZE'
+          ? 'ไฟล์มีขนาดใหญ่เกินกำหนด (สูงสุด 5MB)'
+          : `ข้อผิดพลาดในการอัปโหลดไฟล์: ${multerErr.message}`,
+      errorCode: ERROR_CODES.BAD_REQUEST,
+    };
+  }
+
   return {
     statusCode: 500,
     message: 'เกิดข้อผิดพลาดภายในระบบ',

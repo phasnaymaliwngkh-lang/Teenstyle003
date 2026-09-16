@@ -411,3 +411,71 @@ export interface AssignBarcodeResult {
   barcodeKind: "EAN-13";
   attempts: number;
 }
+
+/* ─────────────── นำเข้าและส่งออกข้อมูล (STEP 18) ─────────────── */
+
+export type FileFormat = "csv" | "xlsx";
+
+export interface ImportErrorDetail {
+  row: number;
+  field?: string;
+  sku?: string;
+  message: string;
+}
+
+export interface ProductImportPreview {
+  row: number;
+  productName: string;
+  sku: string;
+  variantSku: string;
+  category: string;
+  brand?: string;
+  price: number;
+  salePrice?: number | null;
+  color?: string;
+  size?: string;
+  barcode?: string;
+  initialStock: number;
+  action: "CREATE" | "UPDATE";
+}
+
+export interface ProductImportResult {
+  success: boolean;
+  dryRun: boolean;
+  totalRows: number;
+  validCount: number;
+  errorCount: number;
+  errors: ImportErrorDetail[];
+  createdProducts?: number;
+  updatedProducts?: number;
+  createdVariants?: number;
+  updatedVariants?: number;
+  preview?: ProductImportPreview[];
+}
+
+export interface InventoryImportPreview {
+  row: number;
+  sku: string;
+  productName: string;
+  type: string;
+  currentQuantity: number;
+  reservedQuantity: number;
+  delta: number;
+  newQuantity: number;
+  availableBefore: number;
+  availableAfter: number;
+  reason: string;
+  status: "VALID" | "INVALID";
+  error?: string;
+}
+
+export interface InventoryImportResult {
+  success: boolean;
+  dryRun: boolean;
+  totalRows: number;
+  validCount: number;
+  errorCount: number;
+  errors: ImportErrorDetail[];
+  adjustedCount?: number;
+  preview?: InventoryImportPreview[];
+}

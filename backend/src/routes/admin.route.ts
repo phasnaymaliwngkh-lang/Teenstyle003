@@ -32,6 +32,15 @@ import {
   buildLabelsHandler,
   lookupBarcodeHandler,
 } from '../controllers/barcode.controller.ts';
+import {
+  downloadTemplateHandler,
+  exportInventoryHandler,
+  exportOrdersHandler,
+  exportProductsHandler,
+  importInventoryHandler,
+  importProductsHandler,
+} from '../controllers/import-export.controller.ts';
+import multer from 'multer';
 import { requireAuth } from '../middlewares/authenticate.ts';
 import { requirePermission, requireStaff } from '../middlewares/authorize.ts';
 import { verifyOrigin } from '../middlewares/verify-origin.ts';
@@ -132,3 +141,40 @@ adminRouter.patch(
 adminRouter.get('/barcodes/lookup', requirePermission('product:read'), lookupBarcodeHandler);
 adminRouter.get('/barcodes/labels', requirePermission('product:read'), buildLabelsHandler);
 adminRouter.post('/barcodes/assign', requirePermission('product:update'), assignBarcodeHandler);
+
+/**
+ * นำเข้าและส่งออกข้อมูล (STEP 18 — CSV, Excel)
+ *
+ * - ส่งออก (Export): ส่งออกข้อมูลสินค้า คลังสินค้า และคำสั่งซื้อ เป็น CSV / Excel
+ * - นำเข้า (Import): นำเข้าสินค้าใหม่ หรือปรับปรุงสต็อกเป็นชุด (Stock Take)
+ * - จำกัดขนาดไฟล์อัปโหลดไม่เกิน 5MB ป้องกัน DoS
+ */
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// ส่งออก (Export)
+adminRouter.get('/export/products', requirePermission('product:read'), exportProductsHandler);
+adminRouter.get('/export/inventory', requirePermission('inventory:read'), exportInventoryHandler);
+adminRouter.get('/export/orders', requirePermission('order:read'), exportOrdersHandler);
+adminRouter.get(
+  '/export/templates/:type',
+  requirePermission('product:read'),
+  downloadTemplateHandler,
+);
+
+// นำเข้า (Import)
+adminRouter.post(
+  '/import/products',
+  requirePermission('product:create'),
+  requirePermission('product:update'),
+  upload.single('file'),
+  importProductsHandler,
+);
+adminRouter.post(
+  '/import/inventory',
+  requirePermission('inventory:adjust'),
+  upload.single('file'),
+  importInventoryHandler,
+);

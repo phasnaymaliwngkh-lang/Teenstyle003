@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api";
+import { publicEnv } from "@/lib/env";
 import type {
   AdjustStockInput,
   AdminOrder,
@@ -6,6 +7,9 @@ import type {
   AssignBarcodeResult,
   CreateProductInput,
   DeleteProductResult,
+  FileFormat,
+  InventoryImportResult,
+  ProductImportResult,
   ProductVariantInput,
   UpdateOrderStatusInput,
   UpdateProductInput,
@@ -132,4 +136,95 @@ export function assignBarcode(variantId: string): Promise<AssignBarcodeResult> {
     cache: "no-store",
     timeoutMs: 30_000,
   });
+}
+
+/* ─────────────── นำเข้าและส่งออกข้อมูล (STEP 18) ─────────────── */
+
+async function triggerFileDownload(path: string, fallbackFilename: string): Promise<void> {
+  const base = publicEnv.apiUrl;
+  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+
+  const response = await fetch(url, {
+    credentials: "include",
+    headers: { Accept: "*/*" },
+  });
+
+  if (!response.ok) {
+    let msg = "ดาวน์โหลดไฟล์ไม่สำเร็จ";
+    try {
+      const err = await response.json();
+      if (err && err.message) msg = err.message;
+    } catch {
+      // fallback
+    }
+    throw new Error(msg);
+  }
+
+  const disposition = response.headers.get("Content-Disposition");
+  let filename = fallbackFilename;
+  if (disposition && disposition.includes("filename=")) {
+    const match = disposition.match(/filename="?([^";]+)"?/);
+    if (match && match[1]) filename = match[1];
+  }
+
+  const blob = await response.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(blobUrl);
+}
+
+export function downloadAdminExport(
+  type: "products" | "inventory" | "orders",
+  format: FileFormat,
+  query = "",
+): Promise<void> {
+  const q = query ? `&${query.replace(/^\?/, "")}` : "";
+  return triggerFileDownload(
+    `/api/admin/export/${type}?format=${format}${q}`,
+    `${type}_export.${format}`,
+  );
+}
+
+export function downloadAdminTemplate(
+  type: "products" | "inventory",
+  format: FileFormat,
+): Promise<void> {
+  return triggerFileDownload(
+    `/api/admin/export/templates/${type}?format=${format}`,
+    `${type}_template.${format}`,
+  );
+}
+
+async function uploadFile<T>(path: string, file: File, dryRun = false): Promise<T> {
+  const base = publicEnv.apiUrl;
+  const url = `${base}${path.startsWith("/") ? path : `/${path}`}${path.includes("?") ? "&" : "?"}dryRun=${dryRun}`;
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch(url, {
+    method: "POST",
+    credentials: "include",
+    headers: { Accept: "application/json" },
+    body: formData,
+  });
+
+  const json = await response.json();
+  if (!response.ok || !json.success) {
+    throw new Error(json.message || "อัปโหลดไฟล์ไม่สำเร็จ");
+  }
+
+  return json.data as T;
+}
+
+export function importAdminProducts(file: File, dryRun = false): Promise<ProductImportResult> {
+  return uploadFile<ProductImportResult>("/api/admin/import/products", file, dryRun);
+}
+
+export function importAdminInventory(file: File, dryRun = false): Promise<InventoryImportResult> {
+  return uploadFile<InventoryImportResult>("/api/admin/import/inventory", file, dryRun);
 }

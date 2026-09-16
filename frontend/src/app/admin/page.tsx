@@ -94,6 +94,12 @@ export default async function AdminDashboardPage() {
 
         <div className="flex flex-wrap gap-2">
           <Link
+            href="/admin/import-export"
+            className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            นำเข้า / ส่งออก
+          </Link>
+          <Link
             href="/admin/barcodes"
             className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
           >
@@ -257,7 +263,7 @@ export default async function AdminDashboardPage() {
       </section>
 
       <p className="mt-8 text-xs text-muted">
-        บาร์โค้ด/QR (STEP 17) · นำเข้า-ส่งออก CSV (STEP 18) · รายงานเชิงลึกและกราฟ (STEP 26) ·
+        นำเข้า-ส่งออก CSV/Excel (STEP 18) พร้อมใช้งานแล้ว · รายงานเชิงลึกและกราฟ (STEP 26) ·
         ประวัติการแก้ไขของแอดมิน (STEP 27) จะเพิ่มในลำดับถัดไป
       </p>
     </main>

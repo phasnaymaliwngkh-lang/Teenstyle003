@@ -1,4 +1,12 @@
-import { AlertTriangle, PackageOpen, Plus, Printer, ScanBarcode, Search } from "lucide-react";
+import {
+  AlertTriangle,
+  FileSpreadsheet,
+  PackageOpen,
+  Plus,
+  Printer,
+  ScanBarcode,
+  Search,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -76,6 +84,13 @@ export default async function AdminProductsPage({
             className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
           >
             ภาพรวมร้าน
+          </Link>
+          <Link
+            href="/admin/import-export?tab=products"
+            className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            <FileSpreadsheet className="size-4 text-brand" aria-hidden />
+            นำเข้า / ส่งออก
           </Link>
           <Link
             href="/admin/barcodes"
