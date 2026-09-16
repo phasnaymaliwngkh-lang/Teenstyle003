@@ -143,15 +143,10 @@ async function workbookToBuffer(workbook: ExcelJS.Workbook, format: FileFormat):
 }
 
 function isZipBuffer(buf: Buffer): boolean {
-  return (
-    buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04
-  );
+  return buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04;
 }
 
-async function parseSpreadsheetBuffer(
-  fileBuffer: Buffer,
-  fileName: string,
-): Promise<ExcelJS.Worksheet> {
+async function parseSpreadsheetBuffer(fileBuffer: Buffer, fileName: string): Promise<ExcelJS.Worksheet> {
   const workbook = new ExcelJS.Workbook();
   const isCsv = fileName.toLowerCase().endsWith('.csv') || !isZipBuffer(fileBuffer);
 
@@ -332,9 +327,7 @@ export async function exportInventory(query: ExportInventoryQuery): Promise<Expo
       },
       color: { select: { name: true } },
       size: { select: { name: true } },
-      inventory: {
-        select: { quantity: true, reservedQuantity: true, location: true, updatedAt: true },
-      },
+      inventory: { select: { quantity: true, reservedQuantity: true, location: true, updatedAt: true } },
     },
   });
 
@@ -613,10 +606,7 @@ const PRODUCT_HEADER_MAP: Record<string, string> = {
 };
 
 function normalizeHeader(raw: string): string {
-  const clean = raw
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_()-]/g, '');
+  const clean = raw.trim().toLowerCase().replace(/[\s_()-]/g, '');
   return PRODUCT_HEADER_MAP[clean] ?? PRODUCT_HEADER_MAP[raw.trim()] ?? raw.trim();
 }
 
@@ -652,28 +642,20 @@ export async function importProducts(
   }> = [];
 
   // ดึง Master Data มาแคชไว้ในหน่วยความจำสำหรับการตรวจสอบรอบเดียว (High Performance)
-  const [categories, brands, colors, sizes, existingProducts, existingVariants] = await Promise.all(
-    [
-      prisma.category.findMany({
-        where: { deletedAt: null },
-        select: { id: true, name: true, slug: true },
-      }),
-      prisma.brand.findMany({
-        where: { deletedAt: null },
-        select: { id: true, name: true, slug: true },
-      }),
-      prisma.color.findMany({ select: { id: true, name: true, slug: true } }),
-      prisma.size.findMany({ select: { id: true, name: true, code: true } }),
-      prisma.product.findMany({
-        where: { deletedAt: null },
-        select: { id: true, sku: true, slug: true, name: true },
-      }),
-      prisma.productVariant.findMany({
-        where: { deletedAt: null },
-        select: { id: true, sku: true, barcode: true, productId: true },
-      }),
-    ],
-  );
+  const [categories, brands, colors, sizes, existingProducts, existingVariants] = await Promise.all([
+    prisma.category.findMany({ where: { deletedAt: null }, select: { id: true, name: true, slug: true } }),
+    prisma.brand.findMany({ where: { deletedAt: null }, select: { id: true, name: true, slug: true } }),
+    prisma.color.findMany({ select: { id: true, name: true, slug: true } }),
+    prisma.size.findMany({ select: { id: true, name: true, code: true } }),
+    prisma.product.findMany({
+      where: { deletedAt: null },
+      select: { id: true, sku: true, slug: true, name: true },
+    }),
+    prisma.productVariant.findMany({
+      where: { deletedAt: null },
+      select: { id: true, sku: true, barcode: true, productId: true },
+    }),
+  ]);
 
   const seenVariantSkusInFile = new Set<string>();
 
@@ -692,10 +674,7 @@ export async function importProducts(
           const num = Number(cellVal);
           rawObj[key] = isNaN(num) ? cellVal : num;
         } else {
-          rawObj[key] =
-            typeof cellVal === 'object' && 'text' in cellVal
-              ? (cellVal as { text: string }).text
-              : String(cellVal).trim();
+          rawObj[key] = typeof cellVal === 'object' && 'text' in cellVal ? (cellVal as { text: string }).text : String(cellVal).trim();
         }
       }
     }
@@ -731,9 +710,7 @@ export async function importProducts(
 
     // 3. ตรวจสอบหมวดหมู่ (Category)
     const categoryRef = categories.find(
-      (c) =>
-        c.name.toLowerCase() === data.category.toLowerCase() ||
-        c.slug.toLowerCase() === data.category.toLowerCase(),
+      (c) => c.name.toLowerCase() === data.category.toLowerCase() || c.slug.toLowerCase() === data.category.toLowerCase(),
     );
     if (!categoryRef) {
       errors.push({
@@ -748,9 +725,7 @@ export async function importProducts(
     let brandRef: { id: string; name: string } | null = null;
     if (data.brand) {
       const foundBrand = brands.find(
-        (b) =>
-          b.name.toLowerCase() === data.brand!.toLowerCase() ||
-          b.slug.toLowerCase() === data.brand!.toLowerCase(),
+        (b) => b.name.toLowerCase() === data.brand!.toLowerCase() || b.slug.toLowerCase() === data.brand!.toLowerCase(),
       );
       if (!foundBrand) {
         errors.push({
@@ -767,9 +742,7 @@ export async function importProducts(
     let colorRef: { id: string; name: string } | null = null;
     if (data.color) {
       const foundColor = colors.find(
-        (c) =>
-          c.name.toLowerCase() === data.color!.toLowerCase() ||
-          c.slug.toLowerCase() === data.color!.toLowerCase(),
+        (c) => c.name.toLowerCase() === data.color!.toLowerCase() || c.slug.toLowerCase() === data.color!.toLowerCase(),
       );
       if (foundColor) {
         colorRef = foundColor;
@@ -780,9 +753,7 @@ export async function importProducts(
     let sizeRef: { id: string; name: string } | null = null;
     if (data.size) {
       const foundSize = sizes.find(
-        (s) =>
-          s.name.toLowerCase() === data.size!.toLowerCase() ||
-          s.code.toLowerCase() === data.size!.toLowerCase(),
+        (s) => s.name.toLowerCase() === data.size!.toLowerCase() || s.code.toLowerCase() === data.size!.toLowerCase(),
       );
       if (foundSize) {
         sizeRef = foundSize;
@@ -1037,10 +1008,7 @@ const INVENTORY_HEADER_MAP: Record<string, string> = {
 };
 
 function normalizeInventoryHeader(raw: string): string {
-  const clean = raw
-    .trim()
-    .toLowerCase()
-    .replace(/[\s_()-]/g, '');
+  const clean = raw.trim().toLowerCase().replace(/[\s_()-]/g, '');
   return INVENTORY_HEADER_MAP[clean] ?? INVENTORY_HEADER_MAP[raw.trim()] ?? raw.trim();
 }
 
@@ -1083,10 +1051,7 @@ export async function importInventory(
           const num = Number(cellVal);
           rawObj[key] = isNaN(num) ? cellVal : num;
         } else {
-          rawObj[key] =
-            typeof cellVal === 'object' && 'text' in cellVal
-              ? (cellVal as { text: string }).text
-              : String(cellVal).trim();
+          rawObj[key] = typeof cellVal === 'object' && 'text' in cellVal ? (cellVal as { text: string }).text : String(cellVal).trim();
         }
       }
     }
@@ -1100,7 +1065,10 @@ export async function importInventory(
   const variants = await prisma.productVariant.findMany({
     where: {
       deletedAt: null,
-      OR: [{ sku: { in: searchCodes } }, { barcode: { in: searchCodes } }],
+      OR: [
+        { sku: { in: searchCodes } },
+        { barcode: { in: searchCodes } },
+      ],
     },
     include: {
       product: { select: { id: true, name: true } },

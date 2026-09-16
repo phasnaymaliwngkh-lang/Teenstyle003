@@ -99,10 +99,7 @@ export function InventoryImportPanel() {
       </div>
 
       {generalError && (
-        <div
-          className="rounded-[var(--radius-card)] border border-danger/30 bg-danger/10 p-4 text-sm text-danger"
-          role="alert"
-        >
+        <div className="rounded-[var(--radius-card)] border border-danger/30 bg-danger/10 p-4 text-sm text-danger" role="alert">
           {generalError}
         </div>
       )}
@@ -125,13 +122,9 @@ export function InventoryImportPanel() {
             <Upload className="size-6" />
           </div>
           <p className="mt-3 text-sm font-semibold text-ink">
-            {selectedFile
-              ? selectedFile.name
-              : "คลิกเพื่อเลือกไฟล์ตรวจนับสต็อก หรือลากไฟล์มาวางที่นี่"}
+            {selectedFile ? selectedFile.name : "คลิกเพื่อเลือกไฟล์ตรวจนับสต็อก หรือลากไฟล์มาวางที่นี่"}
           </p>
-          <p className="mt-1 text-xs text-muted">
-            รองรับไฟล์ Excel (.xlsx) และ CSV (.csv) ขนาดไม่เกิน 5MB
-          </p>
+          <p className="mt-1 text-xs text-muted">รองรับไฟล์ Excel (.xlsx) และ CSV (.csv) ขนาดไม่เกิน 5MB</p>
           {selectedFile && (
             <span className="mt-2 rounded-[var(--radius-pill)] bg-lilac px-3 py-1 text-xs font-bold text-brand-dark">
               ขนาด {(selectedFile.size / 1024).toFixed(1)} KB
@@ -146,11 +139,7 @@ export function InventoryImportPanel() {
             onClick={() => handleImport(true)}
             className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50 disabled:opacity-50"
           >
-            {loading ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <FileSpreadsheet className="size-4 text-brand" />
-            )}
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4 text-brand" />}
             ตรวจสอบยอดตรวจนับ (Dry Run)
           </button>
           <button
@@ -259,10 +248,7 @@ export function InventoryImportPanel() {
                   </thead>
                   <tbody className="divide-y divide-line">
                     {result.preview.map((row, i) => (
-                      <tr
-                        key={i}
-                        className={`hover:bg-lilac-50/20 ${row.status === "INVALID" ? "bg-danger/5" : ""}`}
-                      >
+                      <tr key={i} className={`hover:bg-lilac-50/20 ${row.status === "INVALID" ? "bg-danger/5" : ""}`}>
                         <td className="px-3 py-2 font-mono text-muted">{row.row}</td>
                         <td className="px-3 py-2 font-mono font-semibold text-ink">{row.sku}</td>
                         <td className="px-3 py-2 text-ink">{row.productName}</td>
@@ -282,9 +268,7 @@ export function InventoryImportPanel() {
                             {row.delta > 0 ? `+${row.delta}` : row.delta}
                           </span>
                         </td>
-                        <td className="px-3 py-2 font-extrabold text-brand-dark">
-                          {row.newQuantity}
-                        </td>
+                        <td className="px-3 py-2 font-extrabold text-brand-dark">{row.newQuantity}</td>
                         <td className="px-3 py-2">
                           <span
                             className={`rounded px-2 py-0.5 text-[10px] font-bold ${
@@ -309,3 +293,4 @@ export function InventoryImportPanel() {
     </div>
   );
 }
+

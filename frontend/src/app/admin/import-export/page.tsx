@@ -36,8 +36,7 @@ export default async function AdminImportExportPage({ searchParams }: ImportExpo
           </div>
           <h1 className="mt-1 text-3xl font-extrabold text-ink">นำเข้าและส่งออกข้อมูล</h1>
           <p className="mt-1 text-sm text-muted">
-            จัดการแคตตาล็อกสินค้า, ตรวจนับสต็อกเป็นชุด (Stock Take) และส่งออกรายงานในรูปแบบ CSV หรือ
-            Excel
+            จัดการแคตตาล็อกสินค้า, ตรวจนับสต็อกเป็นชุด (Stock Take) และส่งออกรายงานในรูปแบบ CSV หรือ Excel
           </p>
         </div>
 
@@ -61,3 +60,4 @@ export default async function AdminImportExportPage({ searchParams }: ImportExpo
     </main>
   );
 }
+

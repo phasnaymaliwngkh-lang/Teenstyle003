@@ -4,7 +4,10 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 18 เสร็จ — Import / Export (CSV, Excel) (`/admin/import-export`)**
+**ล่าสุด: STEP 19 เสร็จ — AI Stylist (`/ai-stylist`)**
+ผู้ช่วยเลือกชุดและสไตล์ส่วนบุคคล ตอบคำถามสไตล์ สี โอกาสใช้งาน และงบประมาณ · **Universal Invariant: แนะนำเฉพาะสินค้าที่มีอยู่จริงในระบบ TEENSTYLE และมีสต็อกพร้อมขายเท่านั้น (No Hallucination)** · รองรับ OpenAI GPT-4o-mini พร้อม Tool Calling (`search_catalog`) ดึงข้อมูลจริงจาก PostgreSQL และมี Intelligent Catalog Matcher (Fallback Engine) ทำงานได้ 100% ตลอดเวลาแม้ไม่มี OpenAI API Key หรือออฟไลน์ · บันทึกบทสนทนาใน `AIConversation` (type: STYLIST, status: ACTIVE) และ `AIChatMessage` พร้อม `referencedProductIds` ตรวจสอบย้อนหลังได้ · รองรับทั้ง Guest (Cookie `ai-session-id`) และ Authenticated User พร้อม Session Isolation / IDOR Protection ป้องกันการแอบดูแชตคนอื่น · หน้าเว็บ `/ai-stylist` แบบ Interactive Chat พร้อม Quick Preset Chips และ Product Recommendation Cards ที่มีราคา/สต็อกจริงและปุ่มเลือกซื้อ · test 316 เคส (เพิ่ม 8) ผ่านทั้งหมด
+
+**STEP 18:** Import / Export (CSV, Excel) (`/admin/import-export`)
 ส่งออกและนำเข้าข้อมูลสินค้า คลังสินค้า (Stock Take) และประวัติคำสั่งซื้อ รองรับทั้ง CSV (ใส่ UTF-8 BOM ป้องกันภาษาไทยเพี้ยนใน Excel บน Windows) และ Excel (.xlsx) ที่จัดรูปแบบตารางอย่างสวยงาม · **นำเข้าสินค้าพร้อมตรวจสอบความถูกต้องระดับแถวด้วย Zod** (ชื่อ, หมวดหมู่, แบรนด์, สี, ไซซ์, ราคา) · **บาร์โค้ดในไฟล์ต้องผ่านการตรวจ check digit จริง** (GS1 / EAN-13 / GTIN) ไม่ยอมรับเลขมั่ว · **โหมด Dry Run ตรวจสอบและแสดงตัวอย่างก่อนบันทึกจริง** (ไม่แตะฐานข้อมูลจนกว่าจะกดบันทึกจริง) · **ปรับสต็อกเป็นชุดรักษา Invariants สต็อกห้ามติดลบ และห้ามตัดของที่ลูกค้าจองไว้** (`quantity + delta >= reservedQuantity`) · ทุกการนำเข้าบันทึก `InventoryMovement` (STOCK_IN) สำหรับของเริ่มต้น และบันทึก `AdminLog` พร้อมสแกนแจ้งเตือนสต็อกต่ำทันที · test 308 เคส (เพิ่ม 15) ผ่านทั้งหมด
 
 **STEP 17:** Barcode / QR (`/admin/barcodes` + `/admin/barcodes/labels`)
@@ -147,7 +150,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 
 | STEP | หัวข้อ                                | สถานะ |
 | ---: | ------------------------------------- | :---: |
-|   19 | AI Stylist                            |  ⬜   |
+|   19 | AI Stylist                            |  ✅   |
 |   20 | AI Customer Service (+ human handoff) |  ⬜   |
 |   21 | AI Knowledge Base                     |  ⬜   |
 |   46 | AI Recommendation Engine              |  ⬜   |

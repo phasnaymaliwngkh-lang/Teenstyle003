@@ -4,9 +4,10 @@
 > Full Stack Fashion E-Commerce สำหรับวัยรุ่น — Next.js + Express + PostgreSQL + Prisma + OpenAI
 
 โปรเจกต์นี้เดินตาม **Master Prompt STEP 1–55** ทำทีละ STEP แล้วหยุดรอคำสั่งถัดไป
-สถานะปัจจุบัน: **STEP 1–18 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
+สถานะปัจจุบัน: **STEP 1–19 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
 หน้าร้าน → ตะกร้า → checkout → ชำระเงิน (COD จริง · Stripe รอใส่ key) → ติดตามคำสั่งซื้อ
 → **หลังบ้าน: ภาพรวมร้าน + จัดการคำสั่งซื้อ + จัดการสินค้า + คลังสินค้า + แจ้งเตือนสต็อก + บาร์โค้ด/QR + นำเข้า/ส่งออก (CSV, Excel)**
+→ **AI: AI Stylist ผู้ช่วยเลือกชุดและสไตล์ส่วนบุคคล (OpenAI GPT-4o-mini Tool Calling + Intelligent Catalog Matcher)**
 → ดู [docs/02-step-progress.md](docs/02-step-progress.md)
 
 ## ⚠️ อ่านก่อน: ไฟล์เก่าที่ root ไม่ใช่ส่วนหนึ่งของแอป
@@ -127,7 +128,8 @@ app/
 │   ├── looks/ looks/[slug]/    ← ของจริงแล้ว (STEP 7–8)
 │   ├── cart/ checkout/ checkout/success/   ← ของจริงแล้ว (STEP 9–11 · success = แผงชำระเงิน)
 │   ├── account/orders/ account/orders/[orderNumber]/   ← ประวัติ + ติดตาม (STEP 12)
-│   ├── ai-stylist about wishlist search   ← placeholder (ComingSoon)
+│   ├── ai-stylist          ผู้ช่วยเลือกชุดและสไตล์ (STEP 19)
+│   ├── about wishlist search   ← placeholder (ComingSoon)
 │   └── account forbidden unauthorized
 ├── admin/
 │   ├── layout.tsx          แถบ admin + requireStaff() ป้องกันทุกหน้าใต้ /admin

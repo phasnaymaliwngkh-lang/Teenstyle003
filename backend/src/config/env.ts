@@ -82,6 +82,14 @@ const EnvSchema = z.object({
   SMTP_PASSWORD: optionalSecret,
   MAIL_FROM: optionalSecret,
 
+  /**
+   * OpenAI (STEP 19–21, 45–46)
+   * ถ้าไม่ได้ตั้งค่า ระบบจะใช้ Intelligent Catalog Matcher (Fallback Engine)
+   * เพื่อให้ระบบทำงานได้ 100% ตลอดเวลา และไม่เกิด error หลอกลวง
+   */
+  OPENAI_API_KEY: optionalSecret,
+  OPENAI_MODEL: z.string().min(1).default('gpt-4o-mini'),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),

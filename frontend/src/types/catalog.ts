@@ -508,3 +508,36 @@ export interface AvailabilityResult {
     finalPrice: number;
   };
 }
+
+// ============================================================================
+// AI STYLIST (STEP 19)
+// ============================================================================
+
+export type AIMessageRole = "USER" | "ASSISTANT" | "SYSTEM" | "AGENT";
+
+export interface StylistPreferences {
+  style?: string;
+  occasion?: string;
+  color?: string;
+  maxBudget?: number;
+  size?: string;
+}
+
+export interface StylistMessage {
+  id: string;
+  role: AIMessageRole;
+  content: string;
+  referencedProducts: ProductCard[];
+  createdAt: string;
+}
+
+export interface StylistChatResponse {
+  conversationId: string;
+  message: StylistMessage;
+  suggestedPrompts: string[];
+}
+
+export interface StylistHistoryResponse {
+  conversationId: string | null;
+  messages: StylistMessage[];
+}
