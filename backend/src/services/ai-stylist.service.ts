@@ -70,8 +70,7 @@ const STYLIST_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         properties: {
           query: {
             type: 'string',
-            description:
-              'คำค้นหา เช่น เสื้อยืด, ยีนส์, ฮู้ดดี้, แจ็คเก็ต, เสื้อเชิ้ต, กางเกงขาสั้น',
+            description: 'คำค้นหา เช่น เสื้อยืด, ยีนส์, ฮู้ดดี้, แจ็คเก็ต, เสื้อเชิ้ต, กางเกงขาสั้น',
           },
           categorySlug: {
             type: 'string',
@@ -220,31 +219,15 @@ export async function runFallbackStylist(
   // วิเคราะห์สไตล์
   let detectedStyle = preferences?.style;
   if (!detectedStyle) {
-    if (
-      lowerMsg.includes('minimal') ||
-      lowerMsg.includes('มินิมอล') ||
-      lowerMsg.includes('เรียบ')
-    ) {
+    if (lowerMsg.includes('minimal') || lowerMsg.includes('มินิมอล') || lowerMsg.includes('เรียบ')) {
       detectedStyle = 'minimal';
-    } else if (
-      lowerMsg.includes('street') ||
-      lowerMsg.includes('สตรีท') ||
-      lowerMsg.includes('ฮิปฮอป')
-    ) {
+    } else if (lowerMsg.includes('street') || lowerMsg.includes('สตรีท') || lowerMsg.includes('ฮิปฮอป')) {
       detectedStyle = 'streetwear';
     } else if (lowerMsg.includes('y2k') || lowerMsg.includes('วายทูเค')) {
       detectedStyle = 'y2k';
-    } else if (
-      lowerMsg.includes('vintage') ||
-      lowerMsg.includes('วินเทจ') ||
-      lowerMsg.includes('ย้อนยุค')
-    ) {
+    } else if (lowerMsg.includes('vintage') || lowerMsg.includes('วินเทจ') || lowerMsg.includes('ย้อนยุค')) {
       detectedStyle = 'vintage';
-    } else if (
-      lowerMsg.includes('korean') ||
-      lowerMsg.includes('เกาหลี') ||
-      lowerMsg.includes('โอปป้า')
-    ) {
+    } else if (lowerMsg.includes('korean') || lowerMsg.includes('เกาหลี') || lowerMsg.includes('โอปป้า')) {
       detectedStyle = 'korean';
     }
   }
@@ -254,20 +237,8 @@ export async function runFallbackStylist(
   if (!detectedColor) {
     if (lowerMsg.includes('ดำ') || lowerMsg.includes('black')) detectedColor = 'ดำ';
     else if (lowerMsg.includes('ขาว') || lowerMsg.includes('white')) detectedColor = 'ขาว';
-    else if (
-      lowerMsg.includes('เอิร์ธโทน') ||
-      lowerMsg.includes('earth tone') ||
-      lowerMsg.includes('น้ำตาล') ||
-      lowerMsg.includes('ครีม')
-    )
-      detectedColor = 'ครีม';
-    else if (
-      lowerMsg.includes('พาสเทล') ||
-      lowerMsg.includes('pastel') ||
-      lowerMsg.includes('ชมพู') ||
-      lowerMsg.includes('ฟ้า')
-    )
-      detectedColor = 'พาสเทล';
+    else if (lowerMsg.includes('เอิร์ธโทน') || lowerMsg.includes('earth tone') || lowerMsg.includes('น้ำตาล') || lowerMsg.includes('ครีม')) detectedColor = 'ครีม';
+    else if (lowerMsg.includes('พาสเทล') || lowerMsg.includes('pastel') || lowerMsg.includes('ชมพู') || lowerMsg.includes('ฟ้า')) detectedColor = 'พาสเทล';
   }
 
   // วิเคราะห์งบประมาณ
@@ -294,9 +265,7 @@ export async function runFallbackStylist(
   if (products.length > 0) {
     const styleLabel = detectedStyle ? `สไตล์ ${detectedStyle}` : 'ลุคที่คุณต้องการ';
     const colorLabel = detectedColor ? ` โทนสี ${detectedColor}` : '';
-    const budgetLabel = detectedMaxBudget
-      ? ` ในงบประมาณไม่เกิน ${detectedMaxBudget.toLocaleString('th-TH')} บาท`
-      : '';
+    const budgetLabel = detectedMaxBudget ? ` ในงบประมาณไม่เกิน ${detectedMaxBudget.toLocaleString('th-TH')} บาท` : '';
 
     replyText = `สวัสดีครับ! สไตลิสต์คัดสรรชุดสำหรับ **${styleLabel}**${colorLabel}${budgetLabel} มาให้คุณแล้วครับ ✨\n\n`;
 
@@ -425,23 +394,20 @@ async function callOpenAIStylist(
         max_tokens: 800,
       });
 
-      const finalReply =
-        secondResponse.choices[0]?.message?.content ??
-        'สไตลิสต์จัดเตรียมสินค้าแนะนำไว้ให้ด้านล่างนี้ครับ';
+      const finalReply = secondResponse.choices[0]?.message?.content ?? 'สไตลิสต์จัดเตรียมสินค้าแนะนำไว้ให้ด้านล่างนี้ครับ';
 
       return {
         replyText: finalReply,
         products: Array.from(referencedProductsMap.values()),
         model,
-        tokensUsed: (response.usage?.total_tokens ?? 0) + (secondResponse.usage?.total_tokens ?? 0),
+        tokensUsed:
+          (response.usage?.total_tokens ?? 0) + (secondResponse.usage?.total_tokens ?? 0),
       };
     }
 
     // กรณีโมเดลตอบกลับโดยตรงโดยไม่เรียก Tool (เช่น ตอบคำถามทักทายหรือคำถามทั่วไป)
     return {
-      replyText:
-        assistantMessage?.content ??
-        'สวัสดีครับ มีสไตล์การแต่งตัวแบบไหนที่อยากให้สไตลิสต์ช่วยแนะนำไหมครับ?',
+      replyText: assistantMessage?.content ?? 'สวัสดีครับ มีสไตล์การแต่งตัวแบบไหนที่อยากให้สไตลิสต์ช่วยแนะนำไหมครับ?',
       products: [],
       model,
       tokensUsed: response.usage?.total_tokens ?? 0,
@@ -455,7 +421,10 @@ async function callOpenAIStylist(
 /**
  * ดึงหรือสร้าง AIConversation สำหรับผู้ใช้หรือ Guest
  */
-async function resolveStylistConversation(owner: StylistOwner, conversationId?: string) {
+async function resolveStylistConversation(
+  owner: StylistOwner,
+  conversationId?: string,
+) {
   const prisma = getPrisma();
 
   if (conversationId) {
@@ -472,8 +441,7 @@ async function resolveStylistConversation(owner: StylistOwner, conversationId?: 
     if (existing) {
       // ตรวจสอบความเป็นเจ้าของ (IDOR Protection)
       if (owner.userId && existing.userId === owner.userId) return existing;
-      if (!owner.userId && owner.sessionId && existing.sessionId === owner.sessionId)
-        return existing;
+      if (!owner.userId && owner.sessionId && existing.sessionId === owner.sessionId) return existing;
     }
   }
 
@@ -585,7 +553,9 @@ export async function sendStylistMessage(
 /**
  * ดึงประวัติการสนทนาของ AI Stylist
  */
-export async function getStylistHistory(owner: StylistOwner): Promise<StylistHistoryResponse> {
+export async function getStylistHistory(
+  owner: StylistOwner,
+): Promise<StylistHistoryResponse> {
   const prisma = getPrisma();
 
   const where: Prisma.AIConversationWhereInput = {
@@ -647,7 +617,9 @@ export async function getStylistHistory(owner: StylistOwner): Promise<StylistHis
 /**
  * รีเซ็ตบทสนทนาเดิมเพื่อเริ่มคุยใหม่
  */
-export async function resetStylistConversation(owner: StylistOwner): Promise<{ success: boolean }> {
+export async function resetStylistConversation(
+  owner: StylistOwner,
+): Promise<{ success: boolean }> {
   const prisma = getPrisma();
 
   const where: Prisma.AIConversationWhereInput = {

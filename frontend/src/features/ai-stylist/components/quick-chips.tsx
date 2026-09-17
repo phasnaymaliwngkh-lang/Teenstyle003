@@ -69,3 +69,4 @@ export function QuickChips({ onSelectPrompt, disabled }: QuickChipsProps) {
     </div>
   );
 }
+

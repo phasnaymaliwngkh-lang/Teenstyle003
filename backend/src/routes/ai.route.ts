@@ -19,3 +19,4 @@ aiRouter.use(attachUser);
 aiRouter.get('/stylist/history', stylistHistoryHandler);
 aiRouter.post('/stylist/chat', verifyOrigin, stylistChatHandler);
 aiRouter.post('/stylist/reset', verifyOrigin, stylistResetHandler);
+
