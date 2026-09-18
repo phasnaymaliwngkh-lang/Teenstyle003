@@ -7,7 +7,7 @@ import express, { type Express } from 'express';
 import helmet from 'helmet';
 import { pinoHttp } from 'pino-http';
 
-import { env, isTest } from './config/index.ts';
+import { env, isDevelopment, isTest } from './config/index.ts';
 import { errorHandler, globalRateLimiter, notFound, requestId } from './middlewares/index.ts';
 import { rootRouter } from './routes/index.ts';
 import { logger } from './utils/logger.ts';
@@ -23,8 +23,11 @@ export function createApp(): Express {
   app.set('trust proxy', 1);
   app.disable('x-powered-by');
 
-  // ─── Security (STEP 28) ───────────────────────────────────────────────────
-  app.use(helmet());
+  app.use(
+    helmet({
+      hsts: isDevelopment ? false : undefined,
+    }),
+  );
   app.use(
     cors({
       origin: env.CORS_ORIGIN,

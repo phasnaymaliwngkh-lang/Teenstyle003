@@ -49,10 +49,11 @@ backups/
 *.dump
 *.sql.gz
 
-# ─── OS / Editor ────────────────────────────────────────────────
+# ─── OS / Editor / Executables ──────────────────────────────────
 .DS_Store
 Thumbs.db
 desktop.ini
+*.exe
 .idea/
 .vscode/*
 !.vscode/extensions.json
