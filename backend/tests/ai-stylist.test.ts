@@ -82,9 +82,7 @@ const asUser = () => ({
 describe('STEP 19: AI Stylist — ผู้ช่วยเลือกชุดและสไตล์ส่วนบุคคล', () => {
   describe('Guest Session & Initial State', () => {
     it('GET /api/ai/stylist/history สำหรับ guest ใหม่ คืน messages ว่าง และตั้ง cookie session id', async () => {
-      const res = await request(app)
-        .get('/api/ai/stylist/history')
-        .expect(200);
+      const res = await request(app).get('/api/ai/stylist/history').expect(200);
 
       expect(res.body.success).toBe(true);
       expect(res.body.data.messages).toEqual([]);
@@ -235,10 +233,7 @@ describe('STEP 19: AI Stylist — ผู้ช่วยเลือกชุด�
     });
 
     it('User ดึงประวัติการคุย คืนข้อความของตัวเอง', async () => {
-      const res = await request(app)
-        .get('/api/ai/stylist/history')
-        .set(asUser())
-        .expect(200);
+      const res = await request(app).get('/api/ai/stylist/history').set(asUser()).expect(200);
 
       expect(res.body.success).toBe(true);
       expect(res.body.data.conversationId).toBe(userConvId);
@@ -247,10 +242,7 @@ describe('STEP 19: AI Stylist — ผู้ช่วยเลือกชุด�
 
     it('POST /api/ai/stylist/reset ปิดบทสนทนาเดิม → ข้อความใหม่สร้างห้องใหม่', async () => {
       // 1. Reset บทสนทนาเดิม
-      const resetRes = await request(app)
-        .post('/api/ai/stylist/reset')
-        .set(asUser())
-        .expect(200);
+      const resetRes = await request(app).post('/api/ai/stylist/reset').set(asUser()).expect(200);
 
       expect(resetRes.body.success).toBe(true);
 

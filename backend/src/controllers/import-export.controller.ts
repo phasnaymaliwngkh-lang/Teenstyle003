@@ -71,9 +71,11 @@ export const exportOrdersHandler = asyncHandler(
 /** GET /api/admin/export/templates/:type — ดาวน์โหลด template สำหรับนำเข้า */
 export const downloadTemplateHandler = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const type = z.enum(['products', 'inventory'], {
-      message: 'ประเภท template ต้องเป็น products หรือ inventory เท่านั้น',
-    }).parse(req.params.type);
+    const type = z
+      .enum(['products', 'inventory'], {
+        message: 'ประเภท template ต้องเป็น products หรือ inventory เท่านั้น',
+      })
+      .parse(req.params.type);
 
     const { format } = templateQuerySchema.parse(req.query);
     const result = await getTemplate(type, format);
@@ -95,12 +97,7 @@ export const importProductsHandler = asyncHandler(
     const { dryRun } = importQuerySchema.parse(req.query);
     const actor = actorOf(req);
 
-    const result = await importProducts(
-      actor,
-      req.file.buffer,
-      req.file.originalname,
-      dryRun,
-    );
+    const result = await importProducts(actor, req.file.buffer, req.file.originalname, dryRun);
 
     sendSuccess(
       res,
@@ -124,12 +121,7 @@ export const importInventoryHandler = asyncHandler(
     const { dryRun } = importQuerySchema.parse(req.query);
     const actor = actorOf(req);
 
-    const result = await importInventory(
-      actor,
-      req.file.buffer,
-      req.file.originalname,
-      dryRun,
-    );
+    const result = await importInventory(actor, req.file.buffer, req.file.originalname, dryRun);
 
     sendSuccess(
       res,
@@ -142,4 +134,3 @@ export const importInventoryHandler = asyncHandler(
     );
   },
 );
-

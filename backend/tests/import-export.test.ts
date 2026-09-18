@@ -70,10 +70,7 @@ afterAll(async () => {
   await disconnectDatabase();
 });
 
-const binaryParser = (
-  res: unknown,
-  callback: (err: Error | null, body: Buffer) => void,
-) => {
+const binaryParser = (res: unknown, callback: (err: Error | null, body: Buffer) => void) => {
   const stream = res as NodeJS.ReadableStream;
   const chunks: Buffer[] = [];
   stream.on('data', (chunk: Buffer) => chunks.push(chunk));

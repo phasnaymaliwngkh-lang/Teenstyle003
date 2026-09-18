@@ -40,7 +40,7 @@ export const FOOTER_SECTIONS: readonly {
   {
     title: "Customer Service",
     links: [
-      { label: "AI Customer Service", pendingStep: 20 },
+      { label: "AI Customer Service", href: "/customer-service", pendingStep: 20 },
       { label: "คำถามที่พบบ่อย", pendingStep: 49 },
       { label: "Shipping — การจัดส่ง", pendingStep: 44 },
       { label: "Return Policy — การคืนสินค้า", pendingStep: 43 },

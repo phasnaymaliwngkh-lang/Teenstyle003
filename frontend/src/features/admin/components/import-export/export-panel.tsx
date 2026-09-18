@@ -41,7 +41,10 @@ export function ExportPanel() {
   return (
     <div className="space-y-6">
       {error && (
-        <div className="rounded-[var(--radius-card)] border border-danger/30 bg-danger/10 p-4 text-sm text-danger" role="alert">
+        <div
+          className="rounded-[var(--radius-card)] border border-danger/30 bg-danger/10 p-4 text-sm text-danger"
+          role="alert"
+        >
           {error}
         </div>
       )}
@@ -254,7 +257,9 @@ export function ExportPanel() {
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-muted uppercase">สถานะคำสั่งซื้อ</label>
+                <label className="text-xs font-semibold text-muted uppercase">
+                  สถานะคำสั่งซื้อ
+                </label>
                 <select
                   value={orderStatus}
                   onChange={(e) => setOrderStatus(e.target.value)}
@@ -297,4 +302,3 @@ export function ExportPanel() {
     </div>
   );
 }
-

@@ -541,3 +541,98 @@ export interface StylistHistoryResponse {
   conversationId: string | null;
   messages: StylistMessage[];
 }
+
+// ============================================================================
+// AI CUSTOMER SERVICE & SUPPORT (STEP 20)
+// ============================================================================
+
+export type AIConversationStatus = "ACTIVE" | "ESCALATED" | "CLOSED";
+
+export interface CsMessage {
+  id: string;
+  role: AIMessageRole;
+  content: string;
+  referencedOrderNumber?: string | null;
+  createdAt: string;
+}
+
+export interface CsChatResponse {
+  conversationId: string;
+  status: AIConversationStatus;
+  message: CsMessage;
+  suggestedPrompts: string[];
+}
+
+export interface CsHistoryResponse {
+  conversationId: string | null;
+  status: AIConversationStatus;
+  messages: CsMessage[];
+}
+
+export interface SupportTicketItem {
+  id: string;
+  title: string | null;
+  status: AIConversationStatus;
+  escalatedAt: string | null;
+  lastMessageAt: string | null;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+    phone: string | null;
+  } | null;
+  assignedTo: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+  messageCount: number;
+  lastMessage: {
+    role: string;
+    content: string;
+    createdAt: string;
+  } | null;
+}
+
+export interface SupportTicketListResult {
+  items: SupportTicketItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  counts: {
+    all: number;
+    escalated: number;
+    active: number;
+    closed: number;
+  };
+}
+
+export interface SupportTicketDetail {
+  id: string;
+  title: string | null;
+  summary: string | null;
+  status: AIConversationStatus;
+  escalatedAt: string | null;
+  lastMessageAt: string | null;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string | null;
+    email: string;
+    phone: string | null;
+  } | null;
+  assignedTo: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+  messages: Array<{
+    id: string;
+    role: AIMessageRole;
+    content: string;
+    referencedProductIds: string[];
+    createdAt: string;
+  }>;
+}

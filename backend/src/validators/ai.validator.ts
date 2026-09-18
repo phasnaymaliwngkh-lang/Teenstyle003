@@ -26,4 +26,3 @@ export const stylistChatSchema = z.object({
 
 export type StylistChatInput = z.infer<typeof stylistChatSchema>;
 export type StylistPreferences = z.infer<typeof stylistPreferencesSchema>;
-

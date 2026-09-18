@@ -4,15 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Loader2, RotateCcw, Sparkles } from "lucide-react";
 
 import { ProductCard } from "@/features/products/components/product-card";
-import {
-  fetchStylistHistory,
-  resetStylistChat,
-  sendStylistChat,
-} from "@/services/ai.service";
-import type {
-  StylistMessage,
-  StylistPreferences,
-} from "@/types/catalog";
+import { fetchStylistHistory, resetStylistChat, sendStylistChat } from "@/services/ai.service";
+import type { StylistMessage, StylistPreferences } from "@/types/catalog";
 import { QuickChips } from "./quick-chips";
 
 export function StylistChat() {
@@ -54,10 +47,7 @@ export function StylistChat() {
     loadHistory();
   }, []);
 
-  const handleSend = async (
-    textToSend?: string,
-    preferences?: StylistPreferences,
-  ) => {
+  const handleSend = async (textToSend?: string, preferences?: StylistPreferences) => {
     const text = (textToSend ?? inputText).trim();
     if (!text || loading) return;
 
@@ -130,9 +120,7 @@ export function StylistChat() {
                 ออนไลน์
               </span>
             </div>
-            <p className="text-xs text-muted-light">
-              ผู้ช่วยเลือกชุดและแมตช์แฟชั่นจากสินค้าจริง
-            </p>
+            <p className="text-xs text-muted-light">ผู้ช่วยเลือกชุดและแมตช์แฟชั่นจากสินค้าจริง</p>
           </div>
         </div>
 
@@ -162,9 +150,7 @@ export function StylistChat() {
             <div className="grid size-16 place-items-center rounded-full bg-lilac-100 text-brand shadow-inner">
               <Sparkles className="size-8" aria-hidden />
             </div>
-            <h3 className="mt-4 text-xl font-bold text-ink">
-              ยินดีต้อนรับสู่ AI Stylist ✧
-            </h3>
+            <h3 className="mt-4 text-xl font-bold text-ink">ยินดีต้อนรับสู่ AI Stylist ✧</h3>
             <p className="mt-1.5 max-w-[48ch] text-sm text-muted-light">
               บอกสไตล์ที่ชอบ โอกาสใช้งาน โทนสี หรือช่วงงบประมาณ
               แล้วสไตลิสต์จะคัดสรรสินค้าจริงที่มีสต็อกในร้านพร้อมคำแนะนำให้คุณทันที
@@ -181,9 +167,7 @@ export function StylistChat() {
           messages.map((msg, idx) => (
             <div
               key={msg.id || idx}
-              className={`flex flex-col ${
-                msg.role === "USER" ? "items-end" : "items-start"
-              }`}
+              className={`flex flex-col ${msg.role === "USER" ? "items-end" : "items-start"}`}
             >
               <div
                 className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
@@ -285,11 +269,7 @@ export function StylistChat() {
             className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand text-white shadow-sm transition hover:bg-brand-dark hover:shadow disabled:opacity-40"
             aria-label="ส่งข้อความ"
           >
-            {loading ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <ArrowUp className="size-4" />
-            )}
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
           </button>
         </form>
 
@@ -300,4 +280,3 @@ export function StylistChat() {
     </div>
   );
 }
-

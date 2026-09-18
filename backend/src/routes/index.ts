@@ -32,7 +32,7 @@ const API_ROUTES = [
   { path: '/api/customers', status: 'planned', step: 25 },
   { path: '/api/reviews', status: 'planned', step: 23 },
   { path: '/api/wishlist', status: 'planned', step: 22 },
-  { path: '/api/ai', status: 'ready (AI Stylist STEP 19)', step: 19 },
+  { path: '/api/ai', status: 'ready (AI Stylist STEP 19 · AI CS STEP 20)', step: 20 },
   { path: '/api/notifications', status: 'planned', step: 24 },
   { path: '/api/admin', status: 'partial (overview พร้อมแล้ว)', step: 13 },
   { path: '/api/reports', status: 'planned', step: 26 },

@@ -40,6 +40,7 @@ import {
   importInventoryHandler,
   importProductsHandler,
 } from '../controllers/import-export.controller.ts';
+import { adminSupportRouter } from './admin-support.route.ts';
 import multer from 'multer';
 import { requireAuth } from '../middlewares/authenticate.ts';
 import { requirePermission, requireStaff } from '../middlewares/authorize.ts';
@@ -178,3 +179,6 @@ adminRouter.post(
   upload.single('file'),
   importInventoryHandler,
 );
+
+// ฝ่ายบริการลูกค้า & Human Handoff (STEP 20)
+adminRouter.use('/support', adminSupportRouter);

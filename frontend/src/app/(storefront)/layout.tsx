@@ -1,5 +1,6 @@
 import { Footer } from "@/components/layout/footer";
 import { Navbar } from "@/components/layout/navbar";
+import { SupportFloatingButton } from "@/features/customer-service/components/support-floating-button";
 
 /**
  * Layout ของหน้าร้าน (STEP 4)
@@ -13,6 +14,7 @@ export default function StorefrontLayout({ children }: LayoutProps<"/">) {
     <>
       <Navbar />
       <div className="flex flex-1 flex-col">{children}</div>
+      <SupportFloatingButton />
       <Footer />
     </>
   );

@@ -1,0 +1,550 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import {
+  AlertCircle,
+  Bot,
+  CheckCircle2,
+  Headphones,
+  Loader2,
+  Lock,
+  MessageSquare,
+  RefreshCw,
+  Send,
+  User,
+  UserCheck,
+} from "lucide-react";
+
+import {
+  assignSupportTicket,
+  fetchSupportConversations,
+  fetchSupportDetail,
+  sendSupportReply,
+  updateSupportTicketStatus,
+} from "@/services/admin-support.service";
+import type { AIConversationStatus, SupportTicketDetail, SupportTicketItem } from "@/types/catalog";
+
+export default function AdminSupportPage() {
+  const [activeTab, setActiveTab] = useState<AIConversationStatus | "ALL">("ESCALATED");
+  const [tickets, setTickets] = useState<SupportTicketItem[]>([]);
+  const [counts, setCounts] = useState({ all: 0, escalated: 0, active: 0, closed: 0 });
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [ticketDetail, setTicketDetail] = useState<SupportTicketDetail | null>(null);
+
+  const [loadingList, setLoadingList] = useState(true);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [sendingReply, setSendingReply] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const loadTickets = async () => {
+    try {
+      setLoadingList(true);
+      setErrorMessage(null);
+      const res = await fetchSupportConversations({
+        status: activeTab === "ALL" ? undefined : activeTab,
+      });
+      setTickets(res.items);
+      setCounts(res.counts);
+
+      if (res.items.length > 0 && !selectedTicketId && res.items[0]) {
+        setSelectedTicketId(res.items[0].id);
+      }
+    } catch (err) {
+      console.error("Failed to load support tickets:", err);
+      setErrorMessage("ไม่สามารถโหลดรายการตั๋วบริการลูกค้าได้");
+    } finally {
+      setLoadingList(false);
+    }
+  };
+
+  const handleTabChange = (tab: AIConversationStatus | "ALL") => {
+    setActiveTab(tab);
+    setLoadingList(true);
+    setSelectedTicketId(null);
+    setTicketDetail(null);
+  };
+
+  const handleSelectTicket = (id: string) => {
+    setSelectedTicketId(id);
+    setLoadingDetail(true);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetchSupportConversations({
+          status: activeTab === "ALL" ? undefined : activeTab,
+        });
+        if (!cancelled) {
+          setTickets(res.items);
+          setCounts(res.counts);
+          if (res.items.length > 0 && res.items[0]) {
+            setSelectedTicketId(res.items[0].id);
+            setLoadingDetail(true);
+          }
+          setLoadingList(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to load support tickets:", err);
+          setErrorMessage("ไม่สามารถโหลดรายการตั๋วบริการลูกค้าได้");
+          setLoadingList(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!selectedTicketId) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const detail = await fetchSupportDetail(selectedTicketId);
+        if (!cancelled) {
+          setTicketDetail(detail);
+          setLoadingDetail(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Failed to load ticket detail:", err);
+          setLoadingDetail(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTicketId]);
+
+  const handleAssign = async () => {
+    if (!selectedTicketId || actionLoading) return;
+    try {
+      setActionLoading(true);
+      await assignSupportTicket(selectedTicketId);
+      // โหลดรายละเอียดใหม่
+      const detail = await fetchSupportDetail(selectedTicketId);
+      setTicketDetail(detail);
+      loadTickets();
+    } catch (err) {
+      console.error("Failed to assign ticket:", err);
+      alert("ไม่สามารถรับเรื่องได้ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = replyText.trim();
+    if (!selectedTicketId || !text || sendingReply) return;
+
+    try {
+      setSendingReply(true);
+      await sendSupportReply(selectedTicketId, text);
+      setReplyText("");
+      const detail = await fetchSupportDetail(selectedTicketId);
+      setTicketDetail(detail);
+      loadTickets();
+    } catch (err) {
+      console.error("Failed to send support reply:", err);
+      alert("ไม่สามารถส่งข้อความตอบกลับได้");
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: AIConversationStatus) => {
+    if (!selectedTicketId || actionLoading) return;
+    try {
+      setActionLoading(true);
+      await updateSupportTicketStatus(selectedTicketId, newStatus);
+      const detail = await fetchSupportDetail(selectedTicketId);
+      setTicketDetail(detail);
+      loadTickets();
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      alert("ไม่สามารถเปลี่ยนสถานะได้");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  return (
+    <main className="mx-auto flex h-[calc(100vh-65px)] w-full max-w-[1400px] flex-col px-4 py-4 sm:px-6">
+      {/* ─── Page Title Header ─────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-line">
+        <div>
+          <h1 className="text-2xl font-black text-ink">
+            ฝ่ายบริการลูกค้า (Customer Support Queue)
+          </h1>
+          <p className="text-xs text-muted">
+            จัดการคำร้องที่ส่งต่อจาก AI (Human Handoff) และตอบกลับข้อความลูกค้าแบบเรียลไทม์
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={loadTickets}
+          disabled={loadingList}
+          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-ink transition hover:border-brand hover:text-brand"
+        >
+          <RefreshCw className={`h-3.5 w-3.5 ${loadingList ? "animate-spin" : ""}`} />
+          <span>รีเฟรช</span>
+        </button>
+      </div>
+
+      {errorMessage && (
+        <div className="mt-3 flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-700 border border-rose-200">
+          <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
+      {/* ─── Main Content Split Pane ───────────────────────────────────────────── */}
+      <div className="mt-3 flex flex-1 overflow-hidden gap-4 rounded-2xl border border-line bg-white shadow-soft">
+        {/* ─── Left Column: Ticket List ────────────────────────────────────────── */}
+        <div className="flex w-full md:w-[380px] lg:w-[420px] shrink-0 flex-col border-r border-line bg-slate-50/50">
+          {/* Status Tabs */}
+          <div className="flex border-b border-line p-2 gap-1 bg-white">
+            <button
+              type="button"
+              onClick={() => handleTabChange("ESCALATED")}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-bold transition ${
+                activeTab === "ESCALATED"
+                  ? "bg-amber-100 text-amber-900 shadow-2xs"
+                  : "text-muted hover:bg-slate-100"
+              }`}
+            >
+              <span>รอรับเรื่อง</span>
+              <span className="rounded-full bg-amber-200 px-1.5 py-0.2 text-[10px] text-amber-950">
+                {counts.escalated}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTabChange("ACTIVE")}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-bold transition ${
+                activeTab === "ACTIVE"
+                  ? "bg-brand/10 text-brand shadow-2xs"
+                  : "text-muted hover:bg-slate-100"
+              }`}
+            >
+              <span>กำลังคุย</span>
+              <span className="rounded-full bg-slate-200 px-1.5 py-0.2 text-[10px] text-slate-700">
+                {counts.active}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTabChange("CLOSED")}
+              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-bold transition ${
+                activeTab === "CLOSED"
+                  ? "bg-slate-200 text-slate-800 shadow-2xs"
+                  : "text-muted hover:bg-slate-100"
+              }`}
+            >
+              <span>ปิดแล้ว</span>
+              <span className="rounded-full bg-slate-300 px-1.5 py-0.2 text-[10px] text-slate-800">
+                {counts.closed}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleTabChange("ALL")}
+              className={`flex items-center justify-center px-2.5 rounded-xl py-1.5 text-xs font-bold transition ${
+                activeTab === "ALL"
+                  ? "bg-slate-800 text-white shadow-2xs"
+                  : "text-muted hover:bg-slate-100"
+              }`}
+            >
+              <span>ทั้งหมด ({counts.all})</span>
+            </button>
+          </div>
+
+          {/* Ticket Items Scrollable List */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-2">
+            {loadingList ? (
+              <div className="flex h-40 items-center justify-center text-muted">
+                <Loader2 className="h-5 w-5 animate-spin text-brand mr-2" />
+                <span className="text-xs">กำลังโหลดตั๋ว...</span>
+              </div>
+            ) : tickets.length === 0 ? (
+              <div className="flex h-40 flex-col items-center justify-center text-center p-4">
+                <CheckCircle2 className="h-8 w-8 text-emerald-500 mb-2" />
+                <p className="text-xs font-semibold text-ink">ไม่มีรายการในหมวดนี้</p>
+                <p className="text-[11px] text-muted">คำร้องทั้งหมดได้รับการจัดการเรียบร้อยแล้ว</p>
+              </div>
+            ) : (
+              tickets.map((t) => {
+                const isSelected = t.id === selectedTicketId;
+                const isEscalated = t.status === "ESCALATED";
+
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => handleSelectTicket(t.id)}
+                    className={`w-full text-left rounded-xl p-3 border transition ${
+                      isSelected
+                        ? "border-brand bg-white shadow-xs"
+                        : "border-transparent bg-white/70 hover:bg-white hover:border-line"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="font-bold text-xs text-ink truncate">
+                          {t.user?.name || t.user?.email || "ลูกค้าทั่วไป (Guest)"}
+                        </span>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                          isEscalated
+                            ? "bg-amber-100 text-amber-800 animate-pulse"
+                            : t.status === "CLOSED"
+                              ? "bg-slate-100 text-slate-600"
+                              : "bg-emerald-100 text-emerald-800"
+                        }`}
+                      >
+                        {isEscalated ? "รอตอบ" : t.status === "CLOSED" ? "ปิดเคส" : "Active"}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-ink-soft line-clamp-2 mb-2">
+                      {t.lastMessage ? t.lastMessage.content : "(ไม่มีข้อความ)"}
+                    </p>
+
+                    <div className="flex items-center justify-between text-[10px] text-muted pt-1 border-t border-slate-100">
+                      <span>
+                        {t.assignedTo
+                          ? `ผู้ดูแล: ${t.assignedTo.name || t.assignedTo.email}`
+                          : "ยังไม่มีผู้รับเคส"}
+                      </span>
+                      <span>
+                        {t.lastMessageAt
+                          ? new Date(t.lastMessageAt).toLocaleTimeString("th-TH", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : ""}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* ─── Right Column: Chat History & Action Pane ────────────────────────── */}
+        <div className="flex flex-1 flex-col bg-white overflow-hidden">
+          {loadingDetail ? (
+            <div className="flex h-full flex-col items-center justify-center text-muted">
+              <Loader2 className="h-6 w-6 animate-spin text-brand mb-2" />
+              <span className="text-xs font-semibold">กำลังโหลดรายละเอียดบทสนทนา...</span>
+            </div>
+          ) : ticketDetail ? (
+            <>
+              {/* Header Details */}
+              <div className="flex flex-wrap items-center justify-between border-b border-line px-5 py-3 gap-2 bg-slate-50/40">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-bold text-ink">
+                      {ticketDetail.user?.name || "ลูกค้าทั่วไป"}
+                    </h2>
+                    {ticketDetail.user?.email && (
+                      <span className="text-xs text-muted">({ticketDetail.user.email})</span>
+                    )}
+                    {ticketDetail.user?.phone && (
+                      <span className="text-xs text-muted">· {ticketDetail.user.phone}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 text-xs text-muted">
+                    <span>
+                      สถานะ:{" "}
+                      <strong
+                        className={ticketDetail.status === "ESCALATED" ? "text-amber-700" : ""}
+                      >
+                        {ticketDetail.status}
+                      </strong>
+                    </span>
+                    <span>·</span>
+                    <span>
+                      ผู้รับผิดชอบ:{" "}
+                      <strong>
+                        {ticketDetail.assignedTo?.name ||
+                          ticketDetail.assignedTo?.email ||
+                          "ยังไม่มี"}
+                      </strong>
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {!ticketDetail.assignedTo && (
+                    <button
+                      type="button"
+                      onClick={handleAssign}
+                      disabled={actionLoading}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-brand-dark disabled:opacity-50"
+                    >
+                      <UserCheck className="h-3.5 w-3.5" />
+                      <span>รับเรื่องเคสนี้</span>
+                    </button>
+                  )}
+
+                  {ticketDetail.status !== "CLOSED" ? (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange("CLOSED")}
+                      disabled={actionLoading}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      <Lock className="h-3.5 w-3.5" />
+                      <span>ปิดเคสนี้</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange("ACTIVE")}
+                      disabled={actionLoading}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-slate-100 disabled:opacity-50"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      <span>เปิดเคสใหม่</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Chat Transcript Area */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-slate-50/20">
+                {ticketDetail.messages.map((m) => {
+                  const isUser = m.role === "USER";
+                  const isSystem = m.role === "SYSTEM";
+                  const isAgent = m.role === "AGENT";
+
+                  if (isSystem) {
+                    return (
+                      <div key={m.id} className="flex justify-center my-2">
+                        <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-0.5 text-[11px] font-medium text-slate-600">
+                          {m.content}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={m.id}
+                      className={`flex gap-2.5 ${isUser ? "justify-start" : "justify-end"}`}
+                    >
+                      {isUser && (
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-700 text-xs">
+                          <User className="h-3.5 w-3.5" />
+                        </div>
+                      )}
+
+                      <div className={`max-w-[75%] ${isUser ? "text-left" : "text-right"}`}>
+                        <div className="flex items-center gap-1.5 mb-0.5 text-[11px] text-muted">
+                          <span>
+                            {isUser
+                              ? "ลูกค้า"
+                              : isAgent
+                                ? "เจ้าหน้าที่ (คุณ/Staff)"
+                                : "AI Customer Service"}
+                          </span>
+                          <span>·</span>
+                          <span>
+                            {new Date(m.createdAt).toLocaleTimeString("th-TH", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+
+                        <div
+                          className={`rounded-2xl p-3 text-xs sm:text-sm whitespace-pre-line shadow-2xs ${
+                            isUser
+                              ? "rounded-tl-xs bg-white border border-line text-ink"
+                              : isAgent
+                                ? "rounded-tr-xs bg-blue-600 text-white"
+                                : "rounded-tr-xs bg-lilac/70 text-brand-dark border border-lilac"
+                          }`}
+                        >
+                          {m.content}
+                        </div>
+                      </div>
+
+                      {!isUser && (
+                        <div
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
+                            isAgent ? "bg-blue-600 text-white" : "bg-brand text-white"
+                          }`}
+                        >
+                          {isAgent ? (
+                            <Headphones className="h-3.5 w-3.5" />
+                          ) : (
+                            <Bot className="h-3.5 w-3.5" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Reply Input Bar */}
+              <div className="border-t border-line bg-white p-3">
+                <form onSubmit={handleReply} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={replyText}
+                    onChange={(e) => setReplyText(e.target.value)}
+                    disabled={sendingReply || ticketDetail.status === "CLOSED"}
+                    placeholder={
+                      ticketDetail.status === "CLOSED"
+                        ? "เคสนี้ปิดแล้ว หากต้องการพิมพ์ตอบให้เปิดเคสใหม่ก่อน"
+                        : "พิมพ์ข้อความตอบกลับลูกค้าในฐานะเจ้าหน้าที่..."
+                    }
+                    className="flex-1 rounded-full border border-line bg-slate-50 px-4 py-2.5 text-xs sm:text-sm text-ink placeholder:text-muted focus:border-brand focus:bg-white focus:outline-hidden disabled:bg-slate-100"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={!replyText.trim() || sendingReply || ticketDetail.status === "CLOSED"}
+                    aria-label="ส่งข้อความตอบกลับ"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-soft transition hover:bg-blue-700 disabled:opacity-40"
+                  >
+                    {sendingReply ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </button>
+                </form>
+              </div>
+            </>
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center text-center p-6 text-muted">
+              <MessageSquare className="h-10 w-10 mb-2 opacity-30" />
+              <p className="text-sm font-semibold">เลือกบทสนทนาจากรายการทางซ้าย</p>
+              <p className="text-xs">เพื่อดูประวัติและพิมพ์ข้อความตอบกลับลูกค้า</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </main>
+  );
+}

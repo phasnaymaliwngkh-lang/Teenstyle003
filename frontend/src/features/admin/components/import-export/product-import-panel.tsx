@@ -100,7 +100,10 @@ export function ProductImportPanel() {
       </div>
 
       {generalError && (
-        <div className="rounded-[var(--radius-card)] border border-danger/30 bg-danger/10 p-4 text-sm text-danger" role="alert">
+        <div
+          className="rounded-[var(--radius-card)] border border-danger/30 bg-danger/10 p-4 text-sm text-danger"
+          role="alert"
+        >
           {generalError}
         </div>
       )}
@@ -125,7 +128,9 @@ export function ProductImportPanel() {
           <p className="mt-3 text-sm font-semibold text-ink">
             {selectedFile ? selectedFile.name : "คลิกเพื่อเลือกไฟล์สินค้า หรือลากไฟล์มาวางที่นี่"}
           </p>
-          <p className="mt-1 text-xs text-muted">รองรับไฟล์ Excel (.xlsx) และ CSV (.csv) ขนาดไม่เกิน 5MB</p>
+          <p className="mt-1 text-xs text-muted">
+            รองรับไฟล์ Excel (.xlsx) และ CSV (.csv) ขนาดไม่เกิน 5MB
+          </p>
           {selectedFile && (
             <span className="mt-2 rounded-[var(--radius-pill)] bg-lilac px-3 py-1 text-xs font-bold text-brand-dark">
               ขนาด {(selectedFile.size / 1024).toFixed(1)} KB
@@ -140,7 +145,11 @@ export function ProductImportPanel() {
             onClick={() => handleImport(true)}
             className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50 disabled:opacity-50"
           >
-            {loading ? <Loader2 className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4 text-brand" />}
+            {loading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="size-4 text-brand" />
+            )}
             ตรวจสอบไฟล์ (Dry Run)
           </button>
           <button
@@ -226,7 +235,9 @@ export function ProductImportPanel() {
           {/* ตาราง Preview รายการที่พร้อมนำเข้า */}
           {result.preview && result.preview.length > 0 && (
             <div className="rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)]">
-              <h4 className="text-sm font-bold text-ink">ตัวอย่างรายการที่พร้อมนำเข้า ({result.preview.length} รายการ)</h4>
+              <h4 className="text-sm font-bold text-ink">
+                ตัวอย่างรายการที่พร้อมนำเข้า ({result.preview.length} รายการ)
+              </h4>
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead className="border-b border-line bg-lilac-50/50 text-muted">
@@ -267,7 +278,9 @@ export function ProductImportPanel() {
                           {row.color || "-"} / {row.size || "-"}
                         </td>
                         <td className="px-3 py-2 font-mono text-muted">{row.barcode || "-"}</td>
-                        <td className="px-3 py-2 font-bold text-brand-dark">{row.initialStock} ชิ้น</td>
+                        <td className="px-3 py-2 font-bold text-brand-dark">
+                          {row.initialStock} ชิ้น
+                        </td>
                       </tr>
                     ))}
                   </tbody>

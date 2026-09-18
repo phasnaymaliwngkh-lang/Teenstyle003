@@ -4,7 +4,10 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 19 เสร็จ — AI Stylist (`/ai-stylist`)**
+**ล่าสุด: STEP 20 เสร็จ — AI Customer Service (+ Human Handoff) (`/customer-service`, `/admin/support`)**
+ระบบบริการลูกค้าอัจฉริยะแบบผสมผสาน (AI + เจ้าหน้าที่คนจริง) · **Universal Invariant: No Hallucination — ไม่กุข้อมูลออเดอร์ ข้อมูลจัดส่ง หรือนโยบายร้านขึ้นมาเองโดยเด็ดขาด** (อ่านสถานะคำสั่งซื้อ, ยอดชำระ, Tracking Number, ที่อยู่จัดส่ง และนโยบายร้าน 5 หมวดหลักจริงจากฐานข้อมูล PostgreSQL และ Policy Engine) · รองรับทั้ง OpenAI GPT-4o-mini พร้อม Function Calling (`lookup_order`, `get_store_policy`, `request_human_handoff`) และ Intelligent Fallback Engine ในตัวที่ทำงานได้ 100% ตลอดเวลาแม้ไม่มี OpenAI API Key หรือโหมดออฟไลน์ · **กลไก Human Handoff และ Escalation Protocol**: เมื่อตรวจพบคำร้องขอยกเลิก/คืนเงิน อารมณ์คับข้องใจ หรือคำขอติดต่อเจ้าหน้าที่ ระบบจะปรับสถานะบทสนทนาเป็น `ESCALATED` พร้อมบันทึก `escalatedAt` และส่งเข้า Admin Support Queue ทันที · **Admin Support Dashboard (`/admin/support`)**: เจ้าหน้าที่สามารถเลือกดูคิวตามแท็บ (รอรับเรื่อง, กำลังคุย, ปิดเคส), กดรับเรื่องผูก `assignedTo`, ดูข้อมูลลูกค้าและแชตไทม์ไลน์แบบเรียลไทม์, ส่งข้อความตอบกลับในฐานะ `role: AGENT` (พร้อม audit trail บันทึกลง `AdminLog`), และสลับปิด/เปิดเคสได้ทันที · **Storefront Customer Chat UI (`/customer-service` และ Floating Support Launcher)**: รองรับทั้งผู้ใช้ล็อกอินและ Guest, ป้ายเตือนสถานะเมื่อส่งต่อเจ้าหน้าที่, Quick Action Chips, และปุ่มเริ่มสนทนาใหม่ · test 329 เคส (เพิ่ม 13) ผ่านทั้งหมด
+
+**STEP 19:** AI Stylist (`/ai-stylist`)
 ผู้ช่วยเลือกชุดและสไตล์ส่วนบุคคล ตอบคำถามสไตล์ สี โอกาสใช้งาน และงบประมาณ · **Universal Invariant: แนะนำเฉพาะสินค้าที่มีอยู่จริงในระบบ TEENSTYLE และมีสต็อกพร้อมขายเท่านั้น (No Hallucination)** · รองรับ OpenAI GPT-4o-mini พร้อม Tool Calling (`search_catalog`) ดึงข้อมูลจริงจาก PostgreSQL และมี Intelligent Catalog Matcher (Fallback Engine) ทำงานได้ 100% ตลอดเวลาแม้ไม่มี OpenAI API Key หรือออฟไลน์ · บันทึกบทสนทนาใน `AIConversation` (type: STYLIST, status: ACTIVE) และ `AIChatMessage` พร้อม `referencedProductIds` ตรวจสอบย้อนหลังได้ · รองรับทั้ง Guest (Cookie `ai-session-id`) และ Authenticated User พร้อม Session Isolation / IDOR Protection ป้องกันการแอบดูแชตคนอื่น · หน้าเว็บ `/ai-stylist` แบบ Interactive Chat พร้อม Quick Preset Chips และ Product Recommendation Cards ที่มีราคา/สต็อกจริงและปุ่มเลือกซื้อ · test 316 เคส (เพิ่ม 8) ผ่านทั้งหมด
 
 **STEP 18:** Import / Export (CSV, Excel) (`/admin/import-export`)
@@ -151,7 +154,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 | STEP | หัวข้อ                                | สถานะ |
 | ---: | ------------------------------------- | :---: |
 |   19 | AI Stylist                            |  ✅   |
-|   20 | AI Customer Service (+ human handoff) |  ⬜   |
+|   20 | AI Customer Service (+ human handoff) |  ✅   |
 |   21 | AI Knowledge Base                     |  ⬜   |
 |   46 | AI Recommendation Engine              |  ⬜   |
 
