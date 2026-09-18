@@ -11,6 +11,7 @@ import {
   csHistoryHandler,
   csResetHandler,
 } from '../controllers/ai-cs.controller.ts';
+import { publicKnowledgeRouter } from './knowledge.route.ts';
 import { attachUser } from '../middlewares/authenticate.ts';
 import { verifyOrigin } from '../middlewares/verify-origin.ts';
 
@@ -31,3 +32,6 @@ aiRouter.get('/cs/history', csHistoryHandler);
 aiRouter.post('/cs/chat', verifyOrigin, csChatHandler);
 aiRouter.post('/cs/escalate', verifyOrigin, csEscalateHandler);
 aiRouter.post('/cs/reset', verifyOrigin, csResetHandler);
+
+// AI Knowledge Base endpoints (STEP 21)
+aiRouter.use('/knowledge', publicKnowledgeRouter);

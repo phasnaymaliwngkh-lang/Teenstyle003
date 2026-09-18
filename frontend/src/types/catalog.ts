@@ -636,3 +636,68 @@ export interface SupportTicketDetail {
     createdAt: string;
   }>;
 }
+
+/* ─── STEP 21: AI Knowledge Base ─────────────────────────────────────────── */
+
+export type KnowledgeCategory =
+  | "SHIPPING"
+  | "RETURNS"
+  | "PAYMENTS"
+  | "SIZING"
+  | "CARE"
+  | "ORDERS"
+  | "GENERAL"
+  | "STYLING";
+
+export interface FaqItem {
+  id: string;
+  question: string;
+  answer: string;
+}
+
+export interface KnowledgeArticle {
+  id: string;
+  slug: string;
+  title: string;
+  category: KnowledgeCategory;
+  summary: string;
+  content: string;
+  tags: string[];
+  faqPairs: FaqItem[];
+  isPublished: boolean;
+  viewCount: number;
+  helpfulCount: number;
+  notHelpfulCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KnowledgeCategoryMeta {
+  key: KnowledgeCategory;
+  label: string;
+  description: string;
+  iconName: string;
+  articleCount?: number;
+}
+
+export interface KnowledgeSearchResult {
+  items: KnowledgeArticle[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface KnowledgeAskResponse {
+  answer: string;
+  sourceArticles: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    category: KnowledgeCategory;
+    summary: string;
+  }>;
+  suggestedQuestions: string[];
+  model: string;
+}
+
