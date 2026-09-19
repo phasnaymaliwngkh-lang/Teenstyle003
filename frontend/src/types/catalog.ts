@@ -640,14 +640,7 @@ export interface SupportTicketDetail {
 /* ─── STEP 21: AI Knowledge Base ─────────────────────────────────────────── */
 
 export type KnowledgeCategory =
-  | "SHIPPING"
-  | "RETURNS"
-  | "PAYMENTS"
-  | "SIZING"
-  | "CARE"
-  | "ORDERS"
-  | "GENERAL"
-  | "STYLING";
+  "SHIPPING" | "RETURNS" | "PAYMENTS" | "SIZING" | "CARE" | "ORDERS" | "GENERAL" | "STYLING";
 
 export interface FaqItem {
   id: string;
@@ -700,4 +693,3 @@ export interface KnowledgeAskResponse {
   suggestedQuestions: string[];
   model: string;
 }
-

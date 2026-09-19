@@ -21,10 +21,32 @@ import type {
   UpdateKnowledgeArticleInput,
 } from '../validators/knowledge-base.validator.ts';
 
+/**
+ * ที่เก็บคลังความรู้ (ไฟล์ JSON)
+ *
+ * ⚠️ ไฟล์นี้เป็น **runtime artifact ไม่ใช่ source** — จึงอยู่ที่ `backend/data/` (นอก `src/`)
+ *    และถูก gitignore ไว้ ส่วน "ข้อมูลตั้งต้น" อยู่ที่ `INITIAL_KNOWLEDGE_ARTICLES` ที่เดียว
+ *
+ *    เดิมเก็บไว้ที่ `backend/src/data/knowledge-base.json` แล้ว commit ลง git ซึ่งพังหลายทาง:
+ *      1. แค่**เปิดอ่านบทความ** (`viewCount + 1`) ก็ทำให้ working tree สกปรก
+ *      2. `npm test` เขียนทับไฟล์จริง (create / delete / reset-defaults ในเทสต์)
+ *      3. ไฟล์ที่ commit ไว้ค้างค่าเก่า แล้ว **บังหน้า** `INITIAL_KNOWLEDGE_ARTICLES` ที่แก้ใหม่
+ *         → แก้นโยบายในโค้ดแล้วเว็บยังตอบค่าเดิม
+ *      4. `tsc` ไม่ copy `.json` ไป `dist/` — path ใน production จึงชี้ไปที่ที่ไม่มีไฟล์
+ *    path ปัจจุบันชี้ไป `backend/data/` เหมือนกันทั้ง dev (`src/services/../..`)
+ *    และ production (`dist/services/../..`) จึงไม่ต้องมีขั้นตอน copy
+ *
+ * ⚠️ บน container ที่ filesystem หายตอน redeploy (เช่น Railway) บทความที่แอดมินแก้จะกลับเป็นค่าตั้งต้น
+ *    ถ้าต้องให้คงอยู่จริงต้องย้ายไปเก็บในฐานข้อมูล — ดูหมายเหตุใน CLAUDE.md
+ *
+ * `KNOWLEDGE_BASE_FILE` เปลี่ยน path ได้ (เทสต์ใช้ไฟล์ชั่วคราวใน temp dir)
+ */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const DATA_DIR = join(__dirname, '..', 'data');
-const DATA_FILE = join(DATA_DIR, 'knowledge-base.json');
+const DATA_FILE = process.env['KNOWLEDGE_BASE_FILE']?.trim()
+  ? process.env['KNOWLEDGE_BASE_FILE'].trim()
+  : join(__dirname, '..', '..', 'data', 'knowledge-base.json');
+const DATA_DIR = dirname(DATA_FILE);
 
 // In-memory cache synced with persistent file
 let articlesCache: KnowledgeArticle[] | null = null;

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
+import { COD_MAX_TOTAL, paymentMethods } from '../src/config/payment.ts';
+import { SHIPPING_OPTIONS } from '../src/config/shipping.ts';
+import {
+  RETURN_WINDOW_DAYS,
+  STORE_AGENT_HOURS,
+  STORE_CONTACT_CHANNELS,
+} from '../src/config/store.ts';
+import { INITIAL_KNOWLEDGE_ARTICLES } from '../src/models/knowledge-base.model.ts';
+import { getStorePolicyContent } from '../src/services/ai-cs.service.ts';
 import {
   adminCreateArticle,
   adminDeleteArticle,
@@ -115,6 +124,133 @@ describe('STEP 21: AI Knowledge Base Service', () => {
       expect(res.sourceArticles.length).toBe(0);
       expect(res.answer).toContain('ไม่พบบทความหรือคำตอบ');
       expect(res.suggestedQuestions.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  /**
+   * ⚠️ เทสต์ชุดนี้คือด่านกันไม่ให้ "คลังความรู้" กับ "ระบบที่เก็บเงินจริง" หลุดจากกัน
+   *
+   * บทความในคลังความรู้คือสิ่งที่ AI หยิบไปตอบลูกค้าในฐานะนโยบายของร้าน
+   * ถ้าบทความบอกส่งฟรี 999 แต่ระบบคิดเงินที่ 1,000 = AI โกหกลูกค้าเรื่องเงิน
+   * (ตอนปิด STEP 21 บทความเคยระบุ ส่งฟรี 999 / EMS 70 / Same-day 120 /
+   *  ค่าธรรมเนียม COD 20 บาท ซึ่งไม่ตรงกับระบบสักค่าเดียว และ COD ไม่มีค่าธรรมเนียมเลย)
+   */
+  describe('Knowledge Base ต้องตรงกับ config ที่ใช้คิดเงินจริง (No Hallucination)', () => {
+    const findArticle = (slug: string) => {
+      const found = searchArticles({ page: 1, limit: 50, publishedOnly: false }).items.find(
+        (a) => a.slug === slug,
+      );
+      expect(found, `ไม่พบบทความ ${slug}`).toBeDefined();
+      return found!;
+    };
+
+    it('บทความจัดส่งพูดถึงวิธีจัดส่งครบทุกแบบ พร้อมค่าส่งและ ETA ตรงกับ SHIPPING_OPTIONS', () => {
+      const article = findArticle('shipping-rates-and-delivery-time');
+      const text = `${article.summary}\n${article.content}\n${article.faqPairs
+        .map((f) => `${f.question} ${f.answer}`)
+        .join('\n')}`;
+
+      for (const option of SHIPPING_OPTIONS) {
+        expect(text, `ไม่พบวิธีจัดส่ง "${option.name}"`).toContain(option.name);
+        expect(text, `ไม่พบระยะเวลาของ "${option.name}"`).toContain(option.etaText);
+
+        if (option.baseFee > 0) {
+          expect(text, `ค่าส่งของ "${option.name}" ไม่ตรงกับ config`).toContain(
+            option.baseFee.toLocaleString('th-TH'),
+          );
+        }
+
+        if (option.freeOverSubtotal !== null) {
+          expect(text, 'ยอดส่งฟรีไม่ตรงกับ config').toContain(
+            option.freeOverSubtotal.toLocaleString('th-TH'),
+          );
+        }
+      }
+    });
+
+    it('ทุกจำนวนเงินที่ปรากฏในบทความจัดส่งต้องเป็นค่าที่มีอยู่จริงใน SHIPPING_OPTIONS', () => {
+      const article = findArticle('shipping-rates-and-delivery-time');
+      const text = `${article.summary}\n${article.content}\n${article.faqPairs
+        .map((f) => f.answer)
+        .join('\n')}`;
+
+      /** ทุกจำนวนเงินที่ระบบยอมรับว่าเป็นความจริง (ค่าส่ง + ยอดส่งฟรี) */
+      const allowed = new Set<number>();
+      for (const option of SHIPPING_OPTIONS) {
+        allowed.add(option.baseFee);
+        if (option.freeOverSubtotal !== null) allowed.add(option.freeOverSubtotal);
+      }
+
+      // จับรูปแบบ "1,000 บาท" / "250 บาท" แล้วเทียบกับค่าที่อนุญาต
+      const mentioned = [...text.matchAll(/([\d,]+)\s*บาท/g)].map((m) =>
+        Number(m[1]!.replace(/,/g, '')),
+      );
+
+      expect(mentioned.length, 'บทความจัดส่งควรระบุจำนวนเงินอย่างน้อยหนึ่งค่า').toBeGreaterThan(0);
+
+      for (const amount of mentioned) {
+        expect(
+          allowed.has(amount),
+          `บทความระบุ ${amount.toLocaleString('th-TH')} บาท ซึ่งไม่มีอยู่ใน config/shipping.ts`,
+        ).toBe(true);
+      }
+    });
+
+    it('บทความชำระเงินสะท้อนสถานะจริงของทุกช่องทาง และไม่มีค่าธรรมเนียม COD ที่ระบบไม่เก็บ', () => {
+      const article = findArticle('payment-methods-cod-guide');
+      const text = `${article.summary}\n${article.content}\n${article.faqPairs
+        .map((f) => f.answer)
+        .join('\n')}`;
+
+      for (const method of paymentMethods(0)) {
+        expect(text, `ไม่พบช่องทาง "${method.name}"`).toContain(method.name);
+      }
+
+      expect(text, 'ยอดสูงสุดของ COD ไม่ตรงกับ config').toContain(
+        COD_MAX_TOTAL.toLocaleString('th-TH'),
+      );
+      // ระบบไม่บวกค่าธรรมเนียม COD ที่ไหนเลย — บทความจึงห้ามสัญญาว่าเก็บ
+      expect(text).not.toMatch(/ค่าธรรมเนียม(บริการ)?\s*(COD\s*)?\d+\s*บาท/);
+    });
+
+    it('เงื่อนไขเปลี่ยน/คืนสินค้าใช้จำนวนวันชุดเดียวกับ Policy Engine ของ AI Customer Service', () => {
+      const article = findArticle('return-and-exchange-policy');
+      const policy = getStorePolicyContent('return_exchange');
+
+      expect(article.content).toContain(`${RETURN_WINDOW_DAYS} วัน`);
+      expect(policy).toContain(`${RETURN_WINDOW_DAYS} วัน`);
+    });
+
+    it('ข้อมูลติดต่อและเวลาทำการตรงกันทั้งบทความและ Policy Engine · ไม่มีช่องทางที่ยังไม่เปิด', () => {
+      const article = findArticle('contact-support-and-office-hours');
+      const policy = getStorePolicyContent('store_info');
+
+      expect(article.content).toContain(STORE_AGENT_HOURS);
+      expect(policy).toContain(STORE_AGENT_HOURS);
+
+      for (const channel of STORE_CONTACT_CHANNELS) {
+        if (channel.value === null) {
+          // ช่องทางที่ยังไม่เปิด ห้ามถูกพูดถึงเลย (เดิมมีเบอร์โทรสมมติ 02-999-8888)
+          expect(article.content).not.toContain(channel.label);
+          expect(policy).not.toContain(channel.label);
+        } else {
+          expect(article.content).toContain(channel.value);
+        }
+      }
+
+      expect(article.content, 'ยังมีเบอร์โทรสมมติค้างอยู่').not.toMatch(
+        /0\d[-\s]?\d{3}[-\s]?\d{4}/,
+      );
+    });
+
+    it('ทุกบทความตั้งต้นเริ่มจากยอดวิว/โหวตเป็น 0 — ห้ามใส่สถิติปลอมให้หน้าหลังบ้านดูสวย', () => {
+      for (const article of INITIAL_KNOWLEDGE_ARTICLES) {
+        expect(article.viewCount, `${article.slug} มียอดวิวตั้งต้นที่ไม่ได้เกิดขึ้นจริง`).toBe(0);
+        expect(article.helpfulCount, `${article.slug} มีโหวตตั้งต้นที่ไม่ได้เกิดขึ้นจริง`).toBe(0);
+        expect(article.notHelpfulCount, `${article.slug} มีโหวตตั้งต้นที่ไม่ได้เกิดขึ้นจริง`).toBe(
+          0,
+        );
+      }
     });
   });
 

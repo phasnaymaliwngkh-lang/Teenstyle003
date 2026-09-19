@@ -17,6 +17,9 @@ import { escalateCsChat, fetchCsHistory, resetCsChat, sendCsChat } from "@/servi
 import type { AIConversationStatus, CsMessage } from "@/types/catalog";
 import { CsQuickChips } from "./cs-quick-chips";
 
+/** ความถี่ในการดึงข้อความของเจ้าหน้าที่ระหว่างรอ (ms) */
+const AGENT_POLL_INTERVAL_MS = 10_000;
+
 export function CsChat() {
   const [messages, setMessages] = useState<CsMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -31,7 +34,12 @@ export function CsChat() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    /**
+     * `behavior: "smooth"` ที่ส่งผ่าน JS **ทับ** `scroll-behavior: auto` ที่ globals.css
+     * ตั้งไว้ใน `@media (prefers-reduced-motion: reduce)` จึงต้องเช็คเองตรงนี้
+     */
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    messagesEndRef.current?.scrollIntoView({ behavior: reduced ? "auto" : "smooth" });
   };
 
   useEffect(() => {
@@ -49,8 +57,7 @@ export function CsChat() {
           setStatus(res.status);
           setMessages(res.messages);
         }
-      } catch (err) {
-        console.error("Failed to load customer service history:", err);
+      } catch {
         if (!cancelled) {
           setError("ไม่สามารถโหลดประวัติการสนทนาได้ กรุณารีเฟรชหน้าเว็บ");
         }
@@ -64,6 +71,49 @@ export function CsChat() {
       cancelled = true;
     };
   }, []);
+
+  /**
+   * ดึงข้อความใหม่ระหว่างที่รอเจ้าหน้าที่คนจริง
+   *
+   * ⚠️ จำเป็น ไม่ใช่ของแถม: เมื่อบทสนทนาเป็น `ESCALATED` ฝั่ง backend จะตอบกลับเพียง
+   *    ข้อความ SYSTEM ว่า "ส่งถึงเจ้าหน้าที่แล้ว" ไม่ได้ส่งประวัติชุดใหม่กลับมา
+   *    ถ้าไม่ดึงเอง **คำตอบของเจ้าหน้าที่จะไม่ปรากฏบนหน้าจอลูกค้าเลย** ไม่ว่าลูกค้าจะพิมพ์อีกกี่ครั้ง
+   *    จนกว่าจะรีเฟรชหน้า — ซึ่งทำให้ฟีเจอร์ Human Handoff ใช้งานจริงไม่ได้
+   *
+   * หยุดเองเมื่อเคสถูกปิด และหยุดตอนแท็บถูกซ่อนไว้ เพื่อไม่ยิงทิ้งเปล่า
+   */
+  useEffect(() => {
+    if (status !== "ESCALATED" || !conversationId) return;
+
+    let cancelled = false;
+
+    const pull = async () => {
+      if (document.visibilityState === "hidden") return;
+
+      try {
+        const res = await fetchCsHistory();
+        if (cancelled) return;
+
+        setStatus(res.status);
+        setMessages((prev) => {
+          // ไม่เขียนทับถ้าไม่มีอะไรใหม่ — กันไม่ให้ React re-render ทุก 10 วินาทีเปล่า ๆ
+          const latest = res.messages.at(-1);
+          const current = prev.at(-1);
+          if (res.messages.length === prev.length && latest?.id === current?.id) return prev;
+          return res.messages;
+        });
+      } catch {
+        // เงียบไว้ — การดึงข้อความรอบเดียวล้มเหลวไม่ควรขึ้น error ทับหน้าจอลูกค้า
+      }
+    };
+
+    const timer = window.setInterval(() => void pull(), AGENT_POLL_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [status, conversationId]);
 
   const handleSend = async (textToSend?: string) => {
     const text = (textToSend ?? inputText).trim();
@@ -92,8 +142,14 @@ export function CsChat() {
       setConversationId(res.conversationId);
       setStatus(res.status);
       setMessages((prev) => [...prev, res.message]);
-    } catch (err) {
-      console.error("Error sending CS message:", err);
+    } catch {
+      /**
+       * ⚠️ ต้องถอนข้อความที่ใส่ไว้แบบ optimistic ออก และคืนข้อความกลับเข้าช่องพิมพ์
+       *    ถ้าปล่อยค้างไว้ ลูกค้าจะเห็นข้อความของตัวเองอยู่ในแชตเหมือนส่งสำเร็จ
+       *    ทั้งที่ backend ไม่เคยได้รับ — แล้วนั่งรอคำตอบที่ไม่มีวันมา
+       */
+      setMessages((prev) => prev.filter((m) => m.id !== tempUserMessage.id));
+      setInputText((current) => (current.trim() ? current : text));
       setError("ไม่สามารถส่งข้อความได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setLoading(false);
@@ -118,8 +174,7 @@ export function CsChat() {
         createdAt: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, escalateMsg]);
-    } catch (err) {
-      console.error("Error escalating conversation:", err);
+    } catch {
       setError("ไม่สามารถส่งต่อให้เจ้าหน้าที่ได้ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setEscalating(false);
@@ -138,8 +193,7 @@ export function CsChat() {
       setStatus("ACTIVE");
       setMessages([]);
       setError(null);
-    } catch (err) {
-      console.error("Error resetting CS chat:", err);
+    } catch {
       setError("ไม่สามารถเริ่มการสนทนาใหม่ได้");
     } finally {
       setLoading(false);
@@ -232,8 +286,17 @@ export function CsChat() {
         </div>
       )}
 
-      {/* ─── Chat Body ────────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-slate-50/40">
+      {/**
+       * ─── Chat Body ─────────────────────────────────────────────────────────
+       * `aria-live="polite"` จำเป็น เพราะคำตอบของ AI และของเจ้าหน้าที่ไหลเข้ามาเองโดยที่
+       * ผู้ใช้ไม่ได้ย้าย focus — ถ้าไม่ประกาศ ผู้ใช้ screen reader จะไม่รู้เลยว่ามีใครตอบแล้ว
+       */}
+      <div
+        aria-live="polite"
+        aria-atomic="false"
+        aria-relevant="additions"
+        className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-slate-50/40"
+      >
         {initialLoading ? (
           <div className="flex h-full items-center justify-center">
             <div className="flex flex-col items-center gap-2 text-muted">
@@ -296,7 +359,7 @@ export function CsChat() {
                         {isAgent ? "เจ้าหน้าที่ TEENSTYLE" : "AI Customer Service"}
                       </span>
                       {isAgent && (
-                        <span className="rounded bg-blue-100 px-1.5 py-0.2 text-[9px] font-semibold text-blue-700">
+                        <span className="rounded bg-blue-100 px-1.5 py-px text-[9px] font-semibold text-blue-700">
                           Staff
                         </span>
                       )}
@@ -352,7 +415,10 @@ export function CsChat() {
 
       {/* ─── Bottom Error Notice ─────────────────────────────────────────────── */}
       {error && (
-        <div className="border-t border-rose-200 bg-rose-50 px-4 py-2 text-xs text-rose-700 flex items-center justify-between">
+        <div
+          role="alert"
+          className="border-t border-rose-200 bg-rose-50 px-4 py-2 text-xs text-rose-700 flex items-center justify-between"
+        >
           <span>{error}</span>
           <button
             type="button"

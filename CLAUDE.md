@@ -4,10 +4,11 @@
 > Full Stack Fashion E-Commerce สำหรับวัยรุ่น — Next.js + Express + PostgreSQL + Prisma + OpenAI
 
 โปรเจกต์นี้เดินตาม **Master Prompt STEP 1–55** ทำทีละ STEP แล้วหยุดรอคำสั่งถัดไป
-สถานะปัจจุบัน: **STEP 1–19 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
+สถานะปัจจุบัน: **STEP 1–21 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
 หน้าร้าน → ตะกร้า → checkout → ชำระเงิน (COD จริง · Stripe รอใส่ key) → ติดตามคำสั่งซื้อ
 → **หลังบ้าน: ภาพรวมร้าน + จัดการคำสั่งซื้อ + จัดการสินค้า + คลังสินค้า + แจ้งเตือนสต็อก + บาร์โค้ด/QR + นำเข้า/ส่งออก (CSV, Excel)**
-→ **AI: AI Stylist ผู้ช่วยเลือกชุดและสไตล์ส่วนบุคคล (OpenAI GPT-4o-mini Tool Calling + Intelligent Catalog Matcher)**
+→ **AI: AI Stylist (STEP 19) · AI Customer Service + Human Handoff (STEP 20) · AI Knowledge Base / FAQ (STEP 21)**
+ทุกตัวมี Intelligent Fallback Engine ทำงานได้เต็มรูปแบบแม้ไม่มี `OPENAI_API_KEY`
 → ดู [docs/02-step-progress.md](docs/02-step-progress.md)
 
 ## ⚠️ อ่านก่อน: ไฟล์เก่าที่ root ไม่ใช่ส่วนหนึ่งของแอป
@@ -824,6 +825,83 @@ Zod จะรายงาน `invalid_type` แล้วตอบข้อคว
 
 หน้ารายการใหม่ (เช่น `/search` ใน STEP 45) ให้สร้าง `features/<x>/lib/query.ts` ผูก base path ของตัวเอง
 **ห้าม copy ตรรกะ query string ไปไว้ในโฟลเดอร์ feature ซ้ำอีก**
+
+## AI Customer Service + Human Handoff (STEP 20 — สร้างแล้ว)
+
+```
+/customer-service        → แชตกับ AI · กดขอคุยกับเจ้าหน้าที่ (guest ก็ใช้ได้)
+/admin/support           → คิวเคส · กดรับเรื่อง · ตอบในนาม AGENT · ปิด/เปิดเคส (ai:read / ai:handoff)
+GET  /api/ai/cs/history   POST /api/ai/cs/chat · /cs/escalate · /cs/reset
+GET  /api/admin/support/conversations[/:id]
+POST /api/admin/support/conversations/:id/assign · /messages   PATCH …/status
+```
+
+**เจ้าของบทสนทนา** — `AIConversation` เป็นของได้แบบเดียว: `userId` (ล็อกอิน) หรือ `sessionId` (guest)
+
+**กฎที่ห้ามละเมิด**
+
+1. **ตัวระบุ guest อ่านจาก cookie `ai-session-id` (httpOnly) เท่านั้น**
+   **ห้ามรับ session id จาก header/body/query ที่ client ส่งมาเอง** — เดิม `resolveOwner` อ่าน
+   header `x-session-id` ก่อน cookie ทำให้ใครก็สวมเป็น guest คนอื่นได้ (แก้แล้ว)
+2. **ตรวจความเป็นเจ้าของแบบ "ต้องตรงกัน" ห้ามเขียนแบบ falsy short-circuit**
+   `existing.userId && existing.userId !== owner.userId` **หลุด** เมื่ออีกฝั่งเป็น `null`
+   → ผู้ใช้ที่ล็อกอินอ่านบทสนทนา guest ได้ และ guest อ่านบทสนทนาของผู้ใช้ได้ (เคยเกิดจริง)
+   ใช้ `ownsCsConversation()` ที่เทียบตรง ๆ · ไม่ใช่ของเราคืน **404 ไม่ใช่ 403**
+3. **ห้ามสร้าง `where` ที่ไม่มีตัวระบุเจ้าของ** — `csOwnerWhere()` โยน error เมื่อไม่มีทั้งคู่
+   ไม่งั้น `findFirst` หยิบบทสนทนาของคนอื่นมา และ `updateMany` ไปปิดเคสของคนอื่น
+4. **`lookupOrderForCs` ต้องมี `userId` เสมอ** — `Order.userId` เป็น non-nullable
+   guest จึงไม่มีทางเป็นเจ้าของออเดอร์ → ปฏิเสธตั้งแต่ต้นทาง ไม่ใช่แค่ "ไม่กรอง"
+   (เดิมไม่กรองตอนเป็น guest = เดาเลขออเดอร์แล้วเห็นยอดเงิน/รายการ/เลขพัสดุของคนอื่น)
+5. **ฝั่งลูกค้าต้องดึงข้อความใหม่เองระหว่าง `ESCALATED`** — backend ตอบแค่ SYSTEM ack
+   ไม่ได้ส่งประวัติชุดใหม่กลับมา **ถ้าไม่ดึง คำตอบของเจ้าหน้าที่จะไม่ขึ้นบนจอลูกค้าเลย**
+   (ยังไม่มี realtime push — ถ้าจะทำ SSE/WebSocket เป็นงานของ STEP 52)
+6. **"เริ่มการสนทนาใหม่" ของลูกค้าปิดได้เฉพาะเคส `ACTIVE`** — เคสที่ `ESCALATED` เป็นของเจ้าหน้าที่แล้ว
+   ถ้าลูกค้าปิดเองได้ เรื่องที่ค้างจะหายจากคิวโดยไม่มีใครรู้
+7. **ทุกการกระทำของเจ้าหน้าที่เขียน `AdminLog` ในทรานแซกชันเดียวกัน** (assign · reply · status)
+
+## AI Knowledge Base / FAQ (STEP 21 — สร้างแล้ว)
+
+```
+/faq                → ค้นหา · ถาม AI · อ่านบทความ · โหวตมีประโยชน์
+/admin/knowledge    → จัดการบทความ (ดู = ai:read · แก้/ลบ/รีเซ็ต = ai:knowledge:manage)
+GET  /api/ai/knowledge/articles[/:slug] · /categories
+POST /api/ai/knowledge/ask · /articles/:id/helpful     (ทั้งคู่ strictRateLimiter)
+GET|POST|PUT|DELETE /api/admin/knowledge/articles…
+```
+
+**กฎที่ห้ามละเมิด**
+
+1. **ห้ามพิมพ์ตัวเลขนโยบายลงในบทความตรง ๆ** — ค่าจัดส่ง ยอดส่งฟรี ช่องทางชำระเงิน
+   ยอดสูงสุด COD จำนวนวันเปลี่ยนคืน เวลาทำการ ช่องทางติดต่อ ต้องประกอบจาก
+   [config/shipping.ts](backend/src/config/shipping.ts) · [config/payment.ts](backend/src/config/payment.ts) ·
+   **[config/store.ts](backend/src/config/store.ts)** เท่านั้น
+   บทความคือสิ่งที่ AI หยิบไปตอบลูกค้าในฐานะ "นโยบายของร้าน" — ตัวเลขไม่ตรง = โกหกลูกค้าเรื่องเงิน
+   (ตอนปิด STEP 21 บทความระบุ ส่งฟรี 999 · EMS 70 · Same-day 120 · **ค่าธรรมเนียม COD 20 บาทที่ระบบไม่เคยเก็บ**
+   และเบอร์โทรสมมติ `02-999-8888` — ไม่ตรงกับระบบสักค่าเดียว)
+   มี test ใน `ai-knowledge.test.ts` เทียบทุกจำนวนเงินในบทความกับ config ตรง ๆ
+2. **ช่องทางติดต่อที่ยังไม่มีจริงตั้งเป็น `null`** ใน `STORE_CONTACT_CHANNELS` แล้วมันจะหายจากทั้ง
+   บทความและ Policy Engine เอง — **ห้ามใส่เบอร์/อีเมลสมมติให้หน้าดูครบ**
+   (แพตเทิร์นเดียวกับ STEP 16 ข้อ 6: ไม่สร้างช่องทางที่ส่งจริงไม่ได้)
+3. **`getStorePolicyContent()` กับบทความต้องอ่านจากแหล่งเดียวกัน** — ห้ามให้ฝ่ายใดฝ่ายหนึ่ง
+   พิมพ์ค่าเอง ไม่งั้นลูกค้าถามคำถามเดียวกันสองทางแล้วได้คนละคำตอบ (เคยเกิดจริงเรื่องเวลาทำการและเวลาตัดรอบ)
+4. **สถิติตั้งต้นของบทความต้องเป็น 0** — `viewCount` / `helpfulCount` / `notHelpfulCount`
+   เดิม seed ใส่เลขสวย ๆ ไว้ (342 วิว · 89 โหวต) ซึ่งเป็นตัวเลขที่ไม่เคยเกิดขึ้น
+   และไปโผล่บนหน้า `/admin/knowledge` ให้แอดมินใช้ตัดสินใจ (กฎเดียวกับ STEP 13 ข้อ 6)
+5. **ที่เก็บ `backend/data/knowledge-base.json` เป็น runtime artifact ไม่ใช่ source**
+   อยู่นอก `src/` และถูก gitignore · ข้อมูลตั้งต้นอยู่ที่ `INITIAL_KNOWLEDGE_ARTICLES` ที่เดียว
+   เดิมเก็บไว้ใน `src/data/` แล้ว commit ลง git → แค่เปิดอ่านบทความ (`viewCount + 1`)
+   ก็ทำให้ working tree สกปรก · `npm test` เขียนทับไฟล์จริง · และไฟล์ที่ค้างค่าเก่า
+   **บังหน้า** `INITIAL_KNOWLEDGE_ARTICLES` ที่แก้ใหม่จนแก้โค้ดแล้วเว็บยังตอบค่าเดิม
+   เทสต์ชี้ `KNOWLEDGE_BASE_FILE` ไปที่ temp dir ใน `tests/setup.ts`
+6. **สิทธิ์ต้องเป็นของโดเมน AI ไม่ใช่ `product:*`** — คนที่แก้ข้อมูลสินค้าได้
+   ไม่ควรแก้นโยบายร้านที่ AI เอาไปตอบลูกค้าในฐานะความจริงได้ด้วย
+7. **endpoint ที่เรียก OpenAI และ endpoint ที่เพิ่มตัวนับต้องมี `strictRateLimiter`**
+   (`/knowledge/ask` · `/cs/chat` · `/stylist/chat` · `/articles/:id/helpful`)
+   เปิดให้ guest ใช้ + หนึ่งคำขอมีค่าใช้จ่ายจริง = ยิงรัวได้แปลว่าบิลบานได้
+
+⚠️ **ที่เก็บแบบไฟล์ยังไม่รอด redeploy บน container** (Railway ฯลฯ) บทความที่แอดมินแก้จะกลับเป็นค่าตั้งต้น
+ถ้าต้องให้คงอยู่จริงต้องเพิ่มตารางใน Prisma แล้วย้าย `knowledge-base.service.ts` ไปอ่าน/เขียน DB
+(schema ยังไม่มีโมเดลนี้ — เป็นงานที่ต้องตัดสินใจก่อน deploy จริง)
 
 ## ข้อควรระวังเรื่องเครื่องมือบนเครื่องนี้ (Windows / PowerShell)
 

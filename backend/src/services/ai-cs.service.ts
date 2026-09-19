@@ -2,8 +2,16 @@ import { getPrisma, type Prisma } from '@teenstyle/database';
 import OpenAI from 'openai';
 
 import { env } from '../config/env.ts';
-import { paymentMethods } from '../config/payment.ts';
+import { COD_MAX_TOTAL, paymentMethods } from '../config/payment.ts';
 import { SHIPPING_OPTIONS } from '../config/shipping.ts';
+import {
+  availableContactChannels,
+  RETURN_WINDOW_DAYS,
+  STORE_AGENT_HOURS,
+  STORE_AI_HOURS,
+  STORE_CUTOFF_TIME,
+  STORE_SHIPPING_DAYS,
+} from '../config/store.ts';
 import { ApiError } from '../utils/api-error.ts';
 import { logger } from '../utils/logger.ts';
 
@@ -111,36 +119,52 @@ const CS_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 
 /**
  * ดึงนโยบายทางการของร้าน (Single Source of Truth)
+ *
+ * ⚠️ ทุกตัวเลขและทุกข้อความที่เป็น "นโยบาย" ต้องอ่านจาก config เท่านั้น
+ *    ห้ามพิมพ์ค่าซ้ำลงมาในฟังก์ชันนี้ เพราะจะกลายเป็นแหล่งความจริงที่สอง
+ *    (เดิมพิมพ์ COD 5,000 · เวลาตัดรอบ 12:00 · เวลาทำการ จ–อา 09:00–21:00 ไว้เองทั้งหมด
+ *     แล้วขัดกับบทความในคลังความรู้ที่พิมพ์คนละค่า — ลูกค้าถามสองทางได้คนละคำตอบ)
  */
 export function getStorePolicyContent(topic: string): string {
   switch (topic) {
     case 'shipping': {
-      const optionsText = SHIPPING_OPTIONS.map(
-        (o) =>
-          `• **${o.name}**: ค่าส่ง ${o.baseFee} บาท (ระยะเวลา: ${o.etaText}) ${
-            o.freeOverSubtotal
-              ? `— ส่งฟรีเมื่อซื้อครบ ${o.freeOverSubtotal.toLocaleString('th-TH')} บาท`
-              : ''
-          }${o.onlyProvinces ? ` (เฉพาะ ${o.onlyProvinces.join(', ')})` : ''}`,
-      ).join('\n');
-      return `📦 **นโยบายและช่องทางการจัดส่งของ TEENSTYLE**\n${optionsText}\n\n*หมายเหตุ: ร้านจัดส่งทุกวันจันทร์ - เสาร์ ตัดรอบเวลา 12:00 น.*`;
+      const optionsText = SHIPPING_OPTIONS.map((o) => {
+        const fee =
+          o.baseFee === 0 ? 'ไม่มีค่าใช้จ่าย' : `${o.baseFee.toLocaleString('th-TH')} บาท`;
+        const free =
+          o.freeOverSubtotal !== null
+            ? ` — ส่งฟรีเมื่อยอดสินค้าครบ ${o.freeOverSubtotal.toLocaleString('th-TH')} บาท`
+            : '';
+        const area = o.onlyProvinces !== null ? ` (เฉพาะ ${o.onlyProvinces.join(', ')})` : '';
+
+        return `• **${o.name}**: ค่าส่ง ${fee}${free} · ระยะเวลา ${o.etaText}${area}`;
+      }).join('\n');
+
+      return `📦 **นโยบายและช่องทางการจัดส่งของ TEENSTYLE**\n${optionsText}\n\n*หมายเหตุ: ร้านจัดส่งวัน${STORE_SHIPPING_DAYS} ตัดรอบเวลา ${STORE_CUTOFF_TIME}*`;
     }
     case 'payment': {
-      const methods = paymentMethods(0);
-      const methodsText = methods
-        .map(
-          (m) =>
-            `• **${m.name}**: ${m.description} (${m.available ? 'พร้อมใช้งาน' : 'ยังไม่เปิดใช้งาน'})`,
-        )
+      const methodsText = paymentMethods(0)
+        .map((m) => {
+          const state = m.available
+            ? 'พร้อมใช้งาน'
+            : `ยังไม่เปิดใช้งาน${m.unavailableReason ? ` (${m.unavailableReason})` : ''}`;
+
+          return `• **${m.name}**: ${m.description} — ${state}`;
+        })
         .join('\n');
-      return `💳 **ช่องทางการชำระเงินที่รองรับ**\n${methodsText}\n\n*หมายเหตุ: สำหรับการเก็บเงินปลายทาง (COD) รับยอดสูงสุดไม่เกิน 5,000 บาท*`;
+
+      return `💳 **ช่องทางการชำระเงินที่รองรับ**\n${methodsText}\n\n*หมายเหตุ: เก็บเงินปลายทาง (COD) รับยอดสูงสุดไม่เกิน ${COD_MAX_TOTAL.toLocaleString('th-TH')} บาท และไม่มีค่าธรรมเนียมเพิ่ม*`;
     }
     case 'return_exchange': {
-      return `🔄 **นโยบายการเปลี่ยนและคืนสินค้า**\n• สามารถแจ้งเปลี่ยนไซซ์หรือคืนสินค้าได้ภายใน **7 วัน** นับจากวันที่ได้รับพัสดุ\n• สินค้าต้องอยู่ในสภาพเดิม ไม่ผ่านการซัก ป้ายราคาและแพ็กเกจต้องอยู่ครบ\n• กรณีสินค้ามีตำหนิจากการผลิตหรือส่งผิดแบบ/ไซซ์ ทางร้านยินดีรับผิดชอบค่าจัดส่งเปลี่ยนสินค้าให้ทั้งหมด\n• หากต้องการดำเนินการเปลี่ยน/คืนสินค้า สามารถแจ้งเจ้าหน้าที่ในแชตนี้ได้ทันทีครับ`;
+      return `🔄 **นโยบายการเปลี่ยนและคืนสินค้า**\n• สามารถแจ้งเปลี่ยนไซซ์หรือคืนสินค้าได้ภายใน **${RETURN_WINDOW_DAYS} วัน** นับจากวันที่ได้รับพัสดุ\n• สินค้าต้องอยู่ในสภาพเดิม ไม่ผ่านการซัก ป้ายราคาและแพ็กเกจต้องอยู่ครบ\n• กรณีสินค้ามีตำหนิจากการผลิตหรือส่งผิดแบบ/ไซซ์ ทางร้านยินดีรับผิดชอบค่าจัดส่งเปลี่ยนสินค้าให้ทั้งหมด\n• หากต้องการดำเนินการเปลี่ยน/คืนสินค้า สามารถแจ้งเจ้าหน้าที่ในแชตนี้ได้ทันทีครับ`;
     }
     case 'store_info':
     default: {
-      return `🏪 **ข้อมูลร้าน TEENSTYLE**\n• เวลาทำการบริการลูกค้า: วันจันทร์ - อาทิตย์ 09:00 - 21:00 น.\n• ร้านค้าออนไลน์แฟชั่นวัยรุ่นอันดับ 1 "Find your style, be you 💜"\n• ติดต่อสอบถามเพิ่มเติมผ่านแชตนี้ได้ตลอด 24 ชั่วโมง (AI ตอบทันที และมีเจ้าหน้าที่พร้อมดูแลในเวลาทำการ)`;
+      const channels = availableContactChannels()
+        .map((c) => `• ${c.label}: ${c.value}${c.note ? ` (${c.note})` : ''}`)
+        .join('\n');
+
+      return `🏪 **ข้อมูลร้าน TEENSTYLE**\n• ร้านค้าออนไลน์แฟชั่นวัยรุ่น "Find your style, be you 💜"\n• ผู้ช่วย AI ให้บริการ${STORE_AI_HOURS}\n• เจ้าหน้าที่คนจริงให้บริการ ${STORE_AGENT_HOURS}\n\n**ช่องทางติดต่อ**\n${channels}`;
     }
   }
 }
@@ -155,14 +179,24 @@ export async function lookupOrderForCs(
   const prisma = getPrisma();
   const cleanOrderNumber = orderNumber.trim().toUpperCase();
 
+  /**
+   * ⚠️ `Order.userId` เป็น non-nullable — ออเดอร์ทุกใบผูกกับบัญชีเสมอ (checkout บังคับล็อกอิน)
+   *    ดังนั้น guest จึงไม่มีทางเป็นเจ้าของออเดอร์ใด ๆ ได้เลย
+   *    ถ้าปล่อยให้ guest ค้นได้ = ใครก็ตามที่เดาเลขออเดอร์ถูกจะเห็นยอดเงิน รายการสินค้า
+   *    และเลขพัสดุของคนอื่น → ต้องปฏิเสธตั้งแต่ต้นทาง ไม่ใช่แค่ไม่กรอง userId
+   *    (กฎเดียวกับ STEP 10 ข้อ 7 / STEP 12 ข้อ 4: ทุก query ต้องกรอง userId)
+   */
+  if (!owner.userId) {
+    return {
+      found: false,
+      details: `ระบบตรวจสอบคำสั่งซื้อได้เฉพาะบัญชีที่เข้าสู่ระบบแล้วเท่านั้นครับ กรุณาเข้าสู่ระบบด้วยบัญชีที่ใช้สั่งซื้อ แล้วดูสถานะได้ที่หน้า [ประวัติคำสั่งซื้อ](/account/orders) หรือแจ้งให้เจ้าหน้าที่ช่วยตรวจสอบให้ก็ได้ครับ`,
+    };
+  }
+
   const where: Prisma.OrderWhereInput = {
     orderNumber: cleanOrderNumber,
+    userId: owner.userId,
   };
-
-  // ตรวจสอบความปลอดภัย: หากผู้ใช้ล็อกอิน ให้ตรวจความเป็นเจ้าของ หรือกรองตามผู้ใช้
-  if (owner.userId) {
-    where.userId = owner.userId;
-  }
 
   const order = await prisma.order.findFirst({
     where,
@@ -216,10 +250,43 @@ export async function lookupOrderForCs(
 }
 
 /**
+ * เงื่อนไข "บทสนทนาของผู้เรียกคนนี้" — ใช้ร่วมกันทุก query ของฝั่งลูกค้า
+ *
+ * ⚠️ ต้องโยน error เมื่อไม่มีตัวระบุเจ้าของเลย ห้ามคืน where ว่าง
+ *    เพราะ `findFirst({ where: { type } })` จะไปหยิบบทสนทนาของ**คนอื่น**มาให้
+ *    และ `updateMany` จะไปปิดเคสของคนอื่นทิ้ง
+ */
+function csOwnerWhere(owner: CsOwner): Prisma.AIConversationWhereInput {
+  if (owner.userId) return { userId: owner.userId };
+  if (owner.sessionId) return { sessionId: owner.sessionId };
+
+  throw ApiError.badRequest('ไม่พบตัวระบุผู้ใช้ของบทสนทนา');
+}
+
+/**
+ * บทสนทนานี้เป็นของผู้เรียกจริงไหม
+ *
+ * ⚠️ ต้องเทียบแบบ "ต้องตรงกัน" ไม่ใช่ "ถ้าทั้งคู่มีค่าแล้วต่างกันจึงห้าม"
+ *    ของเดิมเช็คว่า `existing.userId && existing.userId !== owner.userId` ซึ่ง **หลุด** 2 ทาง:
+ *      1. ผู้ใช้ที่ล็อกอินแล้วส่ง id ของบทสนทนา guest มา (existing.userId เป็น null → ผ่าน)
+ *      2. guest ส่ง id ของบทสนทนาผู้ใช้ที่ล็อกอินมา (existing.sessionId เป็น null → ผ่าน)
+ */
+function ownsCsConversation(
+  owner: CsOwner,
+  existing: { userId: string | null; sessionId: string | null },
+): boolean {
+  if (owner.userId) return existing.userId === owner.userId;
+  if (owner.sessionId) return existing.sessionId === owner.sessionId;
+
+  return false;
+}
+
+/**
  * ค้นหาหรือสร้าง Session การสนทนาของ Customer Service
  */
 export async function getOrCreateCsConversation(owner: CsOwner, conversationId?: string) {
   const prisma = getPrisma();
+  const ownerWhere = csOwnerWhere(owner);
 
   if (conversationId) {
     const existing = await prisma.aIConversation.findUnique({
@@ -232,16 +299,9 @@ export async function getOrCreateCsConversation(owner: CsOwner, conversationId?:
 
     if (existing && existing.type === 'CUSTOMER_SERVICE') {
       // ตรวจสอบความเป็นเจ้าของ (IDOR Protection)
-      if (owner.userId && existing.userId && existing.userId !== owner.userId) {
-        throw ApiError.forbidden('คุณไม่มีสิทธิ์เข้าถึงบทสนทนานี้');
-      }
-      if (
-        owner.sessionId &&
-        !owner.userId &&
-        existing.sessionId &&
-        existing.sessionId !== owner.sessionId
-      ) {
-        throw ApiError.forbidden('คุณไม่มีสิทธิ์เข้าถึงบทสนทนานี้');
+      // ไม่ใช่ของเรา → 404 ไม่ใช่ 403 เพื่อไม่บอกใบ้ว่า id นี้มีอยู่จริง (แพตเทิร์นเดียวกับ STEP 9 ข้อ 4)
+      if (!ownsCsConversation(owner, existing)) {
+        throw ApiError.notFound('ไม่พบบทสนทนานี้');
       }
       return existing;
     }
@@ -249,15 +309,10 @@ export async function getOrCreateCsConversation(owner: CsOwner, conversationId?:
 
   // ค้นหาการสนทนา CS ล่าสุดที่ยังไม่ปิด
   const where: Prisma.AIConversationWhereInput = {
+    ...ownerWhere,
     type: 'CUSTOMER_SERVICE',
     status: { in: ['ACTIVE', 'ESCALATED'] },
   };
-
-  if (owner.userId) {
-    where.userId = owner.userId;
-  } else if (owner.sessionId) {
-    where.sessionId = owner.sessionId;
-  }
 
   let conversation = await prisma.aIConversation.findFirst({
     where,
@@ -664,14 +719,9 @@ export async function getCsHistory(owner: CsOwner): Promise<CsHistoryResponse> {
   const prisma = getPrisma();
 
   const where: Prisma.AIConversationWhereInput = {
+    ...csOwnerWhere(owner),
     type: 'CUSTOMER_SERVICE',
   };
-
-  if (owner.userId) {
-    where.userId = owner.userId;
-  } else if (owner.sessionId) {
-    where.sessionId = owner.sessionId;
-  }
 
   const conversation = await prisma.aIConversation.findFirst({
     where,
@@ -704,24 +754,26 @@ export async function getCsHistory(owner: CsOwner): Promise<CsHistoryResponse> {
 /**
  * เริ่มบทสนทนา Customer Service ใหม่
  */
-export async function resetCsConversation(owner: CsOwner): Promise<{ success: boolean }> {
+export async function resetCsConversation(
+  owner: CsOwner,
+): Promise<{ success: boolean; closedCount: number }> {
   const prisma = getPrisma();
 
+  /**
+   * ⚠️ ไม่ปิดเคสที่ `ESCALATED` — เจ้าหน้าที่คนจริงรับเรื่องไปแล้ว
+   *    ถ้าลูกค้ากด "เริ่มใหม่" แล้วเคสหายจากคิวของเจ้าหน้าที่ เรื่องที่ค้างอยู่จะตกหล่น
+   *    การปิดเคสที่ส่งต่อแล้วเป็นสิทธิ์ของเจ้าหน้าที่ (`PATCH /api/admin/support/…/status`)
+   */
   const where: Prisma.AIConversationWhereInput = {
+    ...csOwnerWhere(owner),
     type: 'CUSTOMER_SERVICE',
-    status: { in: ['ACTIVE', 'ESCALATED'] },
+    status: 'ACTIVE',
   };
 
-  if (owner.userId) {
-    where.userId = owner.userId;
-  } else if (owner.sessionId) {
-    where.sessionId = owner.sessionId;
-  }
-
-  await prisma.aIConversation.updateMany({
+  const { count } = await prisma.aIConversation.updateMany({
     where,
     data: { status: 'CLOSED' },
   });
 
-  return { success: true };
+  return { success: true, closedCount: count };
 }

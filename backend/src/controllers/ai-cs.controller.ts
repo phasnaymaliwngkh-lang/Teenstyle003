@@ -28,19 +28,20 @@ function cookieOptions(): CookieOptions {
 
 /**
  * ดึงหรือสร้าง session id สำหรับ guest
+ *
+ * ⚠️ อ่านจาก cookie `httpOnly` เท่านั้น — **ห้ามรับ session id จาก header ที่ client ส่งมาเอง**
+ *    เดิมอ่าน header `x-session-id` ก่อน cookie ซึ่งทำให้ใครก็ตามสวมเป็น guest คนอื่นได้
+ *    ด้วยการเดา/ดัก session id แล้วอ่านประวัติแชต ส่งข้อความแทน และปิดบทสนทนาของเขา
+ *    — ลบล้างเหตุผลทั้งหมดของการใช้ cookie ที่ JavaScript อ่านไม่ได้
+ *    (และไม่มี client ในโปรเจกต์นี้ส่ง header นั้นเลย จึงมีไว้เป็นช่องโหว่อย่างเดียว)
  */
 function resolveOwner(req: Request, res: Response): CsOwner {
   if (req.user?.id) {
     return { userId: req.user.id };
   }
 
-  const headerSessionId = req.headers['x-session-id'];
   const cookieSessionId = req.cookies?.[AI_SESSION_COOKIE];
-
-  let sessionId =
-    (typeof headerSessionId === 'string' && headerSessionId.trim()) ||
-    (typeof cookieSessionId === 'string' && cookieSessionId.trim()) ||
-    '';
+  let sessionId = typeof cookieSessionId === 'string' ? cookieSessionId.trim() : '';
 
   if (!sessionId) {
     sessionId = `ai-guest-${randomUUID()}`;

@@ -58,3 +58,8 @@ desktop.ini
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# ─── Runtime data (ไม่ใช่ source) ───────────────────────────────
+# คลังความรู้ STEP 21 — ข้อมูลตั้งต้นอยู่ใน INITIAL_KNOWLEDGE_ARTICLES
+# ไฟล์นี้ถูกสร้าง/แก้ตอนรันจริง (นับยอดวิว โหวต และบทความที่แอดมินแก้)
+backend/data/

@@ -27,20 +27,17 @@ function cookieOptions(): CookieOptions {
 
 /**
  * ดึงหรือสร้าง session id สำหรับ guest
+ *
+ * ⚠️ อ่านจาก cookie `httpOnly` เท่านั้น — **ห้ามรับ session id จาก header ที่ client ส่งมาเอง**
+ *    (เหตุผลเดียวกับ ai-cs.controller.ts — header ที่ปลอมได้ = สวมเป็น guest คนอื่นได้)
  */
 function resolveOwner(req: Request, res: Response): StylistOwner {
   if (req.user?.id) {
     return { userId: req.user.id };
   }
 
-  // ดูจาก header หรือ cookie
-  const headerSessionId = req.headers['x-session-id'];
   const cookieSessionId = req.cookies?.[AI_SESSION_COOKIE];
-
-  let sessionId =
-    (typeof headerSessionId === 'string' && headerSessionId.trim()) ||
-    (typeof cookieSessionId === 'string' && cookieSessionId.trim()) ||
-    '';
+  let sessionId = typeof cookieSessionId === 'string' ? cookieSessionId.trim() : '';
 
   if (!sessionId) {
     sessionId = `ai-guest-${randomUUID()}`;
