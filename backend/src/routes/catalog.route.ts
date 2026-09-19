@@ -1,6 +1,8 @@
 import { Router } from 'express';
 
 import { getCategories, getLooks, getProducts } from '../controllers/catalog.controller.ts';
+import { listProductReviewsHandler } from '../controllers/review.controller.ts';
+import { attachUser } from '../middlewares/authenticate.ts';
 import {
   checkLookAvailabilityHandler,
   getLookFiltersHandler,
@@ -29,6 +31,17 @@ productRouter.get('/', getProducts); // หน้าแรก: sort=newest|disco
 productRouter.get('/search', searchProductsHandler); // /shop: กรอง + แบ่งหน้า
 productRouter.get('/filters', getFiltersHandler);
 productRouter.post('/availability', checkAvailabilityHandler);
+
+/**
+ * รีวิวของสินค้า (STEP 23) — เปิดให้ทุกคนอ่าน
+ *
+ * ใช้ `attachUser` ไม่ใช่ `requireAuth`: guest อ่านได้ตามปกติ ส่วนคนที่ล็อกอินอยู่จะได้
+ * รีวิวของตัวเองที่ยังรอตรวจสอบกลับไปด้วย และรู้ว่าเคยกด "มีประโยชน์" ไว้ที่ไหนบ้าง
+ *
+ * ⚠️ แยกจาก `GET /api/products/:slug` โดยเจตนา — endpoint สินค้าเป็นของสาธารณะที่แคชร่วมกันทุกคน
+ *    ถ้าเอาข้อมูลรายบุคคลไปใส่จะแคชไม่ได้อีกเลย (กฎเดียวกับ `/api/wishlist/contains` ของ STEP 22)
+ */
+productRouter.get('/:slug/reviews', attachUser, listProductReviewsHandler);
 productRouter.get('/:slug', getProductHandler);
 
 export const categoryRouter = Router();

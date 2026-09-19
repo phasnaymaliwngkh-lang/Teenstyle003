@@ -78,7 +78,7 @@ const ORDER_SELECT = {
       unitPrice: true,
       quantity: true,
       lineTotal: true,
-      product: { select: { slug: true } },
+      product: { select: { id: true, slug: true } },
     },
   },
 } as const satisfies Prisma.OrderSelect;

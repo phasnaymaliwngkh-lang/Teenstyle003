@@ -367,6 +367,8 @@ export interface OrderAddress {
 
 export interface OrderItem {
   id: string;
+  /** null = สินค้าถูกลบไปแล้ว — ประวัติยังแสดงได้จาก snapshot */
+  productId: string | null;
   productSlug: string | null;
   productName: string;
   variantSku: string;
@@ -732,3 +734,104 @@ export interface WishlistListResult {
 }
 
 export type WishlistSort = "newest" | "price-drop" | "price-asc" | "price-desc";
+
+// ─── Reviews (STEP 23) ───────────────────────────────────────────────────────
+
+export type ReviewStatus = "PENDING" | "APPROVED" | "HIDDEN" | "REJECTED";
+
+export type ReviewSort = "newest" | "helpful" | "rating-desc" | "rating-asc";
+
+export type ReviewEligibilityReason = "OK" | "NOT_PURCHASED" | "NOT_DELIVERED" | "ALREADY_REVIEWED";
+
+export interface ReviewAuthor {
+  /** ชื่อที่ย่อแล้ว เช่น "สมชาย ก." — backend ไม่ส่งชื่อเต็มหรืออีเมลออกมา */
+  displayName: string;
+  initial: string;
+}
+
+export interface Review {
+  id: string;
+  rating: number;
+  title: string | null;
+  comment: string;
+  images: string[];
+  isVerifiedPurchase: boolean;
+  helpfulCount: number;
+  votedHelpful: boolean;
+  isMine: boolean;
+  status: ReviewStatus;
+  author: ReviewAuthor;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MyReview extends Review {
+  product: {
+    id: string;
+    name: string;
+    /** null = สินค้าไม่ได้เปิดขายแล้ว จึงไม่มีหน้าให้เปิด */
+    slug: string | null;
+    image: { url: string; alt: string } | null;
+  };
+  adminNote: string | null;
+  orderNumber: string | null;
+}
+
+export interface RatingBucket {
+  rating: number;
+  count: number;
+  percent: number;
+}
+
+export interface ReviewSummary {
+  /** จำนวนรีวิวที่อนุมัติแล้ว */
+  total: number;
+  /** 0 = ยังไม่มีรีวิว (ไม่ใช่คะแนนกลางที่เดาเอา) */
+  average: number;
+  /** เรียงจาก 5 ดาวลง 1 ดาวเสมอ */
+  distribution: RatingBucket[];
+}
+
+export interface ReviewListResult {
+  items: Review[];
+  summary: ReviewSummary;
+  /** รีวิวของผู้ที่กำลังดู แม้จะยังรอตรวจสอบ — null = ยังไม่เคยรีวิว */
+  myReview: Review | null;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface ReviewEligibility {
+  productId: string;
+  canReview: boolean;
+  reason: ReviewEligibilityReason;
+  orderNumber: string | null;
+  existingReviewId: string | null;
+}
+
+export interface MyReviewListResult {
+  items: MyReview[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface AdminReview extends Review {
+  product: { id: string; name: string; slug: string | null };
+  /** หลังบ้านเห็นชื่อจริงได้ เพราะต้องตรวจสอบและติดต่อกลับ */
+  customer: { id: string; name: string | null; email: string };
+  orderNumber: string | null;
+  adminNote: string | null;
+  deletedAt: string | null;
+}
+
+export interface AdminReviewListResult {
+  items: AdminReview[];
+  counts: Record<ReviewStatus, number>;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}

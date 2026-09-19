@@ -10,6 +10,7 @@ import { categoryRouter, lookRouter, productRouter } from './catalog.route.ts';
 import { healthRouter } from './health.route.ts';
 import { checkoutRouter, orderRouter } from './order.route.ts';
 import { paymentRouter } from './payment.route.ts';
+import { reviewRouter } from './review.route.ts';
 import { userRouter } from './user.route.ts';
 import { wishlistRouter } from './wishlist.route.ts';
 
@@ -31,7 +32,7 @@ const API_ROUTES = [
   { path: '/api/shipments', status: 'planned', step: 44 },
   { path: '/api/inventory', status: 'planned', step: 15 },
   { path: '/api/customers', status: 'planned', step: 25 },
-  { path: '/api/reviews', status: 'planned', step: 23 },
+  { path: '/api/reviews', status: 'ready', step: 23 },
   { path: '/api/wishlist', status: 'ready', step: 22 },
   { path: '/api/ai', status: 'ready (AI Stylist STEP 19 · AI CS STEP 20)', step: 20 },
   { path: '/api/notifications', status: 'planned', step: 24 },
@@ -65,6 +66,7 @@ apiRouter.use('/orders', orderRouter);
 apiRouter.use('/payments', paymentRouter);
 apiRouter.use('/ai', aiRouter);
 apiRouter.use('/wishlist', wishlistRouter);
+apiRouter.use('/reviews', reviewRouter);
 
 // STEP 12+ : จะ mount router เพิ่มที่นี่ เช่น apiRouter.use('/shipments', shipmentRouter)
 

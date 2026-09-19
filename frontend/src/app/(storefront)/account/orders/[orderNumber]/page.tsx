@@ -1,4 +1,4 @@
-import { ChevronLeft, MapPin, Package, Receipt, Truck } from "lucide-react";
+import { ChevronLeft, MapPin, Package, Receipt, Star, Truck } from "lucide-react";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
@@ -18,7 +18,8 @@ import { ApiClientError } from "@/lib/api";
 import { getSession } from "@/lib/dal";
 import { cn } from "@/lib/utils";
 import { fetchPaymentStateOnServer } from "@/services/payment.server";
-import type { PaymentState } from "@/types/catalog";
+import { fetchReviewEligibilityOnServer } from "@/services/review.server";
+import type { PaymentState, ReviewEligibility } from "@/types/catalog";
 import { formatBaht } from "@/utils/format";
 
 type PageProps = { params: Promise<{ orderNumber: string }> };
@@ -65,6 +66,20 @@ export default async function OrderTrackingPage({ params }: PageProps) {
   }
 
   const order = state.order;
+
+  /**
+   * สินค้าชิ้นไหนในใบนี้รีวิวได้บ้าง (STEP 23)
+   *
+   * ถามเฉพาะตอนที่ของส่งถึงแล้ว — ก่อนหน้านั้นคำตอบคือ "ยังไม่ได้" อยู่แล้ว
+   * ถามทีเดียวทั้งใบในคำขอเดียว และถ้าถามไม่สำเร็จจะได้ map ว่าง
+   * (หน้าติดตามคำสั่งซื้อต้องเปิดดูได้ตามปกติเสมอ ปุ่มรีวิวเป็นของแถม)
+   */
+  const reviewable =
+    order.status === "DELIVERED"
+      ? await fetchReviewEligibilityOnServer(
+          order.items.map((item) => item.productId).filter((id): id is string => id !== null),
+        )
+      : new Map();
 
   return (
     <main className="mx-auto w-full max-w-[900px] px-4 py-10 sm:px-6">
@@ -204,6 +219,16 @@ export default async function OrderTrackingPage({ params }: PageProps) {
                     <p className="text-xs text-muted">
                       {formatBaht(item.unitPrice)} × {item.quantity}
                     </p>
+
+                    <ReviewLink
+                      slug={item.productSlug}
+                      eligibility={
+                        item.productId !== null
+                          ? ((reviewable.get(item.productId) as ReviewEligibility | undefined) ??
+                            null)
+                          : null
+                      }
+                    />
                   </div>
 
                   <p className="shrink-0 text-sm font-extrabold">{formatBaht(item.lineTotal)}</p>
@@ -281,5 +306,46 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="text-muted">{label}</dt>
       <dd className="shrink-0 font-semibold">{value}</dd>
     </div>
+  );
+}
+
+/**
+ * ลิงก์ "เขียนรีวิว" ข้างสินค้าแต่ละชิ้น (STEP 23)
+ *
+ * ⚠️ แสดงตามคำตอบของ backend เท่านั้น — รีวิวไปแล้วบอกว่ารีวิวแล้ว (พร้อมทางไปแก้)
+ *    ไม่ใช่โชว์ปุ่มเขียนรีวิวซ้ำแล้วไปเจอ error ที่ปลายทาง
+ *    สินค้าที่ถูกลบไปแล้ว (ไม่มี slug) ไม่มีหน้าให้ไป จึงไม่แสดงอะไร
+ */
+function ReviewLink({
+  slug,
+  eligibility,
+}: {
+  slug: string | null;
+  eligibility: ReviewEligibility | null;
+}) {
+  if (slug === null || eligibility === null) return null;
+
+  if (eligibility.reason === "ALREADY_REVIEWED") {
+    return (
+      <Link
+        href="/account/reviews"
+        className="mt-1 inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-muted transition hover:text-brand"
+      >
+        <Star className="size-3.5" aria-hidden />
+        คุณรีวิวสินค้านี้แล้ว — แก้ไขได้
+      </Link>
+    );
+  }
+
+  if (!eligibility.canReview) return null;
+
+  return (
+    <Link
+      href={`/product/${slug}#reviews`}
+      className="mt-1 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-brand transition hover:underline"
+    >
+      <Star className="size-3.5" aria-hidden />
+      เขียนรีวิวสินค้านี้
+    </Link>
   );
 }

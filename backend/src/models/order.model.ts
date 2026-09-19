@@ -24,6 +24,8 @@ export interface OrderAddressSnapshot {
 export interface OrderItemDto {
   id: string;
   /** null = สินค้าถูกลบไปแล้ว — ยังแสดงประวัติได้จาก snapshot */
+  productId: string | null;
+  /** null = สินค้าถูกลบไปแล้ว — ยังแสดงประวัติได้จาก snapshot */
   productSlug: string | null;
   productName: string;
   variantSku: string;
@@ -126,7 +128,7 @@ export interface OrderRow {
     unitPrice: unknown;
     quantity: number;
     lineTotal: unknown;
-    product: { slug: string } | null;
+    product: { id: string; slug: string } | null;
   }[];
 }
 
@@ -207,6 +209,7 @@ export function toOrder(order: OrderRow): OrderDto {
 
   const items: OrderItemDto[] = order.items.map((item) => ({
     id: item.id,
+    productId: item.product?.id ?? null,
     productSlug: item.product?.slug ?? null,
     productName: item.productName,
     variantSku: item.variantSku,

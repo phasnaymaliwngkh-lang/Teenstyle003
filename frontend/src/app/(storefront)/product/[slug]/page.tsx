@@ -13,15 +13,22 @@ import {
 import { ProductCard } from "@/features/products/components/product-card";
 import { ProductGallery } from "@/features/products/components/product-gallery";
 import { VariantPicker } from "@/features/products/components/variant-picker";
+import { ProductRatingBadge } from "@/features/reviews/components/product-rating-badge";
+import { ReviewSection } from "@/features/reviews/components/review-section";
 import { WishlistHeart } from "@/features/wishlist/components/wishlist-heart";
 import { ApiClientError } from "@/lib/api";
 import { getSession } from "@/lib/dal";
+import { toSearchParams, type RawSearchParams } from "@/lib/query-params";
 import { fetchProductDetail, searchShopProducts } from "@/services/catalog.service";
 import { fetchWishlistedIdsOnServer } from "@/services/wishlist.server";
 import type { ProductDetail } from "@/types/catalog";
 import { formatBaht, STOCK_LABEL } from "@/utils/format";
 
-type PageProps = { params: Promise<{ slug: string }> };
+type PageProps = {
+  params: Promise<{ slug: string }>;
+  /** ส่วนรีวิวใช้ `reviewSort` / `reviewRating` / `reviewPage` (STEP 23) */
+  searchParams: Promise<RawSearchParams>;
+};
 
 type LoadResult =
   | { kind: "found"; product: ProductDetail }
@@ -82,7 +89,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
  *    (ทดลองยืนยันแล้ว: มี loading.tsx → 200, ไม่มี → 404 ตามจริง)
  *    ส่วนที่เหลือ (สินค้าที่เกี่ยวข้อง) ยัง stream พร้อม skeleton ตามปกติ
  */
-export default async function ProductPage({ params }: PageProps) {
+export default async function ProductPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
   const loaded = await loadProduct(slug);
 
@@ -100,6 +107,8 @@ export default async function ProductPage({ params }: PageProps) {
       ? await fetchWishlistedIdsOnServer([loaded.product.id])
       : new Set<string>();
 
+  const reviewParams = toSearchParams(await searchParams);
+
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6 sm:py-10">
       {loaded.kind === "error" ? (
@@ -111,6 +120,18 @@ export default async function ProductPage({ params }: PageProps) {
             isSignedIn={session !== null}
             isWishlisted={wishlisted.has(loaded.product.id)}
           />
+
+          {/* รีวิว (STEP 23) — stream แยก: โหลดช้าหรือพังต้องไม่ทำให้ราคา/ปุ่มซื้อหาย */}
+          <div className="mt-14">
+            <Suspense fallback={<ReviewsSkeleton />}>
+              <ReviewSection
+                slug={loaded.product.slug}
+                productId={loaded.product.id}
+                isSignedIn={session !== null}
+                params={reviewParams}
+              />
+            </Suspense>
+          </div>
 
           <div className="mt-14">
             <Suspense fallback={<RelatedSkeleton />}>
@@ -178,6 +199,22 @@ async function RelatedSection({
   );
 }
 
+function ReviewsSkeleton() {
+  return (
+    <section aria-busy="true" aria-live="polite">
+      <h2 className="text-2xl sm:text-3xl">รีวิวจากคนที่ซื้อจริง</h2>
+      <p className="mt-2 text-sm text-muted">กำลังโหลดรีวิว…</p>
+      <div className="mt-6 grid gap-8 lg:grid-cols-[320px_1fr]">
+        <div className="h-52 rounded-[var(--radius-card)] bg-lilac-50" aria-hidden />
+        <div className="space-y-4" aria-hidden>
+          <div className="h-32 rounded-[var(--radius-card)] bg-lilac-50" />
+          <div className="h-32 rounded-[var(--radius-card)] bg-lilac-50" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function RelatedSkeleton() {
   return (
     <section aria-busy="true" aria-live="polite">
@@ -239,6 +276,11 @@ function ProductDetailSection({
             </div>
 
             <h1 className="text-2xl leading-tight sm:text-3xl lg:text-4xl">{product.name}</h1>
+
+            {/* คะแนนรีวิว (STEP 23) — โหลดเองใน Suspense เพื่อไม่ให้ถ่วงราคาและปุ่มซื้อ */}
+            <Suspense fallback={<span className="block h-4" aria-hidden />}>
+              <ProductRatingBadge slug={product.slug} />
+            </Suspense>
 
             {product.shortDescription && (
               <p className="text-sm text-muted">{product.shortDescription}</p>

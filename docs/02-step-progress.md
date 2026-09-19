@@ -4,7 +4,26 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 22 เสร็จ — Wishlist (`/wishlist`)**
+**ล่าสุด: STEP 23 เสร็จ — Reviews (`/product/[slug]#reviews`, `/account/reviews`, `/admin/reviews`)**
+รีวิวสินค้าที่พิสูจน์ได้ว่ามาจากคนซื้อจริง · **เขียนได้เฉพาะคนที่มีคำสั่งซื้อของตัวเองที่ `DELIVERED`
+และมีสินค้าชิ้นนั้นอยู่ในใบจริง** — เกณฑ์คือ _ได้รับของแล้ว_ ไม่ใช่แค่จ่ายเงินแล้ว ·
+`orderId` / `isVerifiedPurchase` / `status` คำนวณที่ server ทั้งหมด **ค่าที่ client แนบมาถูกเมิน**
+(มี test ที่ยัด `status: APPROVED` และ `orderId` ของลูกค้าคนอื่นมาแล้วไม่มีผล) ·
+**หนึ่งคนรีวิวได้ครั้งเดียวต่อสินค้า** ไม่ใช่ครั้งเดียวต่อคำสั่งซื้อ — ซื้อซ้ำสามครั้งแล้วรีวิวได้สามฉบับ
+แปลว่าคนเดียวดันคะแนนเฉลี่ยได้ (unique ของฐานข้อมูลกันไม่ได้เพราะ `orderId` เป็น NULL ได้
+และ PostgreSQL ถือว่า NULL ไม่ซ้ำกับ NULL) ·
+**รีวิวใหม่เป็น `PENDING` และไม่ขึ้นหน้าสินค้าจนกว่าจะอนุมัติ · แก้แล้วกลับไปรอตรวจใหม่ทุกครั้ง**
+(ไม่งั้นเขียนสุภาพให้ผ่านก่อนแล้วค่อยแก้เป็นอย่างอื่นทีหลังได้) ·
+คะแนนเฉลี่ยกับกราฟแท่งคิดจาก `groupBy` ชุดเดียวกันและนับเฉพาะ `APPROVED` ·
+**ยังไม่มีรีวิว = บอกว่ายังไม่มี ไม่ใช่โชว์ 0.0 ดาว** ·
+**หน้าร้านไม่ส่งชื่อเต็ม อีเมล หรือรูปโปรไฟล์ออกไป** — ย่อเป็น "สมชาย ก." (หลังบ้านเห็นของจริงเพราะต้องติดต่อกลับ) ·
+โหวต "มีประโยชน์" หนึ่งคนหนึ่งเสียงด้วยตาราง `ReviewHelpfulVote` ใหม่ (unique `[reviewId, userId]`)
+กดของตัวเองไม่ได้ · กดซ้ำ/ยกเลิกซ้ำไม่ error และยอดไม่ติดลบ ·
+ซ่อน/ไม่อนุมัติ **ต้องกรอกเหตุผล** ซึ่งเขียนลง `AdminLog` ในทรานแซกชันเดียวกันและแสดงให้เจ้าของรีวิวเห็น ·
+สิทธิ์ใช้ `review:create` (CUSTOMER) กับ `review:moderate` (ADMIN) จากฐานข้อมูล ไม่ hard-code ตามบทบาท ·
+test 402 เคส (เพิ่ม 31) ผ่านทั้งหมด
+
+**STEP 22:** Wishlist (`/wishlist`)
 รายการที่ถูกใจของลูกค้า พร้อมป้ายบอกเมื่อราคาถูกลงกว่าตอนที่กดถูกใจ ·
 **ต้องล็อกอินทุก endpoint** เพราะ `Wishlist.userId` เป็น non-nullable (ไม่มีแบบ guest ต่างจากตะกร้า) ·
 `priceWhenAdded` เป็น snapshot ที่ backend อ่านจากฐานข้อมูลตอนกด — **ราคาที่ client แนบมาถูกเมิน**
@@ -133,11 +152,11 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 
 ## Foundation
 
-| STEP | หัวข้อ                                    | สถานะ | หมายเหตุ                                                                                  |
-| ---: | ----------------------------------------- | :---: | ----------------------------------------------------------------------------------------- |
-|    1 | Project Structure                         |  ✅   | monorepo (npm workspaces), Next 16 + Express 5 + Prisma 7, Docker, docs                   |
-|    2 | Database (Prisma models, migration, seed) |  ✅   | 36 ตาราง (+Cart/CartItem ใน STEP 9) · 37 CHECK constraints · seed 12 สินค้า / 102 variant |
-|    3 | Authentication + Google OAuth + RBAC      |  ✅   | Google Login จริง · session ในฐานข้อมูล · RBAC 4 บทบาท / 31 สิทธิ์ · 401/403 ครบ          |
+| STEP | หัวข้อ                                    | สถานะ | หมายเหตุ                                                                                                                                 |
+| ---: | ----------------------------------------- | :---: | ---------------------------------------------------------------------------------------------------------------------------------------- |
+|    1 | Project Structure                         |  ✅   | monorepo (npm workspaces), Next 16 + Express 5 + Prisma 7, Docker, docs                                                                  |
+|    2 | Database (Prisma models, migration, seed) |  ✅   | 38 ตาราง (+Cart/CartItem STEP 9 · คลังความรู้ STEP 21 · ReviewHelpfulVote STEP 23) · 37 CHECK constraints · seed 12 สินค้า / 102 variant |
+|    3 | Authentication + Google OAuth + RBAC      |  ✅   | Google Login จริง · session ในฐานข้อมูล · RBAC 4 บทบาท / 31 สิทธิ์ · 401/403 ครบ                                                         |
 
 ## Customer Website
 
@@ -153,7 +172,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 |   11 | Payment (COD + Stripe)                      |  ✅   |
 |   12 | Order Tracking                              |  ✅   |
 |   22 | Wishlist                                    |  ✅   |
-|   23 | Reviews                                     |  ⬜   |
+|   23 | Reviews                                     |  ✅   |
 |   43 | Return / Refund                             |  ⬜   |
 |   45 | Advanced Search                             |  ⬜   |
 
@@ -188,25 +207,25 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 
 ## Platform / Quality
 
-| STEP | หัวข้อ                            | สถานะ | หมายเหตุ                                                                                                       |
-| ---: | --------------------------------- | :---: | -------------------------------------------------------------------------------------------------------------- |
-|   24 | Notifications                     |  ⬜   |                                                                                                                |
-|   28 | Security                          |  🚧   | helmet · cors · rate limit · Zod env · CSRF (Origin) · IDOR · STEP 11: ตรวจลายเซ็น webhook + ไม่เก็บ card data |
-|   29 | REST API                          |  🚧   | +6..12 storefront/orders · +13..16 admin · +17 `admin/barcodes/{lookup,labels,assign}`                         |
-|   30 | Error Handling                    |  ✅   | global errorHandler + `{ success, message, errorCode }` + 400/401/403/404/409/422/429/500                      |
-|   31 | Responsive                        |  🚧   | จะครบเมื่อมีหน้าจริงตั้งแต่ STEP 4                                                                             |
-|   32 | Loading / Empty / Error / Retry   |  ✅   | โครงใช้ซ้ำได้ใน components/shared/section.tsx · ทดสอบ error state แล้วตอน backend ล่ม                          |
-|   33 | SEO                               |  🚧   | STEP 6/8: metadata ต่อสินค้า/ลุค + slug ที่ไม่มีจริงคืน HTTP 404 จริง (ไม่ใช่ soft 404)                        |
-|   34 | Performance (cache, index, Redis) |  ⬜   |                                                                                                                |
-|   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                    |
-|   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                  |
-|   37 | Testing                           |  🚧   | vitest + supertest 293 เคส · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                  |
-|   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                  |
-|   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                |
-|   40 | Final Audit                       |  ⬜   |                                                                                                                |
-|   50 | Backup / Recovery                 |  ⬜   |                                                                                                                |
-|   51 | Monitoring                        |  🚧   | `/health` พร้อมแล้ว                                                                                            |
-|   52 | Background Jobs (BullMQ)          |  ⬜   |                                                                                                                |
-|   53 | Privacy / Consent                 |  ⬜   |                                                                                                                |
-|   54 | Accessibility                     |  🚧   |                                                                                                                |
-|   55 | Production Readiness Audit        |  ⬜   |                                                                                                                |
+| STEP | หัวข้อ                            | สถานะ | หมายเหตุ                                                                                                             |
+| ---: | --------------------------------- | :---: | -------------------------------------------------------------------------------------------------------------------- |
+|   24 | Notifications                     |  ⬜   |                                                                                                                      |
+|   28 | Security                          |  🚧   | helmet · cors · rate limit · Zod env · CSRF (Origin) · IDOR · STEP 11: ตรวจลายเซ็น webhook + ไม่เก็บ card data       |
+|   29 | REST API                          |  🚧   | +6..12 storefront/orders · +13..16 admin · +17 `admin/barcodes/*` · +22 `wishlist` · +23 `reviews` + `admin/reviews` |
+|   30 | Error Handling                    |  ✅   | global errorHandler + `{ success, message, errorCode }` + 400/401/403/404/409/422/429/500                            |
+|   31 | Responsive                        |  🚧   | จะครบเมื่อมีหน้าจริงตั้งแต่ STEP 4                                                                                   |
+|   32 | Loading / Empty / Error / Retry   |  ✅   | โครงใช้ซ้ำได้ใน components/shared/section.tsx · ทดสอบ error state แล้วตอน backend ล่ม                                |
+|   33 | SEO                               |  🚧   | STEP 6/8: metadata ต่อสินค้า/ลุค + slug ที่ไม่มีจริงคืน HTTP 404 จริง (ไม่ใช่ soft 404)                              |
+|   34 | Performance (cache, index, Redis) |  ⬜   |                                                                                                                      |
+|   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                          |
+|   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                        |
+|   37 | Testing                           |  🚧   | vitest + supertest 293 เคส · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                        |
+|   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                        |
+|   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                      |
+|   40 | Final Audit                       |  ⬜   |                                                                                                                      |
+|   50 | Backup / Recovery                 |  ⬜   |                                                                                                                      |
+|   51 | Monitoring                        |  🚧   | `/health` พร้อมแล้ว                                                                                                  |
+|   52 | Background Jobs (BullMQ)          |  ⬜   |                                                                                                                      |
+|   53 | Privacy / Consent                 |  ⬜   |                                                                                                                      |
+|   54 | Accessibility                     |  🚧   |                                                                                                                      |
+|   55 | Production Readiness Audit        |  ⬜   |                                                                                                                      |

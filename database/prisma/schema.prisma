@@ -254,6 +254,7 @@ model User {
   orders             Order[]
   cart               Cart?
   reviews            Review[]
+  reviewHelpfulVotes ReviewHelpfulVote[]
   wishlist           Wishlist[]
   savedLooks         SavedLook[]
   notifications      Notification[]
@@ -928,16 +929,39 @@ model Review {
   helpfulCount       Int          @default(0)
   adminNote          String?
 
+  helpfulVotes ReviewHelpfulVote[]
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  /// รีวิวได้ 1 ครั้งต่อสินค้าต่อคำสั่งซื้อ — กัน spam review
+  /// ด่านสุดท้ายของฐานข้อมูล — กันเขียนซ้ำในคำสั่งซื้อเดียวกัน
+  ///
+  /// ⚠️ `orderId` เป็น nullable และ PostgreSQL ถือว่า NULL ไม่ซ้ำกับ NULL
+  ///    unique นี้จึงกันรีวิวที่ไม่มีคำสั่งซื้อไม่ได้เลย
+  ///    กฎจริงคือ **หนึ่งคนรีวิวได้ครั้งเดียวต่อสินค้า** ซึ่งบังคับที่ `review.service.ts` (STEP 23)
   @@unique([userId, productId, orderId])
   @@index([productId, status])
   @@index([userId])
   @@index([status])
   @@index([rating])
+}
+
+/// โหวตว่ารีวิวนี้มีประโยชน์ — หนึ่งคนหนึ่งเสียงต่อรีวิว (STEP 23)
+///
+/// ถ้าไม่มีตารางนี้ `Review.helpfulCount` จะถูกกดซ้ำได้ไม่จำกัด
+/// แล้วลำดับ "มีประโยชน์มากสุด" บนหน้าสินค้าก็ปั่นได้ด้วยคนเดียว
+model ReviewHelpfulVote {
+  id       String @id @default(uuid(7)) @db.Uuid
+  reviewId String @db.Uuid
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  userId   String @db.Uuid
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([reviewId, userId])
+  @@index([userId])
 }
 
 model Wishlist {

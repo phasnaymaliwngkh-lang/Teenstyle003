@@ -40,6 +40,10 @@ import {
   importInventoryHandler,
   importProductsHandler,
 } from '../controllers/import-export.controller.ts';
+import {
+  listAdminReviewsHandler,
+  moderateReviewHandler,
+} from '../controllers/review-admin.controller.ts';
 import { adminSupportRouter } from './admin-support.route.ts';
 import { adminKnowledgeRouter } from './knowledge.route.ts';
 import multer from 'multer';
@@ -186,3 +190,17 @@ adminRouter.use('/support', adminSupportRouter);
 
 // AI Knowledge Base Management (STEP 21)
 adminRouter.use('/knowledge', adminKnowledgeRouter);
+
+/**
+ * ตรวจรีวิวสินค้า (STEP 23)
+ *
+ * ⚠️ ใช้สิทธิ์ `review:moderate` ไม่ใช่ `product:update`
+ *    รีวิวคือข้อความของลูกค้า คนที่แก้ข้อมูลสินค้าได้ไม่ควรเอาความเห็นลูกค้าลงได้ด้วย
+ *    (แพตเทิร์นเดียวกับ STEP 21 ข้อ 8)
+ */
+adminRouter.get('/reviews', requirePermission('review:moderate'), listAdminReviewsHandler);
+adminRouter.patch(
+  '/reviews/:reviewId/status',
+  requirePermission('review:moderate'),
+  moderateReviewHandler,
+);

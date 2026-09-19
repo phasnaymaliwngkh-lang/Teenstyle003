@@ -1,4 +1,13 @@
-import { Award, Mail, Package, ShieldCheck, ShoppingBag, Sparkles } from "lucide-react";
+import {
+  Award,
+  Heart,
+  Mail,
+  Package,
+  ShieldCheck,
+  ShoppingBag,
+  Sparkles,
+  Star,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -90,13 +99,42 @@ export default async function AccountPage() {
               <span className="block text-sm text-muted">ดูของที่เลือกไว้แล้วสั่งซื้อต่อ</span>
             </span>
           </Link>
+
+          <Link
+            href="/wishlist"
+            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)] transition hover:border-brand-soft hover:shadow-[var(--shadow-lift)]"
+          >
+            <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-lilac">
+              <Heart className="size-6 text-brand" aria-hidden />
+            </span>
+            <span>
+              <span className="block font-extrabold">รายการที่ถูกใจ</span>
+              <span className="block text-sm text-muted">
+                ของที่เก็บไว้ดูทีหลัง พร้อมป้ายบอกเมื่อราคาลด
+              </span>
+            </span>
+          </Link>
+
+          <Link
+            href="/account/reviews"
+            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)] transition hover:border-brand-soft hover:shadow-[var(--shadow-lift)]"
+          >
+            <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-lilac">
+              <Star className="size-6 text-brand" aria-hidden />
+            </span>
+            <span>
+              <span className="block font-extrabold">รีวิวของฉัน</span>
+              <span className="block text-sm text-muted">
+                ดูสถานะรีวิวที่เขียนไว้ แก้ไขหรือลบได้
+              </span>
+            </span>
+          </Link>
         </section>
 
         <section className="mt-6 rounded-[var(--radius-card)] border border-line bg-white p-6 shadow-[var(--shadow-soft)] sm:p-8">
           <h2 className="text-lg font-extrabold">ยังไม่เปิดใช้งานในขั้นนี้</h2>
           <p className="mt-2 text-sm text-muted">ส่วนที่เหลือจะเพิ่มตามลำดับ STEP</p>
           <ul className="mt-5 space-y-3 text-sm">
-            <PendingItem step={22}>Wishlist ที่บันทึกในบัญชี</PendingItem>
             <PendingItem step={25}>แก้ข้อมูลส่วนตัวและสมุดที่อยู่</PendingItem>
             <PendingItem step={42}>แลกแต้มและสิทธิประโยชน์ตามระดับสมาชิก</PendingItem>
             <PendingItem step={43}>ขอคืนสินค้า / คืนเงิน</PendingItem>
