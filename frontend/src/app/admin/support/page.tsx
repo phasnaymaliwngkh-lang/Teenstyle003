@@ -203,8 +203,11 @@ export default function AdminSupportPage() {
       </div>
 
       {errorMessage && (
-        <div className="mt-3 flex items-center gap-2 rounded-xl bg-danger/5 p-3 text-xs font-semibold text-danger border border-danger/25">
-          <AlertCircle className="h-4 w-4 shrink-0 text-danger" />
+        <div
+          role="alert"
+          className="mt-3 flex items-center gap-2 rounded-xl bg-danger/5 p-3 text-xs font-semibold text-danger border border-danger/25"
+        >
+          <AlertCircle className="h-4 w-4 shrink-0 text-danger" aria-hidden />
           <span>{errorMessage}</span>
         </div>
       )}
@@ -273,11 +276,18 @@ export default function AdminSupportPage() {
             </button>
           </div>
 
-          {/* Ticket Items Scrollable List */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-2">
+          {/**
+           * Ticket Items Scrollable List
+           * `aria-live` เพราะรายการเปลี่ยนเองเมื่อสลับแท็บ/กดรีเฟรช โดยผู้ใช้ไม่ได้ย้าย focus
+           */}
+          <div
+            aria-live="polite"
+            aria-busy={loadingList}
+            className="flex-1 overflow-y-auto p-2 space-y-2"
+          >
             {loadingList ? (
               <div className="flex h-40 items-center justify-center text-muted">
-                <Loader2 className="h-5 w-5 animate-spin text-brand mr-2" />
+                <Loader2 className="h-5 w-5 animate-spin text-brand mr-2" aria-hidden />
                 <span className="text-xs">กำลังโหลดตั๋ว...</span>
               </div>
             ) : tickets.length === 0 ? (
@@ -427,7 +437,12 @@ export default function AdminSupportPage() {
               </div>
 
               {/* Chat Transcript Area */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-3 bg-lilac-50/20">
+              {/* ไทม์ไลน์แชต — ข้อความใหม่ไหลเข้ามาเองหลังกดส่ง จึงต้องประกาศให้ screen reader รู้ */}
+              <div
+                aria-live="polite"
+                aria-relevant="additions"
+                className="flex-1 overflow-y-auto p-5 space-y-3 bg-lilac-50/20"
+              >
                 {ticketDetail.messages.map((m) => {
                   const isUser = m.role === "USER";
                   const isSystem = m.role === "SYSTEM";
@@ -506,7 +521,11 @@ export default function AdminSupportPage() {
               {/* Reply Input Bar */}
               <div className="border-t border-line bg-white p-3">
                 <form onSubmit={handleReply} className="flex items-center gap-2">
+                  <label htmlFor="support-reply" className="sr-only">
+                    ข้อความตอบกลับลูกค้า
+                  </label>
                   <input
+                    id="support-reply"
                     type="text"
                     value={replyText}
                     onChange={(e) => setReplyText(e.target.value)}

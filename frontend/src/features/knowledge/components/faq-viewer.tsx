@@ -94,6 +94,28 @@ export function FaqViewer() {
   const [userVotes, setUserVotes] = useState<Record<string, boolean>>({});
   const [votingLoading, setVotingLoading] = useState<Record<string, boolean>>({});
 
+  /**
+   * ปิดหน้าต่างอ่านบทความด้วย Esc และล็อก scroll ของหน้าหลังตอนเปิด
+   * (แพตเทิร์นเดียวกับ mobile-menu.tsx — ไม่งั้นผู้ใช้คีย์บอร์ดออกจากหน้าต่างไม่ได้
+   *  และเลื่อนหน้าเบื้องหลังทะลุ modal ได้)
+   */
+  useEffect(() => {
+    if (!readingArticle) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setReadingArticle(null);
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [readingArticle]);
+
   // Load Categories on mount
   useEffect(() => {
     let cancelled = false;
@@ -261,7 +283,11 @@ export function FaqViewer() {
                 className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-muted-light"
                 aria-hidden
               />
+              <label htmlFor="faq-search" className="sr-only">
+                ค้นหาในคลังความรู้
+              </label>
               <input
+                id="faq-search"
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -331,32 +357,46 @@ export function FaqViewer() {
         </div>
       </div>
 
-      {/* AI Grounded Answer Box */}
-      {aiLoading && (
-        <div className="rounded-[var(--radius-card)] border border-brand/20 bg-lilac-50/50 p-6 text-center animate-pulse">
-          <div className="flex items-center justify-center gap-2 text-brand font-bold text-sm">
-            <Loader2 className="size-5 animate-spin" />
-            AI กำลังวิเคราะห์และสังเคราะห์คำตอบจากฐานข้อมูลทางการ...
+      {/**
+       * AI Grounded Answer Box
+       *
+       * คำตอบของ AI โผล่ขึ้นมาเองหลังกดถาม โดย focus ยังอยู่ที่ปุ่ม/ช่องค้นหา
+       * ถ้าไม่ประกาศ ผู้ใช้ screen reader จะไม่รู้เลยว่าได้คำตอบแล้ว
+       * (สถานะ "ได้คำตอบแล้ว" เป็นอีกภูมิภาคหนึ่งด้านล่าง เพราะเป็นบล็อกคนละก้อนใน DOM)
+       */}
+      <div aria-live="polite" aria-busy={aiLoading}>
+        {aiLoading && (
+          <div className="rounded-[var(--radius-card)] border border-brand/20 bg-lilac-50/50 p-6 text-center animate-pulse">
+            <div className="flex items-center justify-center gap-2 text-brand font-bold text-sm">
+              <Loader2 className="size-5 animate-spin" aria-hidden />
+              AI กำลังวิเคราะห์และสังเคราะห์คำตอบจากฐานข้อมูลทางการ...
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {aiError && (
-        <div className="rounded-[var(--radius-card)] border border-danger/20 bg-danger/5 p-4 text-sm text-danger flex items-center gap-3">
-          <AlertCircle className="size-5 shrink-0" />
-          <span>{aiError}</span>
-          <button
-            type="button"
-            onClick={() => setAiError(null)}
-            className="ml-auto text-xs font-bold hover:underline"
+        {aiError && (
+          <div
+            role="alert"
+            className="rounded-[var(--radius-card)] border border-danger/20 bg-danger/5 p-4 text-sm text-danger flex items-center gap-3"
           >
-            ปิด
-          </button>
-        </div>
-      )}
+            <AlertCircle className="size-5 shrink-0" aria-hidden />
+            <span>{aiError}</span>
+            <button
+              type="button"
+              onClick={() => setAiError(null)}
+              className="ml-auto text-xs font-bold hover:underline"
+            >
+              ปิด
+            </button>
+          </div>
+        )}
+      </div>
 
       {aiResult && !aiLoading && (
-        <div className="rounded-[var(--radius-card)] border-2 border-brand/30 bg-white p-6 shadow-[var(--shadow-lift)] space-y-4">
+        <div
+          aria-live="polite"
+          className="rounded-[var(--radius-card)] border-2 border-brand/30 bg-white p-6 shadow-[var(--shadow-lift)] space-y-4"
+        >
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-4">
             <div className="flex items-center gap-2.5">
               <div className="flex size-9 items-center justify-center rounded-xl bg-lilac text-brand">
@@ -519,8 +559,11 @@ export function FaqViewer() {
           <p className="text-sm text-muted">กำลังค้นหาข้อมูลในคลังความรู้...</p>
         </div>
       ) : errorMessage ? (
-        <div className="rounded-[var(--radius-card)] border border-line bg-white p-8 text-center space-y-3">
-          <AlertCircle className="size-10 text-danger mx-auto" />
+        <div
+          role="alert"
+          className="rounded-[var(--radius-card)] border border-line bg-white p-8 text-center space-y-3"
+        >
+          <AlertCircle className="size-10 text-danger mx-auto" aria-hidden />
           <h4 className="font-bold text-ink">{errorMessage}</h4>
           <button
             type="button"
@@ -703,10 +746,24 @@ export function FaqViewer() {
         </div>
       )}
 
-      {/* Full Article Reader Modal */}
+      {/**
+       * Full Article Reader Modal
+       * ใช้แพตเทิร์นเดียวกับ mobile-menu.tsx: พื้นหลังเป็น div แยกที่คลิกปิดได้และ `aria-hidden`
+       * ส่วนตัวหน้าต่างเป็น `role="dialog" aria-modal` ผูกชื่อกับหัวข้อบทความ + ปิดด้วย Esc + ล็อก scroll
+       */}
       {readingArticle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-[var(--radius-card)] bg-white p-6 sm:p-8 shadow-2xl space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            onClick={() => setReadingArticle(null)}
+            className="absolute inset-0 bg-ink/50 backdrop-blur-xs"
+            aria-hidden
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="knowledge-article-title"
+            className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-[var(--radius-card)] bg-white p-6 sm:p-8 shadow-[var(--shadow-float)] space-y-6"
+          >
             {/* Modal Header */}
             <div className="flex items-start justify-between gap-4 border-b border-line pb-4">
               <div className="space-y-2">
@@ -723,7 +780,9 @@ export function FaqViewer() {
                     </span>
                   ))}
                 </div>
-                <h2 className="text-2xl font-black text-ink">{readingArticle.title}</h2>
+                <h2 id="knowledge-article-title" className="text-2xl font-black text-ink">
+                  {readingArticle.title}
+                </h2>
                 <p className="text-sm text-muted">{readingArticle.summary}</p>
               </div>
 

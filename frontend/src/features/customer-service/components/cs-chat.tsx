@@ -447,7 +447,11 @@ export function CsChat() {
           }}
           className="flex items-center gap-2"
         >
+          <label htmlFor="cs-message" className="sr-only">
+            ข้อความถึงฝ่ายบริการลูกค้า
+          </label>
           <input
+            id="cs-message"
             ref={inputRef}
             type="text"
             value={inputText}

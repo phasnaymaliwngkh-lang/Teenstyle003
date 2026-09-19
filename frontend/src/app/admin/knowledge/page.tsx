@@ -85,6 +85,35 @@ export default function AdminKnowledgePage() {
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
 
+  /**
+   * ปิดหน้าต่างด้วย Esc และล็อก scroll ของหน้าเบื้องหลังตอนเปิด
+   * (แพตเทิร์นเดียวกับ mobile-menu.tsx — ผู้ใช้คีย์บอร์ดต้องออกจาก modal ได้
+   *  และหน้าเบื้องหลังต้องไม่เลื่อนทะลุ)
+   * ระหว่างกำลังบันทึก/ลบ/รีเซ็ต ไม่ให้ปิด เพราะงานยังค้างอยู่
+   */
+  const anyModalOpen = isFormModalOpen || deletingArticle !== null || isResetModalOpen;
+  const modalBusy = isSubmitting || isDeleting || isResetting;
+
+  useEffect(() => {
+    if (!anyModalOpen) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape" || modalBusy) return;
+      setIsFormModalOpen(false);
+      setDeletingArticle(null);
+      setIsResetModalOpen(false);
+    }
+
+    document.addEventListener("keydown", handleKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [anyModalOpen, modalBusy]);
+
   // Fetch articles from backend
   const loadArticles = useCallback(async () => {
     try {
@@ -412,9 +441,12 @@ export default function AdminKnowledgePage() {
       )}
 
       {errorMessage && (
-        <div className="flex items-center justify-between rounded-xl border border-danger/25 bg-danger/5 px-4 py-3 text-sm text-danger">
+        <div
+          role="alert"
+          className="flex items-center justify-between rounded-xl border border-danger/25 bg-danger/5 px-4 py-3 text-sm text-danger"
+        >
           <div className="flex items-center gap-2">
-            <AlertCircle className="size-5 text-danger shrink-0" />
+            <AlertCircle className="size-5 text-danger shrink-0" aria-hidden />
             <span>{errorMessage}</span>
           </div>
           <button
@@ -459,8 +491,15 @@ export default function AdminKnowledgePage() {
         <div className="flex flex-1 flex-wrap items-center gap-3 min-w-[280px]">
           {/* Search */}
           <div className="relative flex-1 min-w-[220px]">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-light" />
+            <Search
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-light"
+              aria-hidden
+            />
+            <label htmlFor="kb-filter-search" className="sr-only">
+              ค้นหาบทความในคลังความรู้
+            </label>
             <input
+              id="kb-filter-search"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -470,7 +509,11 @@ export default function AdminKnowledgePage() {
           </div>
 
           {/* Category Filter */}
+          <label htmlFor="kb-filter-category" className="sr-only">
+            กรองตามหมวดหมู่
+          </label>
           <select
+            id="kb-filter-category"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value as KnowledgeCategory | "ALL")}
             className="rounded-full border border-line bg-lilac-50 px-4 py-2 text-sm font-semibold text-ink focus:border-brand focus:bg-white focus:outline-none"
@@ -524,16 +567,24 @@ export default function AdminKnowledgePage() {
           onClick={() => void loadArticles()}
           className="p-2 rounded-full border border-line hover:bg-lilac-50 transition text-muted"
           title="รีเฟรชข้อมูล"
+          aria-label="รีเฟรชรายการบทความ"
         >
-          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
+          <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} aria-hidden />
         </button>
       </section>
 
-      {/* Articles Table */}
-      <section className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-white shadow-[var(--shadow-soft)]">
+      {/**
+       * Articles Table
+       * `aria-live` เพราะตารางเปลี่ยนเองเมื่อพิมพ์ค้นหาหรือสลับตัวกรอง โดยผู้ใช้ไม่ได้ย้าย focus
+       */}
+      <section
+        aria-live="polite"
+        aria-busy={loading}
+        className="overflow-hidden rounded-[var(--radius-card)] border border-line bg-white shadow-[var(--shadow-soft)]"
+      >
         {loading ? (
           <div className="py-20 text-center space-y-3">
-            <Loader2 className="size-8 animate-spin text-brand mx-auto" />
+            <Loader2 className="size-8 animate-spin text-brand mx-auto" aria-hidden />
             <p className="text-sm text-muted">กำลังโหลดรายการบทความ...</p>
           </div>
         ) : filteredArticles.length === 0 ? (
@@ -635,16 +686,18 @@ export default function AdminKnowledgePage() {
                           onClick={() => handleOpenEdit(article)}
                           className="p-2 rounded-full hover:bg-lilac hover:text-brand transition text-muted"
                           title="แก้ไขบทความ"
+                          aria-label={`แก้ไขบทความ ${article.title}`}
                         >
-                          <Edit className="size-4" />
+                          <Edit className="size-4" aria-hidden />
                         </button>
                         <button
                           type="button"
                           onClick={() => setDeletingArticle(article)}
                           className="p-2 rounded-full hover:bg-danger/5 hover:text-danger transition text-muted"
                           title="ลบบทความ"
+                          aria-label={`ลบบทความ ${article.title}`}
                         >
-                          <Trash2 className="size-4" />
+                          <Trash2 className="size-4" aria-hidden />
                         </button>
                       </div>
                     </td>
@@ -658,19 +711,27 @@ export default function AdminKnowledgePage() {
 
       {/* Create / Edit Modal */}
       {isFormModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-[var(--radius-card)] bg-white p-6 sm:p-8 shadow-2xl space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* ฟอร์มแก้บทความไม่ปิดด้วยการคลิกพื้นหลัง — เผลอคลิกแล้วงานที่พิมพ์ไว้หายทั้งหมด */}
+          <div className="absolute inset-0 bg-ink/50 backdrop-blur-xs" aria-hidden />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="kb-form-title"
+            className="relative w-full max-w-3xl max-h-[92vh] overflow-y-auto rounded-[var(--radius-card)] bg-white p-6 sm:p-8 shadow-[var(--shadow-float)] space-y-6"
+          >
             <div className="flex items-center justify-between border-b border-line pb-4">
-              <h3 className="text-xl font-bold text-ink flex items-center gap-2">
-                <BookOpen className="size-5 text-brand" />
+              <h3 id="kb-form-title" className="text-xl font-bold text-ink flex items-center gap-2">
+                <BookOpen className="size-5 text-brand" aria-hidden />
                 {formData.id ? "แก้ไขบทความคลังความรู้" : "สร้างบทความใหม่"}
               </h3>
               <button
                 type="button"
                 onClick={() => setIsFormModalOpen(false)}
+                aria-label="ปิดหน้าต่าง"
                 className="p-1.5 rounded-full hover:bg-lilac-50 text-muted"
               >
-                <X className="size-5" />
+                <X className="size-5" aria-hidden />
               </button>
             </div>
 
@@ -685,10 +746,14 @@ export default function AdminKnowledgePage() {
               {/* Title & Slug */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-bold text-ink uppercase mb-1">
+                  <label
+                    htmlFor="kb-title"
+                    className="block text-xs font-bold text-ink uppercase mb-1"
+                  >
                     ชื่อบทความ (Title) *
                   </label>
                   <input
+                    id="kb-title"
                     type="text"
                     required
                     value={formData.title}
@@ -699,10 +764,14 @@ export default function AdminKnowledgePage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-ink uppercase mb-1">
+                  <label
+                    htmlFor="kb-slug"
+                    className="block text-xs font-bold text-ink uppercase mb-1"
+                  >
                     Slug URL *
                   </label>
                   <input
+                    id="kb-slug"
                     type="text"
                     required
                     value={formData.slug}
@@ -716,10 +785,14 @@ export default function AdminKnowledgePage() {
               {/* Category & Tags */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-xs font-bold text-ink uppercase mb-1">
+                  <label
+                    htmlFor="kb-category"
+                    className="block text-xs font-bold text-ink uppercase mb-1"
+                  >
                     หมวดหมู่ (Category) *
                   </label>
                   <select
+                    id="kb-category"
                     value={formData.category}
                     onChange={(e) =>
                       setFormData((p) => ({ ...p, category: e.target.value as KnowledgeCategory }))
@@ -735,10 +808,14 @@ export default function AdminKnowledgePage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-ink uppercase mb-1">
+                  <label
+                    htmlFor="kb-tags"
+                    className="block text-xs font-bold text-ink uppercase mb-1"
+                  >
                     แท็กค้นหา (คั่นด้วยเครื่องหมายจุลภาค ,)
                   </label>
                   <input
+                    id="kb-tags"
                     type="text"
                     value={formData.tagsText}
                     onChange={(e) => setFormData((p) => ({ ...p, tagsText: e.target.value }))}
@@ -750,10 +827,14 @@ export default function AdminKnowledgePage() {
 
               {/* Summary */}
               <div>
-                <label className="block text-xs font-bold text-ink uppercase mb-1">
+                <label
+                  htmlFor="kb-summary"
+                  className="block text-xs font-bold text-ink uppercase mb-1"
+                >
                   คำสรุปย่อ (Summary - สำคัญสำหรับ AI ค้นคืน) *
                 </label>
                 <textarea
+                  id="kb-summary"
                   rows={2}
                   required
                   value={formData.summary}
@@ -765,10 +846,14 @@ export default function AdminKnowledgePage() {
 
               {/* Content */}
               <div>
-                <label className="block text-xs font-bold text-ink uppercase mb-1">
+                <label
+                  htmlFor="kb-content"
+                  className="block text-xs font-bold text-ink uppercase mb-1"
+                >
                   เนื้อหาฉบับเต็ม (Content - รองรับ Markdown) *
                 </label>
                 <textarea
+                  id="kb-content"
                   rows={6}
                   required
                   value={formData.content}
@@ -819,6 +904,7 @@ export default function AdminKnowledgePage() {
                       </div>
                       <input
                         type="text"
+                        aria-label={`คำถามข้อที่ ${idx + 1}`}
                         value={faq.question}
                         onChange={(e) => handleFaqChange(idx, "question", e.target.value)}
                         placeholder="คำถาม เช่น ส่งฟรีเมื่อไหร่?"
@@ -826,9 +912,10 @@ export default function AdminKnowledgePage() {
                       />
                       <textarea
                         rows={2}
+                        aria-label={`คำตอบข้อที่ ${idx + 1}`}
                         value={faq.answer}
                         onChange={(e) => handleFaqChange(idx, "answer", e.target.value)}
-                        placeholder="คำตอบ เช่น ร้าน TEENSTYLE จัดส่งฟรีทั่วไทยเมื่อยอดสั่งซื้อครบ 500 บาท..."
+                        placeholder="คำตอบที่อ้างอิงนโยบายจริงของร้าน..."
                         className="w-full rounded-lg border border-line bg-white p-2 text-xs text-ink focus:border-brand focus:outline-none"
                       />
                     </div>
@@ -875,13 +962,25 @@ export default function AdminKnowledgePage() {
 
       {/* Delete Confirmation Modal */}
       {deletingArticle && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="relative w-full max-w-md rounded-[var(--radius-card)] bg-white p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            onClick={() => !isDeleting && setDeletingArticle(null)}
+            className="absolute inset-0 bg-ink/50 backdrop-blur-xs"
+            aria-hidden
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="kb-delete-title"
+            className="relative w-full max-w-md rounded-[var(--radius-card)] bg-white p-6 shadow-[var(--shadow-float)] space-y-4"
+          >
             <div className="flex items-center gap-3 text-danger">
               <div className="flex size-10 items-center justify-center rounded-full bg-danger/10">
                 <Trash2 className="size-5" />
               </div>
-              <h3 className="text-lg font-bold text-ink">ยืนยันการลบบทความ?</h3>
+              <h3 id="kb-delete-title" className="text-lg font-bold text-ink">
+                ยืนยันการลบบทความ?
+              </h3>
             </div>
 
             <p className="text-xs text-muted leading-relaxed">
@@ -914,13 +1013,25 @@ export default function AdminKnowledgePage() {
 
       {/* Reset Defaults Confirmation Modal */}
       {isResetModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-          <div className="relative w-full max-w-md rounded-[var(--radius-card)] bg-white p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            onClick={() => !isResetting && setIsResetModalOpen(false)}
+            className="absolute inset-0 bg-ink/50 backdrop-blur-xs"
+            aria-hidden
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="kb-reset-title"
+            className="relative w-full max-w-md rounded-[var(--radius-card)] bg-white p-6 shadow-[var(--shadow-float)] space-y-4"
+          >
             <div className="flex items-center gap-3 text-warning">
               <div className="flex size-10 items-center justify-center rounded-full bg-warning/10">
                 <AlertTriangle className="size-5" />
               </div>
-              <h3 className="text-lg font-bold text-ink">คืนค่าเริ่มต้นคลังความรู้?</h3>
+              <h3 id="kb-reset-title" className="text-lg font-bold text-ink">
+                คืนค่าเริ่มต้นคลังความรู้?
+              </h3>
             </div>
 
             <p className="text-xs text-muted leading-relaxed">
