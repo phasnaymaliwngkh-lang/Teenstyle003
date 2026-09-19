@@ -693,3 +693,42 @@ export interface KnowledgeAskResponse {
   suggestedQuestions: string[];
   model: string;
 }
+
+// ─── Wishlist (STEP 22) ──────────────────────────────────────────────────────
+
+export interface WishlistPriceDrop {
+  /** ถูกลงกี่บาทเทียบกับตอนกดถูกใจ */
+  amount: number;
+  /** ถูกลงกี่เปอร์เซ็นต์ */
+  percent: number;
+}
+
+export interface WishlistItem {
+  id: string;
+  addedAt: string;
+  /** ราคาที่ต้องจ่ายจริง ณ ตอนที่กดถูกใจ — ใช้เทียบเท่านั้น ห้ามใช้คิดเงิน */
+  priceWhenAdded: number;
+  notifyOnPriceDrop: boolean;
+  /** null = ราคายังไม่ถูกลงกว่าตอนกดถูกใจ */
+  priceDrop: WishlistPriceDrop | null;
+  product: ProductCard;
+  /** null = ต้องไปเลือกสี/ไซซ์ที่หน้าสินค้าก่อน */
+  quickAddVariantId: string | null;
+  activeVariantCount: number;
+}
+
+export interface WishlistSummary {
+  total: number;
+  priceDropCount: number;
+  outOfStockCount: number;
+}
+
+export interface WishlistListResult {
+  items: WishlistItem[];
+  summary: WishlistSummary;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export type WishlistSort = "newest" | "price-drop" | "price-asc" | "price-desc";

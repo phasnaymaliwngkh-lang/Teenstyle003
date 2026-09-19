@@ -51,7 +51,7 @@ export const FOOTER_SECTIONS: readonly {
     links: [
       { label: "บัญชีของฉัน", href: "/account" },
       { label: "ตะกร้าสินค้า", href: "/cart" },
-      { label: "Wishlist", href: "/wishlist", pendingStep: 22 },
+      { label: "Wishlist", href: "/wishlist" },
       { label: "ประวัติคำสั่งซื้อ", href: "/account/orders" },
     ],
   },

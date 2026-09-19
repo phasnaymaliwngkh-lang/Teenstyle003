@@ -4,7 +4,7 @@
 > Full Stack Fashion E-Commerce สำหรับวัยรุ่น — Next.js + Express + PostgreSQL + Prisma + OpenAI
 
 โปรเจกต์นี้เดินตาม **Master Prompt STEP 1–55** ทำทีละ STEP แล้วหยุดรอคำสั่งถัดไป
-สถานะปัจจุบัน: **STEP 1–21 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
+สถานะปัจจุบัน: **STEP 1–22 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
 หน้าร้าน → ตะกร้า → checkout → ชำระเงิน (COD จริง · Stripe รอใส่ key) → ติดตามคำสั่งซื้อ
 → **หลังบ้าน: ภาพรวมร้าน + จัดการคำสั่งซื้อ + จัดการสินค้า + คลังสินค้า + แจ้งเตือนสต็อก + บาร์โค้ด/QR + นำเข้า/ส่งออก (CSV, Excel)**
 → **AI: AI Stylist (STEP 19) · AI Customer Service + Human Handoff (STEP 20) · AI Knowledge Base / FAQ (STEP 21)**
@@ -130,7 +130,9 @@ app/
 │   ├── cart/ checkout/ checkout/success/   ← ของจริงแล้ว (STEP 9–11 · success = แผงชำระเงิน)
 │   ├── account/orders/ account/orders/[orderNumber]/   ← ประวัติ + ติดตาม (STEP 12)
 │   ├── ai-stylist          ผู้ช่วยเลือกชุดและสไตล์ (STEP 19)
-│   ├── about wishlist search   ← placeholder (ComingSoon)
+│   ├── customer-service faq    ← AI CS + คลังความรู้ (STEP 20–21)
+│   ├── wishlist            รายการที่ถูกใจ (STEP 22 · ต้องล็อกอิน)
+│   ├── about search        ← placeholder (ComingSoon)
 │   └── account forbidden unauthorized
 ├── admin/
 │   ├── layout.tsx          แถบ admin + requireStaff() ป้องกันทุกหน้าใต้ /admin
@@ -907,6 +909,46 @@ GET|POST|PUT|DELETE /api/admin/knowledge/articles…
 เพราะต้องรองรับทั้งไทยและอังกฤษ และคลังความรู้มีขนาดหลักสิบบทความ
 ถ้าโตถึงหลักพัน ให้ย้ายไปใช้ full-text search ของ Postgres (`to_tsvector` + ดัชนี GIN)
 
+## Wishlist (STEP 22 — สร้างแล้ว)
+
+```
+/wishlist            → รายการที่ถูกใจ · เรียง 4 แบบ · กรองเฉพาะที่ราคาลด · แบ่งหน้า (ต้องล็อกอิน)
+ปุ่มหัวใจที่ /product/[slug]   → เก็บไว้ดูทีหลัง
+GET    /api/wishlist?page=&limit=&sort=&onlyPriceDrop=
+GET    /api/wishlist/contains?productIds=a,b,c
+POST   /api/wishlist/items            { productId }
+DELETE /api/wishlist/items/:productId
+PATCH  /api/wishlist/items/:productId/notify   { notifyOnPriceDrop }
+```
+
+**กฎที่ห้ามละเมิด**
+
+1. **ต้องล็อกอินทุก endpoint** — `Wishlist.userId` เป็น non-nullable ไม่มีแบบ guest
+   (ต่างจากตะกร้าที่ guest ใช้ cookie ได้) · สิทธิ์ `wishlist:manage` ตรวจจากฐานข้อมูล
+   หน้าเว็บที่ยังไม่ล็อกอินเด้งไป `/signin?callbackUrl=/wishlist` — **ไม่ต้องแวะ `/api/cart/merge`**
+   เพราะไม่มีรายการที่ถูกใจของ guest ให้รวม
+2. **`priceWhenAdded` อ่านจากฐานข้อมูลตอนกด** — client ส่งได้แค่ `productId`
+   ค่านี้มีไว้ **เทียบว่าราคาลดหรือยังเท่านั้น ห้ามใช้คิดเงิน** (กฎเดียวกับ `CartItem.addedPrice`)
+   และ **กดถูกใจซ้ำห้ามเขียนทับค่าเดิม** ไม่งั้นส่วนลดที่สะสมมาหายไป
+3. **ป้าย "ราคาลด" คำนวณสดทุกครั้ง** จาก `priceWhenAdded` เทียบกับราคาปัจจุบันของ `pricing.ts`
+   ไม่เก็บเป็นคอลัมน์ · แจ้งเฉพาะตอนถูกลง (แพงขึ้นไม่แจ้ง)
+4. **ห้ามเดาตัวเลือกให้ลูกค้า** — ปุ่ม "เพิ่มลงตะกร้า" โผล่เฉพาะเมื่อ backend ยืนยันว่ามี variant
+   ที่ **ซื้อได้จริงเพียงตัวเดียว** (`quickAddVariantId`) · หลายสี/ไซซ์ต้องพาไปเลือกที่หน้าสินค้า
+   และการเพิ่มยังผ่านการตรวจสต็อกของ `/api/cart/items` อีกชั้นอยู่ดี
+5. **การ์ดสินค้าสร้างผ่าน `toProductCards()`** เท่านั้น — สถานะสต็อกจึงเป็น "จำนวนที่ขายได้จริง"
+   ไม่ใช่ `totalStock` (กฎ STEP 15)
+6. **ยังไม่มีการส่งอีเมลแจ้งเตือนจริง** — สวิตช์ `notifyOnPriceDrop` บันทึกความต้องการไว้เฉย ๆ
+   เพราะ SMTP ยังไม่ได้ตั้งค่า **หน้าเว็บต้องบอกตรง ๆ** ว่าป้ายบนหน้านี้คือช่องทางเดียวที่ใช้ได้
+   (แพตเทิร์นเดียวกับ STEP 16 ข้อ 6) · การส่งจริงเป็นงานของ STEP 24/50
+7. **สถานะ "ถูกใจแล้วหรือยัง" ไม่ใส่ลงใน `/api/products/:slug`** — endpoint สินค้าเป็นของสาธารณะ
+   ที่แคชร่วมกันทุกคน ถ้าเอาข้อมูลรายบุคคลไปใส่จะแคชไม่ได้อีกเลย
+   ใช้ `/api/wishlist/contains` แยกต่างหาก แล้วให้ Server Component ส่งค่าเริ่มต้นลงไปที่ปุ่ม
+
+⚠️ **การเรียง `price-drop` และตัวกรอง `onlyPriceDrop` ทำใน TypeScript** เพราะต้องเทียบกับราคา
+ปัจจุบันที่คิดจากกฎใน `pricing.ts` (`salePrice ?? price`) ไม่ใช่คอลัมน์เดียว · และยอดสรุป
+(ราคาลดกี่ชิ้น/ของหมดกี่ชิ้น) ต้องนับจากทั้งชุดไม่ใช่แค่หน้าปัจจุบัน
+ถ้ารายการโตมากค่อยย้ายไปเขียนเป็น SQL แบบเดียวกับ `/shop`
+
 ## Accessibility — จุดที่พลาดบ่อย (สรุปจากการเก็บงาน STEP 20/21)
 
 **หน้าต่าง (modal/dialog) — ใช้แพตเทิร์นของ [mobile-menu.tsx](frontend/src/components/layout/mobile-menu.tsx) เสมอ**
@@ -960,6 +1002,10 @@ GET|POST|PUT|DELETE /api/admin/knowledge/articles…
   ถ้าฆ่าแต่ลูกที่ฟัง port 4000 มันจะ **start ขึ้นมาใหม่ให้อัตโนมัติ** ทำให้เข้าใจผิดว่า backend ปิดแล้ว
   ใช้วิธีนี้: `Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -like "*web003*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }`
   (กรองด้วย CommandLine เพื่อไม่ไปแตะ node ของโปรแกรมอื่น) · restart ซ้ำ ๆ ทำให้มี process ค้างสะสม เคยเจอ 18 ตัว
+- **ฆ่า dev server กลางคันแล้ว `npm run typecheck` อาจพังด้วย error แปลก ๆ ที่ไม่ใช่โค้ดเรา**
+  เช่น `.next/dev/types/routes.d.ts(69,51): error TS1011` — เป็นไฟล์ type ที่ Next สร้างเองและค้างอยู่ครึ่ง ๆ กลาง ๆ
+  แก้ด้วย `rm -rf frontend/.next/dev` แล้วรันใหม่ · **อย่าไปไล่แก้โค้ดตามข้อความ error พวกนี้**
+  (สังเกตง่าย ๆ: path ขึ้นต้นด้วย `.next/` = ไฟล์ที่ถูก generate ไม่ใช่ source)
 - **โฟลเดอร์ใน `app/` ที่ขึ้นต้นด้วย `_` ไม่กลายเป็น route** (Next ถือเป็น private folder)
 - **path ที่มี `[...]` หรือ `(...)` ต้องใช้ `-LiteralPath`** — PowerShell อ่าน `[slug]` เป็น wildcard
   `Remove-Item "app\(storefront)\product\[slug]\loading.tsx"` จะ **ไม่ลบอะไรเลยและไม่ error**

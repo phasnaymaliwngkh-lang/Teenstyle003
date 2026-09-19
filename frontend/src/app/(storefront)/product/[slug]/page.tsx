@@ -13,8 +13,11 @@ import {
 import { ProductCard } from "@/features/products/components/product-card";
 import { ProductGallery } from "@/features/products/components/product-gallery";
 import { VariantPicker } from "@/features/products/components/variant-picker";
+import { WishlistHeart } from "@/features/wishlist/components/wishlist-heart";
 import { ApiClientError } from "@/lib/api";
+import { getSession } from "@/lib/dal";
 import { fetchProductDetail, searchShopProducts } from "@/services/catalog.service";
+import { fetchWishlistedIdsOnServer } from "@/services/wishlist.server";
 import type { ProductDetail } from "@/types/catalog";
 import { formatBaht, STOCK_LABEL } from "@/utils/format";
 
@@ -87,13 +90,27 @@ export default async function ProductPage({ params }: PageProps) {
     notFound();
   }
 
+  /**
+   * สถานะ "ถูกใจแล้วหรือยัง" หามาที่ server เพื่อให้หัวใจถูกต้องตั้งแต่เฟรมแรก
+   * (ยังไม่ล็อกอิน = เซ็ตว่าง ไม่ยิง API และหน้าสินค้ายังเปิดดูได้ตามปกติ)
+   */
+  const session = await getSession();
+  const wishlisted =
+    loaded.kind === "found" && session
+      ? await fetchWishlistedIdsOnServer([loaded.product.id])
+      : new Set<string>();
+
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6 sm:py-10">
       {loaded.kind === "error" ? (
         <SectionError message={loaded.message} />
       ) : (
         <>
-          <ProductDetailSection product={loaded.product} />
+          <ProductDetailSection
+            product={loaded.product}
+            isSignedIn={session !== null}
+            isWishlisted={wishlisted.has(loaded.product.id)}
+          />
 
           <div className="mt-14">
             <Suspense fallback={<RelatedSkeleton />}>
@@ -173,7 +190,15 @@ function RelatedSkeleton() {
   );
 }
 
-function ProductDetailSection({ product }: { product: ProductDetail }) {
+function ProductDetailSection({
+  product,
+  isSignedIn,
+  isWishlisted,
+}: {
+  product: ProductDetail;
+  isSignedIn: boolean;
+  isWishlisted: boolean;
+}) {
   const category = product.category;
 
   return (
@@ -259,6 +284,14 @@ function ProductDetailSection({ product }: { product: ProductDetail }) {
           ) : (
             <VariantPicker product={product} />
           )}
+
+          {/* เก็บไว้ดูทีหลัง (STEP 22) — กดได้แม้สินค้าหมด เพราะจะได้รู้เมื่อของกลับมา/ราคาลด */}
+          <WishlistHeart
+            productId={product.id}
+            productName={product.name}
+            initialWishlisted={isWishlisted}
+            isSignedIn={isSignedIn}
+          />
 
           {product.tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
