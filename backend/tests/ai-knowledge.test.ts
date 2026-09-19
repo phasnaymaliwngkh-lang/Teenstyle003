@@ -24,8 +24,8 @@ import {
 
 describe('STEP 21: AI Knowledge Base Service', () => {
   describe('Public Article Search and Retrieval', () => {
-    it('ดึงรายการบทความที่เผยแพร่แล้ว (Published) ได้ครบถ้วน', () => {
-      const result = searchArticles({ page: 1, limit: 10, publishedOnly: true });
+    it('ดึงรายการบทความที่เผยแพร่แล้ว (Published) ได้ครบถ้วน', async () => {
+      const result = await searchArticles({ page: 1, limit: 10, publishedOnly: true });
       expect(result.items.length).toBeGreaterThanOrEqual(1);
       expect(result.total).toBeGreaterThanOrEqual(1);
       expect(result.page).toBe(1);
@@ -37,36 +37,36 @@ describe('STEP 21: AI Knowledge Base Service', () => {
       }
     });
 
-    it('กรองบทความตามหมวดหมู่ (Category Filter) ได้อย่างถูกต้อง', () => {
-      const shippingArticles = searchArticles({ category: 'SHIPPING' });
+    it('กรองบทความตามหมวดหมู่ (Category Filter) ได้อย่างถูกต้อง', async () => {
+      const shippingArticles = await searchArticles({ category: 'SHIPPING' });
       expect(shippingArticles.items.length).toBeGreaterThanOrEqual(1);
       for (const item of shippingArticles.items) {
         expect(item.category).toBe('SHIPPING');
       }
 
-      const sizingArticles = searchArticles({ category: 'SIZING' });
+      const sizingArticles = await searchArticles({ category: 'SIZING' });
       expect(sizingArticles.items.length).toBeGreaterThanOrEqual(1);
       for (const item of sizingArticles.items) {
         expect(item.category).toBe('SIZING');
       }
     });
 
-    it('กรองบทความตามป้ายกำกับ (Tag Filter) ได้อย่างถูกต้อง', () => {
-      const res = searchArticles({ tag: 'ส่งฟรี' });
+    it('กรองบทความตามป้ายกำกับ (Tag Filter) ได้อย่างถูกต้อง', async () => {
+      const res = await searchArticles({ tag: 'ส่งฟรี' });
       expect(res.items.length).toBeGreaterThanOrEqual(1);
       expect(res.items[0]?.tags).toContain('ส่งฟรี');
     });
 
-    it('ค้นหาด้วยคีย์เวิร์ดภาษาไทย (Keyword Search Scoring) ได้ตรงประเด็น', () => {
-      const res = searchArticles({ q: 'เปลี่ยนไซซ์ คืนของ' });
+    it('ค้นหาด้วยคีย์เวิร์ดภาษาไทย (Keyword Search Scoring) ได้ตรงประเด็น', async () => {
+      const res = await searchArticles({ q: 'เปลี่ยนไซซ์ คืนของ' });
       expect(res.items.length).toBeGreaterThanOrEqual(1);
       expect(res.items[0]?.category).toBe('RETURNS');
       expect(res.items[0]?.title).toContain('เปลี่ยน');
     });
 
-    it('แบ่งหน้าบทความ (Pagination) ได้ถูกต้องตาม limit และ page', () => {
-      const page1 = searchArticles({ page: 1, limit: 2 });
-      const page2 = searchArticles({ page: 2, limit: 2 });
+    it('แบ่งหน้าบทความ (Pagination) ได้ถูกต้องตาม limit และ page', async () => {
+      const page1 = await searchArticles({ page: 1, limit: 2 });
+      const page2 = await searchArticles({ page: 2, limit: 2 });
 
       expect(page1.items.length).toBe(2);
       expect(page2.items.length).toBe(2);
@@ -74,32 +74,32 @@ describe('STEP 21: AI Knowledge Base Service', () => {
       expect(page1.totalPages).toBeGreaterThanOrEqual(2);
     });
 
-    it('ดึงข้อมูลบทความด้วย Slug และเพิ่มจำนวนผู้เข้าชม (View count) อัตโนมัติ', () => {
-      const first = searchArticles({ limit: 1 }).items[0]!;
+    it('ดึงข้อมูลบทความด้วย Slug และเพิ่มจำนวนผู้เข้าชม (View count) อัตโนมัติ', async () => {
+      const first = (await searchArticles({ limit: 1 })).items[0]!;
       const viewsBefore = first.viewCount;
 
-      const article = getArticleBySlug(first.slug);
+      const article = await getArticleBySlug(first.slug);
       expect(article.id).toBe(first.id);
       expect(article.viewCount).toBe(viewsBefore + 1);
     });
 
-    it('ดึงบทความด้วย Slug ที่ไม่มีอยู่จริง → throw 404', () => {
-      expect(() => getArticleBySlug('non-existent-article-slug-xyz')).toThrow();
+    it('ดึงบทความด้วย Slug ที่ไม่มีอยู่จริง → throw 404', async () => {
+      await expect(getArticleBySlug('non-existent-article-slug-xyz')).rejects.toThrow();
     });
 
-    it('สรุปหมวดหมู่บทความพร้อมจำนวนในแต่ละหมวด (getCategoriesSummary)', () => {
-      const categories = getCategoriesSummary();
+    it('สรุปหมวดหมู่บทความพร้อมจำนวนในแต่ละหมวด (getCategoriesSummary)', async () => {
+      const categories = await getCategoriesSummary();
       expect(categories.length).toBe(8);
       const shippingCat = categories.find((c) => c.key === 'SHIPPING');
       expect(shippingCat).toBeDefined();
       expect(shippingCat?.articleCount).toBeGreaterThanOrEqual(1);
     });
 
-    it('โหวตว่าบทความมีประโยชน์ (Helpful vote) ได้ถูกต้อง', () => {
-      const first = searchArticles({ limit: 1 }).items[0]!;
+    it('โหวตว่าบทความมีประโยชน์ (Helpful vote) ได้ถูกต้อง', async () => {
+      const first = (await searchArticles({ limit: 1 })).items[0]!;
       const helpfulBefore = first.helpfulCount;
 
-      const result = voteArticleHelpful(first.id, true);
+      const result = await voteArticleHelpful(first.id, true);
       expect(result.helpfulCount).toBe(helpfulBefore + 1);
     });
   });
@@ -136,16 +136,15 @@ describe('STEP 21: AI Knowledge Base Service', () => {
    *  ค่าธรรมเนียม COD 20 บาท ซึ่งไม่ตรงกับระบบสักค่าเดียว และ COD ไม่มีค่าธรรมเนียมเลย)
    */
   describe('Knowledge Base ต้องตรงกับ config ที่ใช้คิดเงินจริง (No Hallucination)', () => {
-    const findArticle = (slug: string) => {
-      const found = searchArticles({ page: 1, limit: 50, publishedOnly: false }).items.find(
-        (a) => a.slug === slug,
-      );
+    const findArticle = async (slug: string) => {
+      const result = await searchArticles({ page: 1, limit: 50, publishedOnly: false });
+      const found = result.items.find((a) => a.slug === slug);
       expect(found, `ไม่พบบทความ ${slug}`).toBeDefined();
       return found!;
     };
 
-    it('บทความจัดส่งพูดถึงวิธีจัดส่งครบทุกแบบ พร้อมค่าส่งและ ETA ตรงกับ SHIPPING_OPTIONS', () => {
-      const article = findArticle('shipping-rates-and-delivery-time');
+    it('บทความจัดส่งพูดถึงวิธีจัดส่งครบทุกแบบ พร้อมค่าส่งและ ETA ตรงกับ SHIPPING_OPTIONS', async () => {
+      const article = await findArticle('shipping-rates-and-delivery-time');
       const text = `${article.summary}\n${article.content}\n${article.faqPairs
         .map((f) => `${f.question} ${f.answer}`)
         .join('\n')}`;
@@ -168,8 +167,8 @@ describe('STEP 21: AI Knowledge Base Service', () => {
       }
     });
 
-    it('ทุกจำนวนเงินที่ปรากฏในบทความจัดส่งต้องเป็นค่าที่มีอยู่จริงใน SHIPPING_OPTIONS', () => {
-      const article = findArticle('shipping-rates-and-delivery-time');
+    it('ทุกจำนวนเงินที่ปรากฏในบทความจัดส่งต้องเป็นค่าที่มีอยู่จริงใน SHIPPING_OPTIONS', async () => {
+      const article = await findArticle('shipping-rates-and-delivery-time');
       const text = `${article.summary}\n${article.content}\n${article.faqPairs
         .map((f) => f.answer)
         .join('\n')}`;
@@ -196,8 +195,8 @@ describe('STEP 21: AI Knowledge Base Service', () => {
       }
     });
 
-    it('บทความชำระเงินสะท้อนสถานะจริงของทุกช่องทาง และไม่มีค่าธรรมเนียม COD ที่ระบบไม่เก็บ', () => {
-      const article = findArticle('payment-methods-cod-guide');
+    it('บทความชำระเงินสะท้อนสถานะจริงของทุกช่องทาง และไม่มีค่าธรรมเนียม COD ที่ระบบไม่เก็บ', async () => {
+      const article = await findArticle('payment-methods-cod-guide');
       const text = `${article.summary}\n${article.content}\n${article.faqPairs
         .map((f) => f.answer)
         .join('\n')}`;
@@ -213,16 +212,16 @@ describe('STEP 21: AI Knowledge Base Service', () => {
       expect(text).not.toMatch(/ค่าธรรมเนียม(บริการ)?\s*(COD\s*)?\d+\s*บาท/);
     });
 
-    it('เงื่อนไขเปลี่ยน/คืนสินค้าใช้จำนวนวันชุดเดียวกับ Policy Engine ของ AI Customer Service', () => {
-      const article = findArticle('return-and-exchange-policy');
+    it('เงื่อนไขเปลี่ยน/คืนสินค้าใช้จำนวนวันชุดเดียวกับ Policy Engine ของ AI Customer Service', async () => {
+      const article = await findArticle('return-and-exchange-policy');
       const policy = getStorePolicyContent('return_exchange');
 
       expect(article.content).toContain(`${RETURN_WINDOW_DAYS} วัน`);
       expect(policy).toContain(`${RETURN_WINDOW_DAYS} วัน`);
     });
 
-    it('ข้อมูลติดต่อและเวลาทำการตรงกันทั้งบทความและ Policy Engine · ไม่มีช่องทางที่ยังไม่เปิด', () => {
-      const article = findArticle('contact-support-and-office-hours');
+    it('ข้อมูลติดต่อและเวลาทำการตรงกันทั้งบทความและ Policy Engine · ไม่มีช่องทางที่ยังไม่เปิด', async () => {
+      const article = await findArticle('contact-support-and-office-hours');
       const policy = getStorePolicyContent('store_info');
 
       expect(article.content).toContain(STORE_AGENT_HOURS);
@@ -313,12 +312,12 @@ describe('STEP 21: AI Knowledge Base Service', () => {
       expect(deleteRes.success).toBe(true);
 
       // ค้นหาต้องไม่พบบทความที่ลบไปแล้ว
-      const list = adminListArticles({ q: testSlug });
+      const list = await adminListArticles({ q: testSlug });
       expect(list.items.some((a) => a.id === createdArticleId)).toBe(false);
     });
 
-    it('รีเซ็ตบทความกลับเป็นค่าเริ่มต้น (Reset Defaults)', () => {
-      const res = adminResetDefaults();
+    it('รีเซ็ตบทความกลับเป็นค่าเริ่มต้น (Reset Defaults)', async () => {
+      const res = await adminResetDefaults();
       expect(res.count).toBeGreaterThanOrEqual(10);
     });
   });

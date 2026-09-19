@@ -365,7 +365,7 @@ export function FaqViewer() {
               <div>
                 <h3 className="font-bold text-ink text-base flex items-center gap-2">
                   คำตอบจาก AI Knowledge Assistant
-                  <span className="rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold px-2 py-0.5">
+                  <span className="rounded-full bg-success/10 text-success text-[11px] font-bold px-2 py-0.5">
                     Grounded 100%
                   </span>
                 </h3>
@@ -378,7 +378,7 @@ export function FaqViewer() {
             <button
               type="button"
               onClick={() => setAiResult(null)}
-              className="text-xs font-semibold text-muted hover:text-ink px-2.5 py-1 rounded-md hover:bg-gray-100 transition"
+              className="text-xs font-semibold text-muted hover:text-ink px-2.5 py-1 rounded-md hover:bg-lilac-50 transition"
             >
               ล้างคำตอบ
             </button>
@@ -437,7 +437,7 @@ export function FaqViewer() {
                     setSearchQuery(sug);
                     void handleAskAI(sug);
                   }}
-                  className="text-xs rounded-full border border-line bg-gray-50 px-3 py-1 text-ink-soft hover:border-brand hover:text-brand transition font-medium"
+                  className="text-xs rounded-full border border-line bg-lilac-50 px-3 py-1 text-ink-soft hover:border-brand hover:text-brand transition font-medium"
                 >
                   {sug}
                 </button>
@@ -501,7 +501,7 @@ export function FaqViewer() {
                 <span>{cat.label}</span>
                 <span
                   className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                    isSelected ? "bg-white/20 text-white" : "bg-gray-100 text-muted"
+                    isSelected ? "bg-white/20 text-white" : "bg-lilac-50 text-muted"
                   }`}
                 >
                   {cat.articleCount}
@@ -531,7 +531,7 @@ export function FaqViewer() {
           </button>
         </div>
       ) : articles.length === 0 ? (
-        <div className="rounded-[var(--radius-card)] border border-dashed border-line bg-gray-50/50 p-12 text-center space-y-4">
+        <div className="rounded-[var(--radius-card)] border border-dashed border-line bg-lilac-50/50 p-12 text-center space-y-4">
           <HelpCircle className="size-12 text-muted-light mx-auto" />
           <div>
             <h4 className="font-bold text-ink text-base">ไม่พบคู่มือหรือคำถามที่ตรงกับเงื่อนไข</h4>
@@ -546,7 +546,7 @@ export function FaqViewer() {
                 setSelectedCategory("ALL");
                 handleClearSearch();
               }}
-              className="rounded-full border border-line bg-white px-4 py-2 text-xs font-bold text-ink hover:bg-gray-50 transition"
+              className="rounded-full border border-line bg-white px-4 py-2 text-xs font-bold text-ink hover:bg-lilac-50 transition"
             >
               ดูบทความทั้งหมด
             </button>
@@ -582,7 +582,7 @@ export function FaqViewer() {
                       {article.tags.slice(0, 3).map((tag) => (
                         <span
                           key={tag}
-                          className="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-muted"
+                          className="rounded-md bg-lilac-50 px-2 py-0.5 text-[11px] font-medium text-muted"
                         >
                           #{tag}
                         </span>
@@ -625,7 +625,7 @@ export function FaqViewer() {
                           <button
                             type="button"
                             onClick={() => toggleFaq(faq.id)}
-                            className="w-full flex items-center justify-between gap-3 p-3.5 text-left bg-gray-50/50 hover:bg-lilac-50/40 transition"
+                            className="w-full flex items-center justify-between gap-3 p-3.5 text-left bg-lilac-50/50 hover:bg-lilac-50/40 transition"
                           >
                             <span className="text-sm font-bold text-ink flex items-center gap-2">
                               <HelpCircle className="size-4 text-brand shrink-0" />
@@ -659,8 +659,8 @@ export function FaqViewer() {
                       onClick={() => void handleVote(article.id, true)}
                       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold border transition ${
                         isVotedHelpful
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-300"
-                          : "bg-white border-line hover:border-emerald-500 hover:text-emerald-700"
+                          ? "bg-success/5 text-success border-success/30"
+                          : "bg-white border-line hover:border-success hover:text-success"
                       } disabled:opacity-75`}
                     >
                       <ThumbsUp className="size-3.5" />
@@ -673,8 +673,8 @@ export function FaqViewer() {
                       onClick={() => void handleVote(article.id, false)}
                       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold border transition ${
                         isVotedNotHelpful
-                          ? "bg-rose-50 text-rose-700 border-rose-300"
-                          : "bg-white border-line hover:border-rose-500 hover:text-rose-700"
+                          ? "bg-danger/5 text-danger border-danger/25"
+                          : "bg-white border-line hover:border-danger hover:text-danger"
                       } disabled:opacity-75`}
                     >
                       <ThumbsDown className="size-3.5" />
@@ -682,7 +682,7 @@ export function FaqViewer() {
                     </button>
 
                     {hasVoted && (
-                      <span className="text-[11px] text-emerald-600 font-bold ml-1">
+                      <span className="text-[11px] text-success font-bold ml-1">
                         ✓ บันทึกคำติชมแล้ว ขอบคุณครับ!
                       </span>
                     )}
@@ -717,7 +717,7 @@ export function FaqViewer() {
                   {readingArticle.tags.map((t) => (
                     <span
                       key={t}
-                      className="rounded-md bg-gray-100 px-2 py-0.5 text-[11px] text-muted"
+                      className="rounded-md bg-lilac-50 px-2 py-0.5 text-[11px] text-muted"
                     >
                       #{t}
                     </span>
@@ -730,7 +730,7 @@ export function FaqViewer() {
               <button
                 type="button"
                 onClick={() => setReadingArticle(null)}
-                className="rounded-full p-2 text-muted hover:text-ink hover:bg-gray-100 transition"
+                className="rounded-full p-2 text-muted hover:text-ink hover:bg-lilac-50 transition"
                 aria-label="ปิดหน้าต่าง"
               >
                 <X className="size-5" />
@@ -750,12 +750,12 @@ export function FaqViewer() {
                 </h4>
                 <div className="space-y-2">
                   {readingArticle.faqPairs.map((faq) => (
-                    <div key={faq.id} className="rounded-xl border border-line p-4 bg-gray-50/50">
+                    <div key={faq.id} className="rounded-xl border border-line p-4 bg-lilac-50/50">
                       <div className="font-bold text-sm text-ink mb-1 flex items-center gap-2">
                         <HelpCircle className="size-4 text-brand" />
                         {faq.question}
                       </div>
-                      <p className="text-xs sm:text-sm text-muted-dark whitespace-pre-line">
+                      <p className="text-xs sm:text-sm text-ink-soft whitespace-pre-line">
                         {faq.answer}
                       </p>
                     </div>
@@ -772,7 +772,7 @@ export function FaqViewer() {
                   type="button"
                   disabled={userVotes[readingArticle.id] !== undefined}
                   onClick={() => void handleVote(readingArticle.id, true)}
-                  className="rounded-full border border-line px-3 py-1 font-bold hover:border-emerald-500 hover:text-emerald-700 transition"
+                  className="rounded-full border border-line px-3 py-1 font-bold hover:border-success hover:text-success transition"
                 >
                   👍 ใช่ ({readingArticle.helpfulCount})
                 </button>
@@ -780,7 +780,7 @@ export function FaqViewer() {
                   type="button"
                   disabled={userVotes[readingArticle.id] !== undefined}
                   onClick={() => void handleVote(readingArticle.id, false)}
-                  className="rounded-full border border-line px-3 py-1 font-bold hover:border-rose-500 hover:text-rose-700 transition"
+                  className="rounded-full border border-line px-3 py-1 font-bold hover:border-danger hover:text-danger transition"
                 >
                   👎 ไม่ ({readingArticle.notHelpfulCount})
                 </button>
@@ -789,7 +789,7 @@ export function FaqViewer() {
               <button
                 type="button"
                 onClick={() => setReadingArticle(null)}
-                className="rounded-full bg-gray-100 hover:bg-gray-200 px-5 py-2 text-xs font-bold text-ink transition"
+                className="rounded-full bg-lilac-50 hover:bg-lilac px-5 py-2 text-xs font-bold text-ink transition"
               >
                 ปิดหน้าต่าง
               </button>
@@ -799,7 +799,7 @@ export function FaqViewer() {
       )}
 
       {/* Customer Service Bridge Banner */}
-      <div className="rounded-[var(--radius-card)] border border-line bg-gradient-to-r from-lilac-50 via-white to-purple-50 p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-[var(--shadow-soft)]">
+      <div className="rounded-[var(--radius-card)] border border-line bg-gradient-to-r from-lilac-50 via-white to-lilac-50 p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-[var(--shadow-soft)]">
         <div className="flex items-center gap-4">
           <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-lilac text-brand shadow-sm">
             <Headphones className="size-7" />

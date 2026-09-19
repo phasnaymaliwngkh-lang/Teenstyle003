@@ -115,8 +115,8 @@ export function StylistChat() {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="font-bold text-ink">TEENSTYLE AI Stylist</h2>
-              <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-semibold text-success">
+                <span className="size-1.5 rounded-full bg-success animate-pulse" />
                 ออนไลน์
               </span>
             </div>
@@ -173,7 +173,7 @@ export function StylistChat() {
                 className={`max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   msg.role === "USER"
                     ? "bg-brand text-white rounded-br-xs shadow-sm"
-                    : "border border-line bg-gray-50/80 text-ink rounded-bl-xs"
+                    : "border border-line bg-lilac-50/80 text-ink rounded-bl-xs"
                 }`}
               >
                 <div className="whitespace-pre-line">{msg.content}</div>
@@ -212,7 +212,7 @@ export function StylistChat() {
             <div className="grid size-8 place-items-center rounded-full bg-lilac-100 text-brand">
               <Sparkles className="size-4 animate-spin" />
             </div>
-            <div className="flex items-center gap-2 rounded-2xl border border-line bg-gray-50 px-4 py-2.5 text-xs font-medium text-ink">
+            <div className="flex items-center gap-2 rounded-2xl border border-line bg-lilac-50 px-4 py-2.5 text-xs font-medium text-ink">
               <Loader2 className="size-3.5 animate-spin text-brand" />
               <span>AI Stylist กำลังค้นหาสินค้าและจัดชุดที่เข้ากัน...</span>
             </div>
@@ -260,7 +260,7 @@ export function StylistChat() {
             onChange={(e) => setInputText(e.target.value)}
             disabled={loading}
             placeholder="พิมพ์บอกสไตล์ สี โอกาสใช้งาน หรืองบประมาณ..."
-            className="flex-1 rounded-[var(--radius-pill)] border border-line bg-gray-50 px-4 py-2.5 text-sm text-ink outline-none transition focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
+            className="flex-1 rounded-[var(--radius-pill)] border border-line bg-lilac-50 px-4 py-2.5 text-sm text-ink outline-none transition focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
           />
 
           <button

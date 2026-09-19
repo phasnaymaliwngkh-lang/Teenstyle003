@@ -35,7 +35,7 @@ export default function AiStylistPage() {
             สินค้ามีอยู่จริงในร้าน 100%
           </span>
           <span className="flex items-center gap-1">
-            <CheckCircle2 className="size-4 text-emerald-600" aria-hidden />
+            <CheckCircle2 className="size-4 text-success" aria-hidden />
             สต็อกและราคาตรงตามจริงเสมอ
           </span>
           <span className="flex items-center gap-1">

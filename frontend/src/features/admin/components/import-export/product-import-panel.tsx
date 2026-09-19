@@ -191,7 +191,7 @@ export function ProductImportPanel() {
             </div>
 
             <div className="flex gap-2">
-              <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-muted">
+              <span className="rounded-lg bg-lilac-50 px-3 py-1.5 text-xs font-semibold text-muted">
                 ทั้งหมด {result.totalRows} แถว
               </span>
               <span className="rounded-lg bg-success/10 px-3 py-1.5 text-xs font-semibold text-success">

@@ -1,4 +1,3 @@
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,13 +24,3 @@ loadEnv({ path: path.resolve(here, '..', '..', '.env'), quiet: true });
 // ใช้ `||` ไม่ใช่ `??=` เพราะ .env มีบรรทัด `STRIPE_WEBHOOK_SECRET=` ว่างไว้ (ค่าเป็น '' ไม่ใช่ undefined)
 process.env['STRIPE_WEBHOOK_SECRET'] =
   process.env['STRIPE_WEBHOOK_SECRET'] || 'whsec_test_local_only_not_a_real_secret';
-
-/**
- * คลังความรู้ (STEP 21) เก็บเป็นไฟล์ JSON และเทสต์มีทั้ง สร้าง / แก้ / ลบ / รีเซ็ตค่าเริ่มต้น
- * ถ้าไม่ชี้ไปที่ไฟล์ชั่วคราว เทสต์จะเขียนทับ `backend/src/data/knowledge-base.json`
- * ที่อยู่ใน git จริง → รันเทสต์หนึ่งครั้งแล้ว working tree สกปรก (และ diff ปนเข้า commit ได้)
- */
-process.env['KNOWLEDGE_BASE_FILE'] = path.resolve(
-  os.tmpdir(),
-  `teenstyle-knowledge-base.test.${process.pid}.json`,
-);

@@ -887,21 +887,24 @@ GET|POST|PUT|DELETE /api/admin/knowledge/articles…
 4. **สถิติตั้งต้นของบทความต้องเป็น 0** — `viewCount` / `helpfulCount` / `notHelpfulCount`
    เดิม seed ใส่เลขสวย ๆ ไว้ (342 วิว · 89 โหวต) ซึ่งเป็นตัวเลขที่ไม่เคยเกิดขึ้น
    และไปโผล่บนหน้า `/admin/knowledge` ให้แอดมินใช้ตัดสินใจ (กฎเดียวกับ STEP 13 ข้อ 6)
-5. **ที่เก็บ `backend/data/knowledge-base.json` เป็น runtime artifact ไม่ใช่ source**
-   อยู่นอก `src/` และถูก gitignore · ข้อมูลตั้งต้นอยู่ที่ `INITIAL_KNOWLEDGE_ARTICLES` ที่เดียว
-   เดิมเก็บไว้ใน `src/data/` แล้ว commit ลง git → แค่เปิดอ่านบทความ (`viewCount + 1`)
-   ก็ทำให้ working tree สกปรก · `npm test` เขียนทับไฟล์จริง · และไฟล์ที่ค้างค่าเก่า
-   **บังหน้า** `INITIAL_KNOWLEDGE_ARTICLES` ที่แก้ใหม่จนแก้โค้ดแล้วเว็บยังตอบค่าเดิม
-   เทสต์ชี้ `KNOWLEDGE_BASE_FILE` ไปที่ temp dir ใน `tests/setup.ts`
-6. **สิทธิ์ต้องเป็นของโดเมน AI ไม่ใช่ `product:*`** — คนที่แก้ข้อมูลสินค้าได้
+5. **บทความเก็บใน PostgreSQL** (`KnowledgeArticle` + `KnowledgeFaq`) ไม่ใช่ไฟล์
+   `INITIAL_KNOWLEDGE_ARTICLES` เป็น**ข้อมูลตั้งต้น**เท่านั้น — `ensureSeeded()` ใส่ให้อัตโนมัติ
+   ครั้งแรกที่ตารางยังว่าง และ `adminResetDefaults()` ใช้กลับไปเริ่มใหม่
+   เดิมเก็บเป็น JSON ที่ commit ลง git แล้วพังหลายทาง: แค่เปิดอ่านบทความ (`viewCount + 1`)
+   ก็ทำให้ working tree สกปรก · `npm test` เขียนทับไฟล์จริง · ไฟล์ที่ค้างค่าเก่า **บังหน้า**
+   ข้อมูลตั้งต้นที่แก้ใหม่จนแก้โค้ดแล้วเว็บยังตอบค่าเดิม · และ redeploy บน container แล้วหายทั้งหมด
+6. **ตัวนับ `viewCount` / `helpfulCount` ต้องใช้ `{ increment: 1 }` ของ Prisma**
+   ห้ามอ่านค่าเดิมมาบวกแล้วเขียนกลับ — คนเปิดอ่านพร้อมกันแล้วยอดจะตกหล่น
+7. **ทุกการสร้าง/แก้/ลบ/รีเซ็ต เขียน `AdminLog` ในทรานแซกชันเดียวกัน** (กฎเดียวกับ STEP 14/15)
+8. **สิทธิ์ต้องเป็นของโดเมน AI ไม่ใช่ `product:*`** — คนที่แก้ข้อมูลสินค้าได้
    ไม่ควรแก้นโยบายร้านที่ AI เอาไปตอบลูกค้าในฐานะความจริงได้ด้วย
-7. **endpoint ที่เรียก OpenAI และ endpoint ที่เพิ่มตัวนับต้องมี `strictRateLimiter`**
+9. **endpoint ที่เรียก OpenAI และ endpoint ที่เพิ่มตัวนับต้องมี `strictRateLimiter`**
    (`/knowledge/ask` · `/cs/chat` · `/stylist/chat` · `/articles/:id/helpful`)
    เปิดให้ guest ใช้ + หนึ่งคำขอมีค่าใช้จ่ายจริง = ยิงรัวได้แปลว่าบิลบานได้
 
-⚠️ **ที่เก็บแบบไฟล์ยังไม่รอด redeploy บน container** (Railway ฯลฯ) บทความที่แอดมินแก้จะกลับเป็นค่าตั้งต้น
-ถ้าต้องให้คงอยู่จริงต้องเพิ่มตารางใน Prisma แล้วย้าย `knowledge-base.service.ts` ไปอ่าน/เขียน DB
-(schema ยังไม่มีโมเดลนี้ — เป็นงานที่ต้องตัดสินใจก่อน deploy จริง)
+⚠️ **การให้คะแนนความเกี่ยวข้องยังทำใน TypeScript** (ดึงบทความที่ผ่านตัวกรองมาให้คะแนนทั้งชุด)
+เพราะต้องรองรับทั้งไทยและอังกฤษ และคลังความรู้มีขนาดหลักสิบบทความ
+ถ้าโตถึงหลักพัน ให้ย้ายไปใช้ full-text search ของ Postgres (`to_tsvector` + ดัชนี GIN)
 
 ## ข้อควรระวังเรื่องเครื่องมือบนเครื่องนี้ (Windows / PowerShell)
 

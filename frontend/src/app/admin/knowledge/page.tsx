@@ -377,7 +377,7 @@ export default function AdminKnowledgePage() {
           <button
             type="button"
             onClick={() => setIsResetModalOpen(true)}
-            className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold hover:bg-gray-100 transition"
+            className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold hover:bg-lilac-50 transition"
           >
             <RotateCcw className="size-4 text-muted" />
             คืนค่าเริ่มต้น 12 บทความ
@@ -396,15 +396,15 @@ export default function AdminKnowledgePage() {
 
       {/* Notifications */}
       {successNotice && (
-        <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        <div className="flex items-center justify-between rounded-xl border border-success/30 bg-success/5 px-4 py-3 text-sm text-success">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="size-5 text-emerald-600 shrink-0" />
+            <CheckCircle2 className="size-5 text-success shrink-0" />
             <span>{successNotice}</span>
           </div>
           <button
             type="button"
             onClick={() => setSuccessNotice(null)}
-            className="text-xs font-bold text-emerald-700 hover:underline"
+            className="text-xs font-bold text-success hover:underline"
           >
             ปิด
           </button>
@@ -412,15 +412,15 @@ export default function AdminKnowledgePage() {
       )}
 
       {errorMessage && (
-        <div className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
+        <div className="flex items-center justify-between rounded-xl border border-danger/25 bg-danger/5 px-4 py-3 text-sm text-danger">
           <div className="flex items-center gap-2">
-            <AlertCircle className="size-5 text-rose-600 shrink-0" />
+            <AlertCircle className="size-5 text-danger shrink-0" />
             <span>{errorMessage}</span>
           </div>
           <button
             type="button"
             onClick={() => setErrorMessage(null)}
-            className="text-xs font-bold text-rose-700 hover:underline"
+            className="text-xs font-bold text-danger hover:underline"
           >
             ปิด
           </button>
@@ -437,13 +437,13 @@ export default function AdminKnowledgePage() {
 
         <div className="rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)]">
           <span className="text-xs font-bold uppercase text-muted">เผยแพร่อยู่</span>
-          <div className="mt-2 text-2xl font-black text-emerald-600">{stats.published}</div>
+          <div className="mt-2 text-2xl font-black text-success">{stats.published}</div>
           <span className="text-xs text-muted">AI ใช้ตอบคำถามได้ทันที</span>
         </div>
 
         <div className="rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)]">
           <span className="text-xs font-bold uppercase text-muted">แบบร่าง (Draft)</span>
-          <div className="mt-2 text-2xl font-black text-amber-600">{stats.drafts}</div>
+          <div className="mt-2 text-2xl font-black text-warning">{stats.drafts}</div>
           <span className="text-xs text-muted">ซ่อนจากหน้าร้านและ AI</span>
         </div>
 
@@ -465,7 +465,7 @@ export default function AdminKnowledgePage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="ค้นหาชื่อบทความ, Slug, แท็ก..."
-              className="w-full rounded-full border border-line bg-gray-50 py-2 pl-10 pr-4 text-sm text-ink placeholder:text-muted focus:border-brand focus:bg-white focus:outline-none"
+              className="w-full rounded-full border border-line bg-lilac-50 py-2 pl-10 pr-4 text-sm text-ink placeholder:text-muted focus:border-brand focus:bg-white focus:outline-none"
             />
           </div>
 
@@ -473,7 +473,7 @@ export default function AdminKnowledgePage() {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value as KnowledgeCategory | "ALL")}
-            className="rounded-full border border-line bg-gray-50 px-4 py-2 text-sm font-semibold text-ink focus:border-brand focus:bg-white focus:outline-none"
+            className="rounded-full border border-line bg-lilac-50 px-4 py-2 text-sm font-semibold text-ink focus:border-brand focus:bg-white focus:outline-none"
           >
             <option value="ALL">ทุกหมวดหมู่ ({articles.length})</option>
             {CATEGORIES.map((cat) => (
@@ -484,7 +484,7 @@ export default function AdminKnowledgePage() {
           </select>
 
           {/* Status Filter */}
-          <div className="flex rounded-full border border-line bg-gray-50 p-1 text-xs font-bold">
+          <div className="flex rounded-full border border-line bg-lilac-50 p-1 text-xs font-bold">
             <button
               type="button"
               onClick={() => setStatusFilter("ALL")}
@@ -499,7 +499,7 @@ export default function AdminKnowledgePage() {
               onClick={() => setStatusFilter("PUBLISHED")}
               className={`rounded-full px-3 py-1 transition ${
                 statusFilter === "PUBLISHED"
-                  ? "bg-white shadow-xs text-emerald-700"
+                  ? "bg-white shadow-xs text-success"
                   : "text-muted hover:text-ink"
               }`}
             >
@@ -510,7 +510,7 @@ export default function AdminKnowledgePage() {
               onClick={() => setStatusFilter("DRAFT")}
               className={`rounded-full px-3 py-1 transition ${
                 statusFilter === "DRAFT"
-                  ? "bg-white shadow-xs text-amber-700"
+                  ? "bg-white shadow-xs text-warning"
                   : "text-muted hover:text-ink"
               }`}
             >
@@ -522,7 +522,7 @@ export default function AdminKnowledgePage() {
         <button
           type="button"
           onClick={() => void loadArticles()}
-          className="p-2 rounded-full border border-line hover:bg-gray-100 transition text-muted"
+          className="p-2 rounded-full border border-line hover:bg-lilac-50 transition text-muted"
           title="รีเฟรชข้อมูล"
         >
           <RefreshCw className={`size-4 ${loading ? "animate-spin" : ""}`} />
@@ -553,7 +553,7 @@ export default function AdminKnowledgePage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-line bg-gray-50/70 text-[11px] font-bold uppercase tracking-wider text-muted">
+                <tr className="border-b border-line bg-lilac-50/70 text-[11px] font-bold uppercase tracking-wider text-muted">
                   <th className="py-3.5 px-4">ชื่อบทความ / Slug</th>
                   <th className="py-3.5 px-4">หมวดหมู่</th>
                   <th className="py-3.5 px-4">FAQ</th>
@@ -575,7 +575,7 @@ export default function AdminKnowledgePage() {
                         {article.tags.slice(0, 3).map((tag) => (
                           <span
                             key={tag}
-                            className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-muted"
+                            className="rounded bg-lilac-50 px-1.5 py-0.5 text-[10px] text-muted"
                           >
                             #{tag}
                           </span>
@@ -601,7 +601,7 @@ export default function AdminKnowledgePage() {
                     {/* Stats */}
                     <td className="py-4 px-4 whitespace-nowrap text-xs text-muted">
                       <div>👁 {article.viewCount} เข้าชม</div>
-                      <div className="mt-0.5 text-emerald-600 font-medium">
+                      <div className="mt-0.5 text-success font-medium">
                         👍 {article.helpfulCount} / 👎 {article.notHelpfulCount}
                       </div>
                     </td>
@@ -613,14 +613,14 @@ export default function AdminKnowledgePage() {
                         onClick={() => void handleTogglePublish(article)}
                         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition ${
                           article.isPublished
-                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
-                            : "bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100"
+                            ? "bg-success/5 text-success border border-success/30 hover:bg-success/10"
+                            : "bg-warning/5 text-warning border border-warning/30 hover:bg-warning/10"
                         }`}
                         title="คลิกเพื่อสลับสถานะ"
                       >
                         <span
                           className={`size-2 rounded-full ${
-                            article.isPublished ? "bg-emerald-500" : "bg-amber-500"
+                            article.isPublished ? "bg-success" : "bg-warning"
                           }`}
                         />
                         {article.isPublished ? "เผยแพร่แล้ว" : "แบบร่าง"}
@@ -641,7 +641,7 @@ export default function AdminKnowledgePage() {
                         <button
                           type="button"
                           onClick={() => setDeletingArticle(article)}
-                          className="p-2 rounded-full hover:bg-rose-50 hover:text-rose-600 transition text-muted"
+                          className="p-2 rounded-full hover:bg-danger/5 hover:text-danger transition text-muted"
                           title="ลบบทความ"
                         >
                           <Trash2 className="size-4" />
@@ -668,15 +668,15 @@ export default function AdminKnowledgePage() {
               <button
                 type="button"
                 onClick={() => setIsFormModalOpen(false)}
-                className="p-1.5 rounded-full hover:bg-gray-100 text-muted"
+                className="p-1.5 rounded-full hover:bg-lilac-50 text-muted"
               >
                 <X className="size-5" />
               </button>
             </div>
 
             {formError && (
-              <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 flex items-center gap-2">
-                <AlertCircle className="size-4 shrink-0 text-rose-600" />
+              <div className="rounded-xl border border-danger/25 bg-danger/5 p-3 text-xs text-danger flex items-center gap-2">
+                <AlertCircle className="size-4 shrink-0 text-danger" />
                 <span>{formError}</span>
               </div>
             )}
@@ -803,7 +803,7 @@ export default function AdminKnowledgePage() {
                   {formData.faqPairs.map((faq, idx) => (
                     <div
                       key={idx}
-                      className="rounded-xl border border-line p-3 bg-gray-50/70 space-y-2 relative"
+                      className="rounded-xl border border-line p-3 bg-lilac-50/70 space-y-2 relative"
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold text-muted">ข้อที่ {idx + 1}</span>
@@ -811,7 +811,7 @@ export default function AdminKnowledgePage() {
                           <button
                             type="button"
                             onClick={() => handleRemoveFaqPair(idx)}
-                            className="text-xs text-rose-600 hover:underline font-bold"
+                            className="text-xs text-danger hover:underline font-bold"
                           >
                             ลบข้อนี้
                           </button>
@@ -855,7 +855,7 @@ export default function AdminKnowledgePage() {
                 <button
                   type="button"
                   onClick={() => setIsFormModalOpen(false)}
-                  className="rounded-full border border-line px-5 py-2 text-xs font-bold text-ink hover:bg-gray-100 transition"
+                  className="rounded-full border border-line px-5 py-2 text-xs font-bold text-ink hover:bg-lilac-50 transition"
                 >
                   ยกเลิก
                 </button>
@@ -877,8 +877,8 @@ export default function AdminKnowledgePage() {
       {deletingArticle && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
           <div className="relative w-full max-w-md rounded-[var(--radius-card)] bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3 text-rose-600">
-              <div className="flex size-10 items-center justify-center rounded-full bg-rose-100">
+            <div className="flex items-center gap-3 text-danger">
+              <div className="flex size-10 items-center justify-center rounded-full bg-danger/10">
                 <Trash2 className="size-5" />
               </div>
               <h3 className="text-lg font-bold text-ink">ยืนยันการลบบทความ?</h3>
@@ -894,7 +894,7 @@ export default function AdminKnowledgePage() {
               <button
                 type="button"
                 onClick={() => setDeletingArticle(null)}
-                className="rounded-full border border-line px-4 py-2 text-xs font-bold text-ink hover:bg-gray-100 transition"
+                className="rounded-full border border-line px-4 py-2 text-xs font-bold text-ink hover:bg-lilac-50 transition"
               >
                 ยกเลิก
               </button>
@@ -902,7 +902,7 @@ export default function AdminKnowledgePage() {
                 type="button"
                 disabled={isDeleting}
                 onClick={() => void handleDeleteArticle()}
-                className="rounded-full bg-rose-600 px-5 py-2 text-xs font-bold text-white hover:bg-rose-700 transition disabled:opacity-50 flex items-center gap-1.5"
+                className="rounded-full bg-danger px-5 py-2 text-xs font-bold text-white hover:bg-danger transition disabled:opacity-50 flex items-center gap-1.5"
               >
                 {isDeleting && <Loader2 className="size-3.5 animate-spin" />}
                 ยืนยันลบ
@@ -916,8 +916,8 @@ export default function AdminKnowledgePage() {
       {isResetModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
           <div className="relative w-full max-w-md rounded-[var(--radius-card)] bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3 text-amber-600">
-              <div className="flex size-10 items-center justify-center rounded-full bg-amber-100">
+            <div className="flex items-center gap-3 text-warning">
+              <div className="flex size-10 items-center justify-center rounded-full bg-warning/10">
                 <AlertTriangle className="size-5" />
               </div>
               <h3 className="text-lg font-bold text-ink">คืนค่าเริ่มต้นคลังความรู้?</h3>
@@ -932,7 +932,7 @@ export default function AdminKnowledgePage() {
               <button
                 type="button"
                 onClick={() => setIsResetModalOpen(false)}
-                className="rounded-full border border-line px-4 py-2 text-xs font-bold text-ink hover:bg-gray-100 transition"
+                className="rounded-full border border-line px-4 py-2 text-xs font-bold text-ink hover:bg-lilac-50 transition"
               >
                 ยกเลิก
               </button>

@@ -35,11 +35,11 @@ export default function FaqPage() {
             ถาม AI สังเคราะห์คำตอบตรงจุด
           </span>
           <span className="flex items-center gap-1">
-            <ShieldCheck className="size-4 text-emerald-600" aria-hidden />
+            <ShieldCheck className="size-4 text-success" aria-hidden />
             ข้อมูลอ้างอิงนโยบายร้านจริง 100%
           </span>
           <span className="flex items-center gap-1">
-            <HelpCircle className="size-4 text-purple-600" aria-hidden />
+            <HelpCircle className="size-4 text-brand" aria-hidden />
             อัปเดตบทความและคู่มือสม่ำเสมอ
           </span>
         </div>

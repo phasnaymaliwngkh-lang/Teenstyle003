@@ -26,7 +26,7 @@ export function SupportFloatingButton() {
     >
       <div className="relative">
         <Headphones className="h-5 w-5" />
-        <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-emerald-400 border border-brand" />
+        <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-success border border-brand" />
       </div>
       <span className="hidden sm:inline text-xs font-bold tracking-wide">
         ช่วยเหลือ / ติดต่อเรา

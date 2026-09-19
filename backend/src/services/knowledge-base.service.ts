@@ -1,7 +1,3 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { randomUUID } from 'node:crypto';
 import { getPrisma, type Prisma } from '@teenstyle/database';
 import OpenAI from 'openai';
 
@@ -22,72 +18,98 @@ import type {
 } from '../validators/knowledge-base.validator.ts';
 
 /**
- * ที่เก็บคลังความรู้ (ไฟล์ JSON)
+ * คลังความรู้ที่ AI ใช้ตอบลูกค้า (STEP 21) — เก็บใน PostgreSQL
  *
- * ⚠️ ไฟล์นี้เป็น **runtime artifact ไม่ใช่ source** — จึงอยู่ที่ `backend/data/` (นอก `src/`)
- *    และถูก gitignore ไว้ ส่วน "ข้อมูลตั้งต้น" อยู่ที่ `INITIAL_KNOWLEDGE_ARTICLES` ที่เดียว
+ * ⚠️ เดิมเก็บเป็นไฟล์ JSON ใน `backend/src/data/` ซึ่งพังหลายทาง:
+ *    แค่เปิดอ่านบทความ (`viewCount + 1`) ก็ทำให้ working tree สกปรก · `npm test` เขียนทับไฟล์จริง ·
+ *    ไฟล์ที่ commit ไว้ค้างค่าเก่าแล้วบังหน้าข้อมูลตั้งต้นที่แก้ใหม่ ·
+ *    และบน container ที่ filesystem หายตอน redeploy บทความที่แอดมินแก้จะหายทั้งหมด
+ *    ตอนนี้ย้ายมาอยู่ในฐานข้อมูลจริงตามกฎกลางข้อ 1 แล้ว
  *
- *    เดิมเก็บไว้ที่ `backend/src/data/knowledge-base.json` แล้ว commit ลง git ซึ่งพังหลายทาง:
- *      1. แค่**เปิดอ่านบทความ** (`viewCount + 1`) ก็ทำให้ working tree สกปรก
- *      2. `npm test` เขียนทับไฟล์จริง (create / delete / reset-defaults ในเทสต์)
- *      3. ไฟล์ที่ commit ไว้ค้างค่าเก่า แล้ว **บังหน้า** `INITIAL_KNOWLEDGE_ARTICLES` ที่แก้ใหม่
- *         → แก้นโยบายในโค้ดแล้วเว็บยังตอบค่าเดิม
- *      4. `tsc` ไม่ copy `.json` ไป `dist/` — path ใน production จึงชี้ไปที่ที่ไม่มีไฟล์
- *    path ปัจจุบันชี้ไป `backend/data/` เหมือนกันทั้ง dev (`src/services/../..`)
- *    และ production (`dist/services/../..`) จึงไม่ต้องมีขั้นตอน copy
- *
- * ⚠️ บน container ที่ filesystem หายตอน redeploy (เช่น Railway) บทความที่แอดมินแก้จะกลับเป็นค่าตั้งต้น
- *    ถ้าต้องให้คงอยู่จริงต้องย้ายไปเก็บในฐานข้อมูล — ดูหมายเหตุใน CLAUDE.md
- *
- * `KNOWLEDGE_BASE_FILE` เปลี่ยน path ได้ (เทสต์ใช้ไฟล์ชั่วคราวใน temp dir)
+ *    ผลพลอยได้: ตัวนับ view/vote เพิ่มแบบ atomic (`increment`) จึงไม่ตกหล่นเมื่อมีคนใช้พร้อมกัน
+ *    และ `AdminLog` เขียนในทรานแซกชันเดียวกับการแก้ข้อมูลได้จริง
  */
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const DATA_FILE = process.env['KNOWLEDGE_BASE_FILE']?.trim()
-  ? process.env['KNOWLEDGE_BASE_FILE'].trim()
-  : join(__dirname, '..', '..', 'data', 'knowledge-base.json');
-const DATA_DIR = dirname(DATA_FILE);
 
-// In-memory cache synced with persistent file
-let articlesCache: KnowledgeArticle[] | null = null;
+/** ข้อมูลตั้งต้นถูกใส่ลงฐานข้อมูลครั้งเดียวต่อ process — กัน COUNT ซ้ำทุกคำขอ */
+let seedChecked = false;
 
-function ensureDataFile(): KnowledgeArticle[] {
-  if (articlesCache) return articlesCache;
+const articleInclude = {
+  faqPairs: { orderBy: { sortOrder: 'asc' } },
+} satisfies Prisma.KnowledgeArticleInclude;
 
-  try {
-    if (!existsSync(DATA_DIR)) {
-      mkdirSync(DATA_DIR, { recursive: true });
-    }
+type ArticleRow = Prisma.KnowledgeArticleGetPayload<{ include: typeof articleInclude }>;
 
-    if (existsSync(DATA_FILE)) {
-      const content = readFileSync(DATA_FILE, 'utf-8');
-      const parsed = JSON.parse(content) as KnowledgeArticle[];
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        articlesCache = parsed;
-        return articlesCache;
-      }
-    }
-
-    // Initialize with initial verified articles
-    articlesCache = [...INITIAL_KNOWLEDGE_ARTICLES];
-    writeFileSync(DATA_FILE, JSON.stringify(articlesCache, null, 2), 'utf-8');
-    return articlesCache;
-  } catch (err) {
-    logger.error({ err }, 'Failed to read knowledge base data file; using in-memory defaults');
-    articlesCache = [...INITIAL_KNOWLEDGE_ARTICLES];
-    return articlesCache;
-  }
+function toArticleDto(row: ArticleRow): KnowledgeArticle {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    category: row.category,
+    summary: row.summary,
+    content: row.content,
+    tags: row.tags,
+    faqPairs: row.faqPairs.map((faq) => ({
+      id: faq.id,
+      question: faq.question,
+      answer: faq.answer,
+    })),
+    isPublished: row.isPublished,
+    viewCount: row.viewCount,
+    helpfulCount: row.helpfulCount,
+    notHelpfulCount: row.notHelpfulCount,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
 }
 
-function persistArticles(articles: KnowledgeArticle[]): void {
-  articlesCache = articles;
+/**
+ * ใส่บทความตั้งต้นลงฐานข้อมูลถ้ายังไม่มีเลย
+ *
+ * ใช้ `id` คงที่จาก `INITIAL_KNOWLEDGE_ARTICLES` + `skipDuplicates` จึงปลอดภัย
+ * แม้หลายคำขอเข้ามาพร้อมกันตอน boot ครั้งแรก
+ */
+async function ensureSeeded(): Promise<void> {
+  if (seedChecked) return;
+
+  const prisma = getPrisma();
+
   try {
-    if (!existsSync(DATA_DIR)) {
-      mkdirSync(DATA_DIR, { recursive: true });
+    const existing = await prisma.knowledgeArticle.count();
+    if (existing === 0) {
+      await prisma.$transaction(
+        INITIAL_KNOWLEDGE_ARTICLES.map((article) =>
+          prisma.knowledgeArticle.create({
+            data: {
+              id: article.id,
+              slug: article.slug,
+              title: article.title,
+              category: article.category,
+              summary: article.summary,
+              content: article.content,
+              tags: article.tags,
+              isPublished: article.isPublished,
+              faqPairs: {
+                create: article.faqPairs.map((faq, index) => ({
+                  question: faq.question,
+                  answer: faq.answer,
+                  sortOrder: index,
+                })),
+              },
+            },
+          }),
+        ),
+      );
+      logger.info(
+        { count: INITIAL_KNOWLEDGE_ARTICLES.length },
+        'ใส่บทความตั้งต้นของคลังความรู้ลงฐานข้อมูลแล้ว',
+      );
     }
-    writeFileSync(DATA_FILE, JSON.stringify(articles, null, 2), 'utf-8');
+
+    seedChecked = true;
   } catch (err) {
-    logger.error({ err }, 'Failed to persist knowledge base data file');
+    // ชนกันตอน seed พร้อมกันหลาย process → อีกฝั่งใส่ไปแล้ว ถือว่าเรียบร้อย
+    logger.warn({ err }, 'seed คลังความรู้ไม่สำเร็จ (อาจมี process อื่นใส่ไปแล้ว)');
+    seedChecked = true;
   }
 }
 
@@ -101,24 +123,42 @@ export interface SearchArticlesResult {
 
 /**
  * ค้นหาและกรองบทความความรู้
+ *
+ * การให้คะแนนความเกี่ยวข้องทำใน TypeScript เพราะต้องรองรับทั้งไทยและอังกฤษ
+ * และคลังความรู้มีขนาดหลักสิบบทความ — ถ้าโตถึงหลักพันค่อยย้ายไปใช้ full-text search ของ Postgres
+ * (`to_tsvector` + ดัชนี GIN) การกรองหมวด/แท็ก/สถานะเผยแพร่ทำที่ฐานข้อมูลแล้ว
  */
-export function searchArticles(
+export async function searchArticles(
   params: Partial<KnowledgeSearchQuery> & { publishedOnly?: boolean },
-): SearchArticlesResult {
-  const all = ensureDataFile();
+): Promise<SearchArticlesResult> {
+  await ensureSeeded();
+
+  const prisma = getPrisma();
   const publishedOnly = params.publishedOnly ?? true;
 
-  let filtered = all.filter((a) => (publishedOnly ? a.isPublished : true));
+  const where: Prisma.KnowledgeArticleWhereInput = {
+    ...(publishedOnly ? { isPublished: true } : {}),
+    ...(params.category ? { category: params.category } : {}),
+    ...(params.tag ? { tags: { hasSome: [params.tag] } } : {}),
+  };
 
-  if (params.category) {
-    filtered = filtered.filter((a) => a.category === params.category);
-  }
+  const rows = await prisma.knowledgeArticle.findMany({
+    where,
+    include: articleInclude,
+    orderBy: { updatedAt: 'desc' },
+  });
 
+  let filtered = rows.map(toArticleDto);
+
+  // แท็กเทียบแบบไม่สนตัวพิมพ์และยอมให้ตรงบางส่วน (Prisma `hasSome` เทียบตรงตัวเท่านั้น)
   if (params.tag) {
     const targetTag = params.tag.toLowerCase();
-    filtered = filtered.filter((a) =>
-      a.tags.some((t) => t.toLowerCase() === targetTag || t.toLowerCase().includes(targetTag)),
-    );
+    const loose = rows
+      .map(toArticleDto)
+      .filter((a) =>
+        a.tags.some((t) => t.toLowerCase() === targetTag || t.toLowerCase().includes(targetTag)),
+      );
+    filtered = loose.length > 0 ? loose : filtered;
   }
 
   if (params.q) {
@@ -181,8 +221,6 @@ export function searchArticles(
       .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score)
       .map((item) => item.article);
-  } else {
-    filtered.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }
 
   const page = Math.max(1, params.page || 1);
@@ -197,58 +235,80 @@ export function searchArticles(
 
 /**
  * ดึงบทความตาม Slug พร้อมนับ View count
+ *
+ * นับด้วย `increment` ที่ฐานข้อมูล จึงไม่ตกหล่นเมื่อมีคนเปิดอ่านพร้อมกัน
  */
-export function getArticleBySlug(slug: string): KnowledgeArticle {
-  const articles = ensureDataFile();
-  const index = articles.findIndex((a) => a.slug === slug && a.isPublished);
-  if (index === -1) {
+export async function getArticleBySlug(slug: string): Promise<KnowledgeArticle> {
+  await ensureSeeded();
+
+  const prisma = getPrisma();
+  const existing = await prisma.knowledgeArticle.findFirst({
+    where: { slug, isPublished: true },
+    select: { id: true },
+  });
+
+  if (!existing) {
     throw ApiError.notFound(`ไม่พบบทความความรู้สำหรับ "${slug}"`);
   }
 
-  const article = { ...articles[index]!, viewCount: (articles[index]!.viewCount || 0) + 1 };
-  articles[index] = article;
-  persistArticles(articles);
+  const updated = await prisma.knowledgeArticle.update({
+    where: { id: existing.id },
+    data: { viewCount: { increment: 1 } },
+    include: articleInclude,
+  });
 
-  return article;
+  return toArticleDto(updated);
 }
 
 /**
  * สรุปหมวดหมู่บทความความรู้พร้อมจำนวนบทความในแต่ละหมวด
  */
-export function getCategoriesSummary(): Array<KnowledgeCategoryMeta & { articleCount: number }> {
-  const articles = ensureDataFile().filter((a) => a.isPublished);
-  return KNOWLEDGE_CATEGORIES.map((cat) => {
-    const count = articles.filter((a) => a.category === cat.key).length;
-    return { ...cat, articleCount: count };
+export async function getCategoriesSummary(): Promise<
+  Array<KnowledgeCategoryMeta & { articleCount: number }>
+> {
+  await ensureSeeded();
+
+  const prisma = getPrisma();
+  const grouped = await prisma.knowledgeArticle.groupBy({
+    by: ['category'],
+    where: { isPublished: true },
+    _count: { _all: true },
   });
+
+  const counts = new Map(grouped.map((row) => [row.category, row._count._all]));
+
+  return KNOWLEDGE_CATEGORIES.map((cat) => ({
+    ...cat,
+    articleCount: counts.get(cat.key) ?? 0,
+  }));
 }
 
 /**
  * โหวตว่าบทความมีประโยชน์หรือไม่
  */
-export function voteArticleHelpful(
+export async function voteArticleHelpful(
   articleId: string,
   helpful: boolean,
-): { helpfulCount: number; notHelpfulCount: number } {
-  const articles = ensureDataFile();
-  const index = articles.findIndex((a) => a.id === articleId);
-  if (index === -1) {
+): Promise<{ helpfulCount: number; notHelpfulCount: number }> {
+  await ensureSeeded();
+
+  const prisma = getPrisma();
+  const existing = await prisma.knowledgeArticle.findUnique({
+    where: { id: articleId },
+    select: { id: true },
+  });
+
+  if (!existing) {
     throw ApiError.notFound('ไม่พบบทความที่ต้องการโหวต');
   }
 
-  const article = { ...articles[index]! };
-  if (helpful) {
-    article.helpfulCount = (article.helpfulCount || 0) + 1;
-  } else {
-    article.notHelpfulCount = (article.notHelpfulCount || 0) + 1;
-  }
-  articles[index] = article;
-  persistArticles(articles);
+  const updated = await prisma.knowledgeArticle.update({
+    where: { id: articleId },
+    data: helpful ? { helpfulCount: { increment: 1 } } : { notHelpfulCount: { increment: 1 } },
+    select: { helpfulCount: true, notHelpfulCount: true },
+  });
 
-  return {
-    helpfulCount: article.helpfulCount,
-    notHelpfulCount: article.notHelpfulCount,
-  };
+  return updated;
 }
 
 export interface KnowledgeAskResponse {
@@ -271,7 +331,7 @@ export async function askKnowledgeBase(
   query: string,
   category?: KnowledgeCategory,
 ): Promise<KnowledgeAskResponse> {
-  const searchRes = searchArticles({ q: query, category, limit: 3, publishedOnly: true });
+  const searchRes = await searchArticles({ q: query, category, limit: 3, publishedOnly: true });
   const relevantArticles = searchRes.items;
 
   // ดึงคำถาม FAQ ที่ตรงกับเนื้อหา
@@ -389,11 +449,31 @@ export async function askKnowledgeBase(
 // Admin Operations
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** ข้อมูลผู้ทำรายการสำหรับ AdminLog */
+export interface KnowledgeActor {
+  id?: string;
+  ip?: string;
+  userAgent?: string;
+}
+
 /**
  * ดึงรายการบทความสำหรับแอดมิน (รวมฉบับร่าง)
  */
-export function adminListArticles(params: Partial<KnowledgeSearchQuery>): SearchArticlesResult {
+export async function adminListArticles(
+  params: Partial<KnowledgeSearchQuery>,
+): Promise<SearchArticlesResult> {
   return searchArticles({ ...params, publishedOnly: false });
+}
+
+/**
+ * Prisma โยน P2002 เมื่อ slug ซ้ำ — แปลงเป็น 409 ให้ผู้ใช้เข้าใจ
+ * (unique index ของฐานข้อมูลคือด่านจริง ไม่ใช่การเช็คด้วย findFirst ก่อนเขียน ซึ่งมี race condition)
+ */
+function rethrowDuplicateSlug(err: unknown, slug: string): never {
+  if (typeof err === 'object' && err !== null && 'code' in err && err.code === 'P2002') {
+    throw ApiError.conflict(`Slug "${slug}" มีอยู่ในระบบแล้ว กรุณาใช้ slug อื่น`);
+  }
+  throw err;
 }
 
 /**
@@ -401,167 +481,224 @@ export function adminListArticles(params: Partial<KnowledgeSearchQuery>): Search
  */
 export async function adminCreateArticle(
   input: CreateKnowledgeArticleInput,
-  adminUserId?: string,
+  actor: KnowledgeActor = {},
 ): Promise<KnowledgeArticle> {
-  const articles = ensureDataFile();
-  if (articles.some((a) => a.slug === input.slug)) {
-    throw ApiError.conflict(`Slug "${input.slug}" มีอยู่ในระบบแล้ว กรุณาใช้ slug อื่น`);
-  }
+  await ensureSeeded();
 
-  const now = new Date().toISOString();
-  const newArticle: KnowledgeArticle = {
-    id: randomUUID(),
-    slug: input.slug,
-    title: input.title,
-    category: input.category,
-    summary: input.summary,
-    content: input.content,
-    tags: input.tags ?? [],
-    faqPairs: (input.faqPairs ?? []).map((faq) => ({
-      id: faq.id || `faq-${randomUUID().slice(0, 8)}`,
-      question: faq.question,
-      answer: faq.answer,
-    })),
-    isPublished: input.isPublished ?? true,
-    viewCount: 0,
-    helpfulCount: 0,
-    notHelpfulCount: 0,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const prisma = getPrisma();
 
-  articles.unshift(newArticle);
-  persistArticles(articles);
-
-  // Write AdminLog audit trail (safely ignore if db unavailable)
   try {
-    const prisma = getPrisma();
-    await prisma.adminLog
-      .create({
+    return await prisma.$transaction(async (tx) => {
+      const created = await tx.knowledgeArticle.create({
         data: {
-          userId: adminUserId ?? null,
-          action: 'knowledge.create',
-          targetType: 'KNOWLEDGE_ARTICLE',
-          targetId: newArticle.id,
-          after: newArticle as unknown as Prisma.InputJsonValue,
+          slug: input.slug,
+          title: input.title,
+          category: input.category,
+          summary: input.summary,
+          content: input.content,
+          tags: input.tags ?? [],
+          isPublished: input.isPublished ?? true,
+          faqPairs: {
+            create: (input.faqPairs ?? []).map((faq, index) => ({
+              question: faq.question,
+              answer: faq.answer,
+              sortOrder: index,
+            })),
+          },
         },
-      })
-      .catch(() => {});
-  } catch {
-    // Ignore logging error when db offline
-  }
+        include: articleInclude,
+      });
 
-  return newArticle;
+      const dto = toArticleDto(created);
+
+      await tx.adminLog.create({
+        data: {
+          userId: actor.id ?? null,
+          action: 'knowledge.create',
+          targetType: 'KnowledgeArticle',
+          targetId: dto.id,
+          after: dto as unknown as Prisma.InputJsonValue,
+          ipAddress: actor.ip,
+          userAgent: actor.userAgent,
+        },
+      });
+
+      return dto;
+    });
+  } catch (err) {
+    rethrowDuplicateSlug(err, input.slug);
+  }
 }
 
 /**
  * อัปเดตบทความ
+ *
+ * ส่งเฉพาะฟิลด์ที่เปลี่ยน — ฟิลด์ที่ไม่ส่งมาจะไม่ถูกแตะ
+ * `faqPairs` เป็นข้อยกเว้น: ส่งมาเมื่อไรคือแทนที่ทั้งชุด (ฟอร์มหลังบ้านส่งมาทั้งก้อนอยู่แล้ว)
  */
 export async function adminUpdateArticle(
   id: string,
   input: UpdateKnowledgeArticleInput,
-  adminUserId?: string,
+  actor: KnowledgeActor = {},
 ): Promise<KnowledgeArticle> {
-  const articles = ensureDataFile();
-  const index = articles.findIndex((a) => a.id === id);
-  if (index === -1) {
+  await ensureSeeded();
+
+  const prisma = getPrisma();
+
+  const current = await prisma.knowledgeArticle.findUnique({
+    where: { id },
+    include: articleInclude,
+  });
+
+  if (!current) {
     throw ApiError.notFound('ไม่พบบทความที่ต้องการแก้ไข');
   }
 
-  const current = articles[index]!;
+  const before = toArticleDto(current);
 
-  if (input.slug && input.slug !== current.slug) {
-    if (articles.some((a) => a.slug === input.slug && a.id !== id)) {
-      throw ApiError.conflict(`Slug "${input.slug}" มีอยู่ในระบบแล้ว กรุณาใช้ slug อื่น`);
-    }
-  }
-
-  const updated: KnowledgeArticle = {
-    ...current,
-    title: input.title ?? current.title,
-    slug: input.slug ?? current.slug,
-    category: input.category ?? current.category,
-    summary: input.summary ?? current.summary,
-    content: input.content ?? current.content,
-    tags: input.tags ?? current.tags,
-    faqPairs: input.faqPairs
-      ? input.faqPairs.map((f) => ({
-          id: f.id || `faq-${randomUUID().slice(0, 8)}`,
-          question: f.question,
-          answer: f.answer,
-        }))
-      : current.faqPairs,
-    isPublished: input.isPublished !== undefined ? input.isPublished : current.isPublished,
-    updatedAt: new Date().toISOString(),
-  };
-
-  articles[index] = updated;
-  persistArticles(articles);
-
-  // Write AdminLog audit trail (safely ignore if db unavailable)
   try {
-    const prisma = getPrisma();
-    await prisma.adminLog
-      .create({
-        data: {
-          userId: adminUserId ?? null,
-          action: 'knowledge.update',
-          targetType: 'KNOWLEDGE_ARTICLE',
-          targetId: updated.id,
-          before: current as unknown as Prisma.InputJsonValue,
-          after: updated as unknown as Prisma.InputJsonValue,
-        },
-      })
-      .catch(() => {});
-  } catch {
-    // Ignore logging error when db offline
-  }
+    return await prisma.$transaction(async (tx) => {
+      if (input.faqPairs) {
+        await tx.knowledgeFaq.deleteMany({ where: { articleId: id } });
+      }
 
-  return updated;
+      const updated = await tx.knowledgeArticle.update({
+        where: { id },
+        data: {
+          ...(input.title !== undefined ? { title: input.title } : {}),
+          ...(input.slug !== undefined ? { slug: input.slug } : {}),
+          ...(input.category !== undefined ? { category: input.category } : {}),
+          ...(input.summary !== undefined ? { summary: input.summary } : {}),
+          ...(input.content !== undefined ? { content: input.content } : {}),
+          ...(input.tags !== undefined ? { tags: input.tags } : {}),
+          ...(input.isPublished !== undefined ? { isPublished: input.isPublished } : {}),
+          ...(input.faqPairs
+            ? {
+                faqPairs: {
+                  create: input.faqPairs.map((faq, index) => ({
+                    question: faq.question,
+                    answer: faq.answer,
+                    sortOrder: index,
+                  })),
+                },
+              }
+            : {}),
+        },
+        include: articleInclude,
+      });
+
+      const after = toArticleDto(updated);
+
+      await tx.adminLog.create({
+        data: {
+          userId: actor.id ?? null,
+          action: 'knowledge.update',
+          targetType: 'KnowledgeArticle',
+          targetId: id,
+          before: before as unknown as Prisma.InputJsonValue,
+          after: after as unknown as Prisma.InputJsonValue,
+          ipAddress: actor.ip,
+          userAgent: actor.userAgent,
+        },
+      });
+
+      return after;
+    });
+  } catch (err) {
+    rethrowDuplicateSlug(err, input.slug ?? before.slug);
+  }
 }
 
 /**
- * ลบบทความ
+ * ลบบทความ (ลบจริง — FAQ ที่ผูกอยู่หายตามด้วย onDelete: Cascade)
  */
 export async function adminDeleteArticle(
   id: string,
-  adminUserId?: string,
+  actor: KnowledgeActor = {},
 ): Promise<{ success: boolean }> {
-  const articles = ensureDataFile();
-  const index = articles.findIndex((a) => a.id === id);
-  if (index === -1) {
+  await ensureSeeded();
+
+  const prisma = getPrisma();
+
+  const current = await prisma.knowledgeArticle.findUnique({
+    where: { id },
+    include: articleInclude,
+  });
+
+  if (!current) {
     throw ApiError.notFound('ไม่พบบทความที่ต้องการลบ');
   }
 
-  const deleted = articles.splice(index, 1)[0];
-  persistArticles(articles);
+  const before = toArticleDto(current);
 
-  // Write AdminLog audit trail (safely ignore if db unavailable)
-  try {
-    const prisma = getPrisma();
-    await prisma.adminLog
-      .create({
-        data: {
-          userId: adminUserId ?? null,
-          action: 'knowledge.delete',
-          targetType: 'KNOWLEDGE_ARTICLE',
-          targetId: id,
-          before: deleted as unknown as Prisma.InputJsonValue,
-        },
-      })
-      .catch(() => {});
-  } catch {
-    // Ignore logging error when db offline
-  }
+  await prisma.$transaction(async (tx) => {
+    await tx.knowledgeArticle.delete({ where: { id } });
+
+    await tx.adminLog.create({
+      data: {
+        userId: actor.id ?? null,
+        action: 'knowledge.delete',
+        targetType: 'KnowledgeArticle',
+        targetId: id,
+        before: before as unknown as Prisma.InputJsonValue,
+        ipAddress: actor.ip,
+        userAgent: actor.userAgent,
+      },
+    });
+  });
 
   return { success: true };
 }
 
 /**
  * รีเซ็ตบทความกลับเป็นค่าเริ่มต้น
+ *
+ * ⚠️ ลบบทความทั้งหมดรวมถึงที่แอดมินเขียนเอง แล้วใส่ชุดตั้งต้นกลับเข้าไป
+ *    ทำในทรานแซกชันเดียว และเขียน AdminLog ไว้ว่าใครสั่ง
  */
-export function adminResetDefaults(): { count: number } {
-  articlesCache = [...INITIAL_KNOWLEDGE_ARTICLES];
-  persistArticles(articlesCache);
-  return { count: articlesCache.length };
+export async function adminResetDefaults(actor: KnowledgeActor = {}): Promise<{ count: number }> {
+  const prisma = getPrisma();
+
+  await prisma.$transaction(async (tx) => {
+    const removed = await tx.knowledgeArticle.count();
+    await tx.knowledgeArticle.deleteMany({});
+
+    for (const article of INITIAL_KNOWLEDGE_ARTICLES) {
+      await tx.knowledgeArticle.create({
+        data: {
+          id: article.id,
+          slug: article.slug,
+          title: article.title,
+          category: article.category,
+          summary: article.summary,
+          content: article.content,
+          tags: article.tags,
+          isPublished: article.isPublished,
+          faqPairs: {
+            create: article.faqPairs.map((faq, index) => ({
+              question: faq.question,
+              answer: faq.answer,
+              sortOrder: index,
+            })),
+          },
+        },
+      });
+    }
+
+    await tx.adminLog.create({
+      data: {
+        userId: actor.id ?? null,
+        action: 'knowledge.reset',
+        targetType: 'KnowledgeArticle',
+        before: { articleCount: removed } as Prisma.InputJsonValue,
+        after: { articleCount: INITIAL_KNOWLEDGE_ARTICLES.length } as Prisma.InputJsonValue,
+        ipAddress: actor.ip,
+        userAgent: actor.userAgent,
+      },
+    });
+  });
+
+  seedChecked = true;
+
+  return { count: INITIAL_KNOWLEDGE_ARTICLES.length };
 }

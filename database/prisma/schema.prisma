@@ -182,6 +182,18 @@ enum AIMessageRole {
   AGENT
 }
 
+/// หมวดหมู่บทความในคลังความรู้ที่ AI ใช้ตอบลูกค้า (STEP 21)
+enum KnowledgeCategory {
+  SHIPPING
+  RETURNS
+  PAYMENTS
+  SIZING
+  CARE
+  ORDERS
+  GENERAL
+  STYLING
+}
+
 // ============================================================================
 // AUTH / RBAC  (STEP 3)
 // ============================================================================
@@ -1031,6 +1043,56 @@ model AIChatMessage {
   createdAt DateTime @default(now())
 
   @@index([conversationId, createdAt])
+}
+
+// ============================================================================
+// AI KNOWLEDGE BASE  (STEP 21)
+// ============================================================================
+
+/// ⚠️ เนื้อหาของบทความเหล่านี้คือสิ่งที่ AI หยิบไปตอบลูกค้าในฐานะ "นโยบายของร้าน"
+///    ตัวเลขค่าจัดส่ง/ช่องทางชำระเงินในบทความตั้งต้นถูกประกอบจาก backend/src/config/*
+///    (ดูกฎใน CLAUDE.md หัวข้อ AI Knowledge Base) — ห้ามพิมพ์ตัวเลขนโยบายลงไปตรง ๆ
+model KnowledgeArticle {
+  id       String            @id @default(uuid(7)) @db.Uuid
+  slug     String            @unique
+  title    String
+  category KnowledgeCategory
+
+  summary String
+  content String
+
+  tags String[]
+
+  /// false = ฉบับร่าง เห็นได้เฉพาะหลังบ้าน
+  isPublished Boolean @default(true)
+
+  /// สถิติที่เกิดขึ้นจริงเท่านั้น — เริ่มที่ 0 เสมอ ห้าม seed ตัวเลขสมมติ
+  viewCount       Int @default(0)
+  helpfulCount    Int @default(0)
+  notHelpfulCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  faqPairs KnowledgeFaq[]
+
+  @@index([category])
+  @@index([isPublished])
+  @@index([updatedAt])
+}
+
+model KnowledgeFaq {
+  id        String           @id @default(uuid(7)) @db.Uuid
+  articleId String           @db.Uuid
+  article   KnowledgeArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  question String
+  answer   String
+
+  /// ลำดับที่แอดมินจัดไว้ — ต้องคงลำดับเดิมเวลาแสดงผล
+  sortOrder Int @default(0)
+
+  @@index([articleId, sortOrder])
 }
 
 // ============================================================================

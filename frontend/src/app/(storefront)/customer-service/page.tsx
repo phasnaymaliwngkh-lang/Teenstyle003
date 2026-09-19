@@ -35,11 +35,11 @@ export default function CustomerServicePage() {
             เช็คสถานะพัสดุจากระบบจริง
           </span>
           <span className="flex items-center gap-1">
-            <CheckCircle2 className="size-4 text-emerald-600" aria-hidden />
+            <CheckCircle2 className="size-4 text-success" aria-hidden />
             นโยบายเปลี่ยนคืนภายใน 7 วัน
           </span>
           <span className="flex items-center gap-1">
-            <UserCheck className="size-4 text-amber-600" aria-hidden />
+            <UserCheck className="size-4 text-warning" aria-hidden />
             ส่งต่อเจ้าหน้าที่คนจริงได้ทันที
           </span>
         </div>

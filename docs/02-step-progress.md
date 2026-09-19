@@ -11,8 +11,11 @@
 เข้าถึงบทสนทนาข้ามเจ้าของได้ · header `x-session-id` สวมตัวเป็น guest คนอื่นได้) ·
 แก้บทความคลังความรู้ที่ระบุค่าจัดส่ง/ช่องทางชำระเงินไม่ตรงกับระบบจริง โดยเปลี่ยนมาประกอบข้อความจาก
 `config/shipping.ts` · `config/payment.ts` · `config/store.ts` (ใหม่) พร้อม test กันการหลุดจากกัน ·
-ย้ายที่เก็บคลังความรู้ออกจาก `src/` (รันเทสต์แล้วไม่เขียนทับ source อีก) ·
-เพิ่มการดึงข้อความของเจ้าหน้าที่ฝั่งลูกค้า ไม่งั้นคำตอบของเจ้าหน้าที่ไม่ขึ้นบนจอลูกค้าเลย
+**ย้ายคลังความรู้จากไฟล์ JSON ไปเก็บใน PostgreSQL** (`KnowledgeArticle` + `KnowledgeFaq`,
+migration `20260919141807_add_knowledge_base`) — ตัวนับ view/vote เพิ่มแบบ atomic และ
+`AdminLog` เขียนในทรานแซกชันเดียวกับการแก้ข้อมูลได้จริง ·
+เพิ่มการดึงข้อความของเจ้าหน้าที่ฝั่งลูกค้า ไม่งั้นคำตอบของเจ้าหน้าที่ไม่ขึ้นบนจอลูกค้าเลย ·
+**แทนสีดิบของ Tailwind ด้วย design token ครบ 171 จุด** — ทั้ง frontend ไม่เหลือสีที่ hardcode แล้ว
 
 **STEP 20:** AI Customer Service (+ Human Handoff) (`/customer-service`, `/admin/support`)
 ระบบบริการลูกค้าอัจฉริยะแบบผสมผสาน (AI + เจ้าหน้าที่คนจริง) · **Universal Invariant: No Hallucination — ไม่กุข้อมูลออเดอร์ ข้อมูลจัดส่ง หรือนโยบายร้านขึ้นมาเองโดยเด็ดขาด** (อ่านสถานะคำสั่งซื้อ, ยอดชำระ, Tracking Number, ที่อยู่จัดส่ง และนโยบายร้าน 5 หมวดหลักจริงจากฐานข้อมูล PostgreSQL และ Policy Engine) · รองรับทั้ง OpenAI GPT-4o-mini พร้อม Function Calling (`lookup_order`, `get_store_policy`, `request_human_handoff`) และ Intelligent Fallback Engine ในตัวที่ทำงานได้ 100% ตลอดเวลาแม้ไม่มี OpenAI API Key หรือโหมดออฟไลน์ · **กลไก Human Handoff และ Escalation Protocol**: เมื่อตรวจพบคำร้องขอยกเลิก/คืนเงิน อารมณ์คับข้องใจ หรือคำขอติดต่อเจ้าหน้าที่ ระบบจะปรับสถานะบทสนทนาเป็น `ESCALATED` พร้อมบันทึก `escalatedAt` และส่งเข้า Admin Support Queue ทันที · **Admin Support Dashboard (`/admin/support`)**: เจ้าหน้าที่สามารถเลือกดูคิวตามแท็บ (รอรับเรื่อง, กำลังคุย, ปิดเคส), กดรับเรื่องผูก `assignedTo`, ดูข้อมูลลูกค้าและแชตไทม์ไลน์ (โหลดตอนเปิดเคส — ฝั่งเจ้าหน้าที่ยังไม่มีการดึงข้อความใหม่อัตโนมัติ), ส่งข้อความตอบกลับในฐานะ `role: AGENT` (พร้อม audit trail บันทึกลง `AdminLog`), และสลับปิด/เปิดเคสได้ทันที · **Storefront Customer Chat UI (`/customer-service` และ Floating Support Launcher)**: รองรับทั้งผู้ใช้ล็อกอินและ Guest, ป้ายเตือนสถานะเมื่อส่งต่อเจ้าหน้าที่, Quick Action Chips, และปุ่มเริ่มสนทนาใหม่ · test 329 เคส (เพิ่ม 13) ผ่านทั้งหมด
