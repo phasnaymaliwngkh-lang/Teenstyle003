@@ -50,6 +50,8 @@ export const FOOTER_SECTIONS: readonly {
     title: "บัญชีของฉัน",
     links: [
       { label: "บัญชีของฉัน", href: "/account" },
+      { label: "ข้อมูลส่วนตัว", href: "/account/profile" },
+      { label: "สมุดที่อยู่", href: "/account/addresses" },
       { label: "ตะกร้าสินค้า", href: "/cart" },
       { label: "Wishlist", href: "/wishlist" },
       { label: "ประวัติคำสั่งซื้อ", href: "/account/orders" },

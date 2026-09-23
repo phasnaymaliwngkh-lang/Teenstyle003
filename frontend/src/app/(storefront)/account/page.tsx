@@ -3,11 +3,13 @@ import {
   Bell,
   Heart,
   Mail,
+  MapPin,
   Package,
   ShieldCheck,
   ShoppingBag,
   Sparkles,
   Star,
+  UserPen,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -132,6 +134,36 @@ export default async function AccountPage() {
           </Link>
 
           <Link
+            href="/account/profile"
+            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)] transition hover:border-brand-soft hover:shadow-[var(--shadow-lift)]"
+          >
+            <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-lilac">
+              <UserPen className="size-6 text-brand" aria-hidden />
+            </span>
+            <span>
+              <span className="block font-extrabold">ข้อมูลส่วนตัว</span>
+              <span className="block text-sm text-muted">
+                แก้ชื่อ เบอร์โทร วันเกิด และการตั้งค่าความเป็นส่วนตัว
+              </span>
+            </span>
+          </Link>
+
+          <Link
+            href="/account/addresses"
+            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)] transition hover:border-brand-soft hover:shadow-[var(--shadow-lift)]"
+          >
+            <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-lilac">
+              <MapPin className="size-6 text-brand" aria-hidden />
+            </span>
+            <span>
+              <span className="block font-extrabold">สมุดที่อยู่</span>
+              <span className="block text-sm text-muted">
+                ที่อยู่จัดส่งที่บันทึกไว้ — เลือกได้ทันทีตอนชำระเงิน
+              </span>
+            </span>
+          </Link>
+
+          <Link
             href="/account/notifications"
             className="flex items-center gap-4 rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)] transition hover:border-brand-soft hover:shadow-[var(--shadow-lift)]"
           >
@@ -151,7 +183,6 @@ export default async function AccountPage() {
           <h2 className="text-lg font-extrabold">ยังไม่เปิดใช้งานในขั้นนี้</h2>
           <p className="mt-2 text-sm text-muted">ส่วนที่เหลือจะเพิ่มตามลำดับ STEP</p>
           <ul className="mt-5 space-y-3 text-sm">
-            <PendingItem step={25}>แก้ข้อมูลส่วนตัวและสมุดที่อยู่</PendingItem>
             <PendingItem step={42}>แลกแต้มและสิทธิประโยชน์ตามระดับสมาชิก</PendingItem>
             <PendingItem step={43}>ขอคืนสินค้า / คืนเงิน</PendingItem>
             <PendingItem step={53}>ดาวน์โหลดและลบข้อมูลส่วนตัว</PendingItem>

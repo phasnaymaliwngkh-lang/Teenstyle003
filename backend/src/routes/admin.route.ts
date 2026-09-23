@@ -44,6 +44,12 @@ import {
   listAdminReviewsHandler,
   moderateReviewHandler,
 } from '../controllers/review-admin.controller.ts';
+import {
+  getAdminCustomerHandler,
+  listAdminCustomersHandler,
+  updateCustomerRoleHandler,
+  updateCustomerStatusHandler,
+} from '../controllers/admin-customer.controller.ts';
 import { adminSupportRouter } from './admin-support.route.ts';
 import { adminKnowledgeRouter } from './knowledge.route.ts';
 import multer from 'multer';
@@ -203,4 +209,31 @@ adminRouter.patch(
   '/reviews/:reviewId/status',
   requirePermission('review:moderate'),
   moderateReviewHandler,
+);
+
+/**
+ * จัดการลูกค้า (STEP 25)
+ *
+ * แยกสิทธิ์สามระดับตามความเสียหายที่เกิดได้ถ้าใช้ผิด:
+ *   - ดูข้อมูลลูกค้า        → `customer:read`     (EMPLOYEE มี — ต้องใช้ตอบคำถามลูกค้า)
+ *   - ระงับ / ปลดระงับบัญชี → `customer:update`   (ADMIN ขึ้นไป)
+ *   - เปลี่ยนบทบาทและสิทธิ์ → `user:role:manage`  (SUPER_ADMIN เท่านั้นตาม seed)
+ *
+ * คนที่ตอบแชตลูกค้าได้ ไม่ควรตัดลูกค้าออกจากร้านได้
+ * และคนที่ตัดลูกค้าออกได้ ไม่ควรแต่งตั้งผู้ดูแลคนใหม่ได้ (แพตเทิร์นเดียวกับ STEP 17 ข้อ 8)
+ *
+ * ⚠️ **ไม่มี endpoint ลบลูกค้า** — การลบข้อมูลส่วนบุคคลเป็นงานของ STEP 53
+ *    เครื่องมือที่ใช้ตัดคนออกจากร้านคือการระงับบัญชี ซึ่งเพิกถอน session ให้ด้วย
+ */
+adminRouter.get('/customers', requirePermission('customer:read'), listAdminCustomersHandler);
+adminRouter.get('/customers/:userId', requirePermission('customer:read'), getAdminCustomerHandler);
+adminRouter.patch(
+  '/customers/:userId/status',
+  requirePermission('customer:update'),
+  updateCustomerStatusHandler,
+);
+adminRouter.patch(
+  '/customers/:userId/role',
+  requirePermission('user:role:manage'),
+  updateCustomerRoleHandler,
 );

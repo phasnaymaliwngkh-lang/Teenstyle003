@@ -126,8 +126,15 @@ export async function getOverview(): Promise<AdminOverviewDto> {
         AND ${AVAILABLE_STOCK_SQL} <= p."minimumStock"
     `),
     prisma.inventory.aggregate({ _sum: { quantity: true, reservedQuantity: true } }),
-    prisma.user.count({ where: { deletedAt: null } }),
-    prisma.user.count({ where: { deletedAt: null, createdAt: { gte: since(30) } } }),
+    /**
+     * "ลูกค้า" ต้องนับเฉพาะบทบาท CUSTOMER (แก้ตอน STEP 25)
+     * เดิมนับผู้ใช้ทุกแถวจึงรวมบัญชีพนักงานและแอดมินเข้าไปด้วย → ตัวเลขบนหน้า dashboard
+     * สูงกว่าจำนวนลูกค้าจริงตามจำนวนพนักงานที่มี (กฎ STEP 13 ข้อ 6: ตัวเลขต้องตรงกับความจริง)
+     */
+    prisma.user.count({ where: { deletedAt: null, role: { name: 'CUSTOMER' } } }),
+    prisma.user.count({
+      where: { deletedAt: null, role: { name: 'CUSTOMER' }, createdAt: { gte: since(30) } },
+    }),
     prisma.orderItem.groupBy({
       by: ['productId'],
       where: { productId: { not: null }, order: PAID_WHERE },

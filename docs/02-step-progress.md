@@ -4,7 +4,28 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 24 เสร็จ — Notifications (`/account/notifications` + กระดิ่งบน navbar)**
+**ล่าสุด: STEP 25 เสร็จ — Customer Management (`/account/profile`, `/account/addresses`, `/admin/customers`)**
+ลูกค้าดูแลข้อมูลตัวเองได้ และร้านจัดการบัญชีผู้ใช้ได้ โดยทุกด่านสำคัญอยู่ที่ server ·
+**ลูกค้าแก้ได้แค่ชื่อ เบอร์โทร วันเกิด และสวิตช์การแนะนำ** — `email` แก้ไม่ได้เพราะเป็นตัวระบุ
+บัญชี Google ที่ใช้ผูกบัญชี ส่วน `role` `status` `points` `loyaltyTier` `totalSpent`
+ไม่อยู่ในสคีมา PATCH เลย (มี test ยัดมาแล้วยืนยันว่าไม่มีผล) ·
+**ยอดซื้อในหลังบ้านนับจากตาราง `Order` จริง ห้ามอ่านคอลัมน์ `User.totalSpent`** ซึ่งยังไม่มีใครเขียน
+(เป็น 0 ทุกคน จะมาพร้อม STEP 42) — เอามาแสดงคือบอกร้านว่าลูกค้าทุกคนไม่เคยซื้ออะไรเลย
+มี test ที่ตั้งค่าหลอก 999,999 ไว้ในคอลัมน์นั้นแล้วยืนยันว่าเลขไม่โผล่ ·
+**ระงับบัญชี = ลบ `Session` ทั้งหมดในทรานแซกชันเดียวกัน** (ทดสอบแล้วว่า token เดิมได้ 401 ทันที) ·
+**ห้ามแก้บัญชีตัวเอง (400) · แตะได้แค่บทบาทที่ต่ำกว่าตัวเอง (403) · ตั้งบทบาทได้ไม่เกินระดับตัวเอง**
+ด่านหลังอยู่ใน service ไม่ใช่แค่ middleware — มี test ที่ให้สิทธิ์ `user:role:manage` กับ ADMIN
+ชั่วคราวแล้วยืนยันว่ายังตั้งบทบาท ADMIN ให้ใครไม่ได้อยู่ดี ·
+เปลี่ยนบทบาทแล้ว **สิทธิ์มีผลทันทีโดยไม่ต้องล็อกอินใหม่** เพราะอ่านจากฐานข้อมูลทุกคำขอ ·
+ทุกการเปลี่ยนสถานะ/บทบาท **ต้องกรอกเหตุผล** และเขียน `AdminLog` ในทรานแซกชันเดียวกัน ·
+**ไม่มี endpoint ลบลูกค้า** (การลบข้อมูลส่วนบุคคลเป็นงานของ STEP 53) ·
+สมุดที่อยู่: ลบเป็น soft delete เพราะออเดอร์ยังอ้างถึง · ค่าเริ่มต้นมีได้อันเดียวและลบแล้วเลื่อนอันอื่นแทน ·
+**แก้ที่อยู่ไม่เปลี่ยนปลายทางของคำสั่งซื้อที่สั่งไปแล้ว** (ใช้ `Order.addressSnapshot`) และหน้าเว็บบอกไว้ตรง ๆ ·
+แยกสิทธิ์ 3 ระดับ: `customer:read` (EMPLOYEE) · `customer:update` (ADMIN) · `user:role:manage` (SUPER_ADMIN) ·
+แก้ของเดิม: ตัวเลข "ลูกค้า" บน dashboard เคยนับผู้ใช้ทุกแถวจึงรวมบัญชีพนักงาน — ตอนนี้กรอง `role = CUSTOMER` ·
+test 467 เคส (เพิ่ม 45) ผ่านทั้งหมด
+
+**STEP 24:** Notifications (`/account/notifications` + กระดิ่งบน navbar)
 การแจ้งเตือนที่เกิดจากเหตุการณ์จริงเท่านั้น: รับคำสั่งซื้อ · ยืนยัน COD · ชำระเงินสำเร็จ/ไม่สำเร็จ ·
 ส่งของ (พร้อมเลขพัสดุจริงที่ร้านกรอก) · ของถึง · ยกเลิก · ผลการตรวจรีวิว · ราคาสินค้าที่ถูกใจลดลง ·
 **ข้อที่สำคัญที่สุด: ฟีดลูกค้ากรอง `userId` เสมอ ห้ามอ่านแถว `userId = null`**
@@ -202,7 +223,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 |   16 | Stock Alert                     |  ✅   |
 |   17 | Barcode / QR                    |  ✅   |
 |   18 | Import / Export (CSV, Excel)    |  ✅   |
-|   25 | Customer Management             |  ⬜   |
+|   25 | Customer Management             |  ✅   |
 |   26 | Analytics                       |  ⬜   |
 |   27 | Admin Logs (Audit)              |  🚧   |
 |   41 | Promotion / Coupon              |  ⬜   |
@@ -226,8 +247,8 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 | STEP | หัวข้อ                            | สถานะ | หมายเหตุ                                                                                                                                   |
 | ---: | --------------------------------- | :---: | ------------------------------------------------------------------------------------------------------------------------------------------ |
 |   24 | Notifications                     |  ✅   | ฟีดในบัญชี + กระดิ่งบน navbar · IN_APP เท่านั้น (อีเมลจริง STEP 50) · ประกาศของพนักงานไม่หลุดเข้าฟีดลูกค้า                                 |
-|   28 | Security                          |  🚧   | helmet · cors · rate limit · Zod env · CSRF (Origin) · IDOR · STEP 11: ตรวจลายเซ็น webhook + ไม่เก็บ card data                             |
-|   29 | REST API                          |  🚧   | +6..12 storefront/orders · +13..16 admin · +17 `admin/barcodes/*` · +22 `wishlist` · +23 `reviews` + `admin/reviews` · +24 `notifications` |
+|   28 | Security                          |  🚧   | helmet · cors · rate limit · Zod env · CSRF (Origin) · IDOR · STEP 11: ตรวจลายเซ็น webhook + ไม่เก็บ card data · STEP 25: กัน privilege escalation + เพิกถอน session ตอนระงับบัญชี |
+|   29 | REST API                          |  🚧   | +6..12 storefront/orders · +13..16 admin · +17 `admin/barcodes/*` · +22 `wishlist` · +23 `reviews` + `admin/reviews` · +24 `notifications` · +25 `users/me/profile` + `users/me/addresses` + `admin/customers` |
 |   30 | Error Handling                    |  ✅   | global errorHandler + `{ success, message, errorCode }` + 400/401/403/404/409/422/429/500                                                  |
 |   31 | Responsive                        |  🚧   | จะครบเมื่อมีหน้าจริงตั้งแต่ STEP 4                                                                                                         |
 |   32 | Loading / Empty / Error / Retry   |  ✅   | โครงใช้ซ้ำได้ใน components/shared/section.tsx · ทดสอบ error state แล้วตอน backend ล่ม                                                      |
@@ -235,7 +256,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 |   34 | Performance (cache, index, Redis) |  ⬜   |                                                                                                                                            |
 |   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                                                |
 |   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                                              |
-|   37 | Testing                           |  🚧   | vitest + supertest 293 เคส · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                              |
+|   37 | Testing                           |  🚧   | vitest + supertest 467 เคส · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                              |
 |   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                                              |
 |   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                                            |
 |   40 | Final Audit                       |  ⬜   |                                                                                                                                            |

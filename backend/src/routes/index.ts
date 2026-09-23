@@ -21,7 +21,7 @@ import { wishlistRouter } from './wishlist.route.ts';
  */
 const API_ROUTES = [
   { path: '/api/auth', status: 'ready (จัดการที่ Next.js /api/auth/*)', step: 3 },
-  { path: '/api/users', status: 'ready', step: 3 },
+  { path: '/api/users', status: 'ready (+ /me/profile และ /me/addresses ใน STEP 25)', step: 3 },
   { path: '/api/products', status: 'ready', step: 6 },
   { path: '/api/categories', status: 'ready', step: 48 },
   { path: '/api/brands', status: 'planned', step: 48 },
@@ -32,12 +32,17 @@ const API_ROUTES = [
   { path: '/api/payments', status: 'partial (COD พร้อมใช้ · Stripe รอตั้งค่า key)', step: 11 },
   { path: '/api/shipments', status: 'planned', step: 44 },
   { path: '/api/inventory', status: 'planned', step: 15 },
-  { path: '/api/customers', status: 'planned', step: 25 },
+  // ลูกค้าดูแลข้อมูลตัวเองที่ /api/users/me · ร้านจัดการลูกค้าที่ /api/admin/customers
+  { path: '/api/admin/customers', status: 'ready', step: 25 },
   { path: '/api/reviews', status: 'ready', step: 23 },
   { path: '/api/wishlist', status: 'ready', step: 22 },
   { path: '/api/ai', status: 'ready (AI Stylist STEP 19 · AI CS STEP 20)', step: 20 },
   { path: '/api/notifications', status: 'ready (IN_APP · อีเมลจริงเป็นงานของ STEP 50)', step: 24 },
-  { path: '/api/admin', status: 'partial (overview พร้อมแล้ว)', step: 13 },
+  {
+    path: '/api/admin',
+    status: 'ready (overview · orders · products · inventory · reviews)',
+    step: 13,
+  },
   { path: '/api/reports', status: 'planned', step: 26 },
 ] as const;
 

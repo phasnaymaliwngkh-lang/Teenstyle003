@@ -94,6 +94,12 @@ export default async function AdminDashboardPage() {
 
         <div className="flex flex-wrap gap-2">
           <Link
+            href="/admin/customers"
+            className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            จัดการลูกค้า
+          </Link>
+          <Link
             href="/admin/reviews"
             className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
           >
@@ -220,7 +226,8 @@ export default async function AdminDashboardPage() {
             ลูกค้าและคำสั่งซื้อ
           </h2>
           <dl className="mt-3 space-y-2 text-sm">
-            <Row label="ผู้ใช้ทั้งหมด" value={`${data.customers.total} คน`} />
+            {/* นับเฉพาะบทบาท CUSTOMER — บัญชีพนักงานไม่ใช่ลูกค้า (แก้ตอน STEP 25) */}
+            <Row label="ลูกค้าทั้งหมด" value={`${data.customers.total} คน`} />
             <Row label="สมัครใหม่ 30 วัน" value={`${data.customers.newLast30Days} คน`} />
             <Row label="คำสั่งซื้อทั้งหมด" value={`${data.orders.total} ออเดอร์`} />
             <Row label="คำสั่งซื้อ 30 วัน" value={`${data.orders.last30Days} ออเดอร์`} />
