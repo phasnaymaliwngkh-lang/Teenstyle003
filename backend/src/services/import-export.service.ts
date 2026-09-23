@@ -17,6 +17,7 @@ import {
 } from '../validators/import-export.validator.ts';
 
 import type { AdminActor } from './product-admin.service.ts';
+import { notifySafely, notifyWishlistPriceDrops } from './notification.service.ts';
 import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
 
 /**
@@ -852,6 +853,8 @@ export async function importProducts(
   let updatedProducts = 0;
   let createdVariants = 0;
   let updatedVariants = 0;
+  /** สินค้าที่ราคาถูกเขียนทับในรอบนี้ — ใช้แจ้งคนที่กดถูกใจไว้หลัง commit (STEP 24) */
+  const repricedProductIds: string[] = [];
 
   await prisma.$transaction(async (tx) => {
     // จัดกลุ่มตาม Product SKU
@@ -915,6 +918,8 @@ export async function importProducts(
           },
         });
         updatedProducts += 1;
+        // นำเข้าไฟล์เขียนราคาทับทุกครั้ง จึงอาจทำให้ราคาถูกลงกว่าตอนที่ลูกค้ากดถูกใจ
+        repricedProductIds.push(product.id);
       }
 
       // จัดการ Variants ใน Product
@@ -1005,6 +1010,12 @@ export async function importProducts(
       },
     });
   });
+
+  // ราคาที่ถูกเขียนทับอาจถูกลงกว่าตอนที่ลูกค้ากดถูกใจ → แจ้งหลัง commit (STEP 24)
+  await notifySafely(
+    () => notifyWishlistPriceDrops(repricedProductIds),
+    'product-import:price-drop',
+  );
 
   return {
     success: true,

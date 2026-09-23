@@ -54,6 +54,7 @@ export const FOOTER_SECTIONS: readonly {
       { label: "Wishlist", href: "/wishlist" },
       { label: "ประวัติคำสั่งซื้อ", href: "/account/orders" },
       { label: "รีวิวของฉัน", href: "/account/reviews" },
+      { label: "การแจ้งเตือน", href: "/account/notifications" },
     ],
   },
   {

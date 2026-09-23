@@ -16,6 +16,13 @@ import { ApiError } from '../utils/api-error.ts';
 import { logger } from '../utils/logger.ts';
 
 import { deductStockForOrder, releaseReservationForOrder } from './inventory.service.ts';
+import {
+  notifyCodConfirmed,
+  notifyOrderCancelled,
+  notifyPaymentFailed,
+  notifyPaymentSuccess,
+  notifySafely,
+} from './notification.service.ts';
 import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
 
 /**
@@ -261,6 +268,19 @@ async function confirmCashOnDelivery(
 
   // ตัดสต็อกจริงแล้ว → ตรวจเตือนหลัง commit (STEP 16)
   await scanAlertsAfterStockChange(variantIdsOf(order));
+
+  /**
+   * ⚠️ COD ยังไม่ได้รับเงินตอนนี้ (กฎ STEP 11 ข้อ 2) จึงแจ้งว่า "ยืนยันคำสั่งซื้อแล้ว"
+   *    ไม่ใช่ "ชำระเงินสำเร็จ" — เงินเข้าตอนกด DELIVERED ที่หลังบ้าน (STEP 24)
+   */
+  await notifySafely(
+    () =>
+      notifyCodConfirmed(
+        { userId: order.userId, orderId: order.id, orderNumber: order.orderNumber },
+        toNumber(order.total),
+      ),
+    `order:${order.id}:cod-confirmed`,
+  );
 
   const updated = await prisma.order.findUniqueOrThrow({
     where: { id: order.id },
@@ -531,6 +551,30 @@ async function markOrderPaid(
 
   await scanAlertsAfterStockChange(deductedVariantIds);
 
+  /**
+   * แจ้งเตือนเฉพาะเมื่อคำขอนี้เป็นตัวที่เปลี่ยนสถานะจริง (STEP 24)
+   *
+   * event เดิมที่ Stripe ยิงซ้ำจะคืน `ignored` จึงไม่มาถึงตรงนี้
+   * และ `notifyOnce` ยังกันซ้ำอีกชั้นอยู่ดี
+   */
+  if (action === 'paid') {
+    const paid = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { userId: true, orderNumber: true, total: true },
+    });
+
+    if (paid !== null) {
+      await notifySafely(
+        () =>
+          notifyPaymentSuccess(
+            { userId: paid.userId, orderId, orderNumber: paid.orderNumber },
+            toNumber(paid.total),
+          ),
+        `order:${orderId}:paid`,
+      );
+    }
+  }
+
   return action;
 }
 
@@ -589,6 +633,25 @@ async function releaseOrderFromSession(
 
   await scanAlertsAfterStockChange(releasedVariantIds);
 
+  // แจ้งเฉพาะเมื่อคำขอนี้เป็นตัวที่ยกเลิกออเดอร์จริง — event ซ้ำคืน `ignored` จึงไม่มาถึงตรงนี้
+  if (action === 'failed' || action === 'cancelled') {
+    const released = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { userId: true, orderNumber: true },
+    });
+
+    if (released !== null) {
+      await notifySafely(
+        () =>
+          notifyPaymentFailed(
+            { userId: released.userId, orderId, orderNumber: released.orderNumber },
+            kind === 'failed' ? 'ธนาคารปฏิเสธการชำระเงิน' : 'เลยกำหนดเวลาชำระเงินแล้ว',
+          ),
+        `order:${orderId}:payment-failed`,
+      );
+    }
+  }
+
   return action;
 }
 
@@ -631,6 +694,15 @@ export async function cancelUnpaidOrder(userId: string, orderNumber: string): Pr
   // ของที่จองไว้กลับมาขายได้ → การเตือนที่ค้างอยู่ต้องถูกปิดเอง (STEP 16)
   await scanAlertsAfterStockChange(variantIdsOf(order));
 
+  await notifySafely(
+    () =>
+      notifyOrderCancelled(
+        { userId: order.userId, orderId: order.id, orderNumber: order.orderNumber },
+        'customer',
+      ),
+    `order:${order.id}:cancelled-by-customer`,
+  );
+
   const updated = await prisma.order.findUniqueOrThrow({
     where: { id: order.id },
     select: ORDER_FOR_PAYMENT_SELECT,
@@ -661,6 +733,8 @@ export async function expireOverdueOrders(now: Date = new Date()): Promise<numbe
 
   let cancelled = 0;
   const releasedVariantIds: string[] = [];
+  /** ออเดอร์ที่ถูกยกเลิกจริงในรอบนี้ — แจ้งเตือนหลังทรานแซกชันของแต่ละใบ commit แล้ว */
+  const expiredTargets: { userId: string; orderId: string; orderNumber: string }[] = [];
 
   for (const order of overdue) {
     await prisma.$transaction(async (tx) => {
@@ -689,12 +763,24 @@ export async function expireOverdueOrders(now: Date = new Date()): Promise<numbe
       });
 
       releasedVariantIds.push(...variantIdsOf(order));
+      expiredTargets.push({
+        userId: order.userId,
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+      });
       cancelled += 1;
     });
   }
 
   // ของที่จองไว้กลับมาขายได้ทั้งหมด → ตรวจปิดการเตือนที่ค้างในรอบเดียว
   await scanAlertsAfterStockChange(releasedVariantIds);
+
+  for (const target of expiredTargets) {
+    await notifySafely(
+      () => notifyPaymentFailed(target, 'เลยกำหนดเวลาชำระเงินแล้ว'),
+      `order:${target.orderId}:expired`,
+    );
+  }
 
   return cancelled;
 }

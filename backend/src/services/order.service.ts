@@ -12,6 +12,7 @@ import { resolveVariantPrice } from '../models/pricing.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type { CreateOrderInput, NewAddressInput } from '../validators/order.validator.ts';
 
+import { notifyOrderCreated, notifySafely } from './notification.service.ts';
 import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
 
 /**
@@ -501,7 +502,15 @@ export async function createOrder(
    */
   await scanAlertsAfterStockChange(reservedVariantIds);
 
-  return { order: toOrder(created), created: true };
+  const order = toOrder(created);
+
+  // แจ้งเตือนลูกค้าหลัง commit — ล้มแล้วต้องไม่ทำให้คำสั่งซื้อที่สำเร็จแล้วกลายเป็น error (STEP 24)
+  await notifySafely(
+    () => notifyOrderCreated({ userId, orderId, orderNumber: order.orderNumber }, order.total),
+    `order:${orderId}:created`,
+  );
+
+  return { order, created: true };
 }
 
 /* ─── STEP 12: ประวัติและติดตามคำสั่งซื้อ ─────────────────────────────────── */

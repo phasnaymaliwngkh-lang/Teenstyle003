@@ -1,5 +1,6 @@
 import {
   Award,
+  Bell,
   Heart,
   Mail,
   Package,
@@ -126,6 +127,21 @@ export default async function AccountPage() {
               <span className="block font-extrabold">รีวิวของฉัน</span>
               <span className="block text-sm text-muted">
                 ดูสถานะรีวิวที่เขียนไว้ แก้ไขหรือลบได้
+              </span>
+            </span>
+          </Link>
+
+          <Link
+            href="/account/notifications"
+            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)] transition hover:border-brand-soft hover:shadow-[var(--shadow-lift)]"
+          >
+            <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-lilac">
+              <Bell className="size-6 text-brand" aria-hidden />
+            </span>
+            <span>
+              <span className="block font-extrabold">การแจ้งเตือน</span>
+              <span className="block text-sm text-muted">
+                ความเคลื่อนไหวของคำสั่งซื้อ รีวิว และราคาที่ลดลง
               </span>
             </span>
           </Link>

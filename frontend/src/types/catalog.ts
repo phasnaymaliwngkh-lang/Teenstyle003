@@ -835,3 +835,45 @@ export interface AdminReviewListResult {
   limit: number;
   totalPages: number;
 }
+
+// ─── Notifications (STEP 24) ─────────────────────────────────────────────────
+
+export type NotificationType =
+  | "ORDER_CREATED"
+  | "PAYMENT_SUCCESS"
+  | "PAYMENT_FAILED"
+  | "SHIPPING"
+  | "DELIVERED"
+  | "LOW_STOCK"
+  | "PROMOTION"
+  | "PRICE_DROP"
+  | "WISHLIST_UPDATE"
+  | "SYSTEM"
+  | "ORDER_UPDATE"
+  | "ORDER_CANCELLED"
+  | "REVIEW_UPDATE";
+
+export type NotificationGroup = "ORDER" | "PRICE" | "REVIEW" | "OTHER";
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  group: NotificationGroup;
+  title: string;
+  body: string;
+  /** ลิงก์ปลายทางที่ backend คำนวณให้ — null = ไม่มีหน้าให้ไป (ห้ามเดาเอง) */
+  link: string | null;
+  isRead: boolean;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface NotificationListResult {
+  items: AppNotification[];
+  /** จำนวนที่ยังไม่อ่านทั้งหมด — ไม่ใช่แค่ที่กรองอยู่ */
+  unreadCount: number;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}

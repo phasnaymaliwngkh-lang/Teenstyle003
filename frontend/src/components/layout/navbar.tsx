@@ -7,6 +7,11 @@ import { MobileMenu } from "./mobile-menu";
 import { NavLinks } from "./nav-links";
 import { UserMenu } from "./user-menu";
 
+import {
+  NotificationBell,
+  NotificationBellFallback,
+} from "@/features/notifications/components/notification-bell";
+
 import { getSession } from "@/lib/dal";
 import { publicEnv } from "@/lib/env";
 
@@ -57,6 +62,17 @@ export async function Navbar() {
           <IconLink href="/wishlist" label="รายการที่ถูกใจ">
             <Heart className="size-5" aria-hidden />
           </IconLink>
+
+          {/**
+           * กระดิ่งแจ้งเตือน (STEP 24) — แสดงเฉพาะคนที่ล็อกอิน
+           * เพราะการแจ้งเตือนผูกกับบัญชี guest จะได้ 401 กลับมาเปล่า ๆ
+           * stream แยกเพื่อไม่ให้ทุกหน้าในเว็บรอ API นี้
+           */}
+          {user !== null && (
+            <Suspense fallback={<NotificationBellFallback />}>
+              <NotificationBell />
+            </Suspense>
+          )}
 
           <div className="hidden lg:block">
             <UserMenu user={user} />

@@ -12,6 +12,8 @@ import type {
   UpdateVariantInput,
 } from '../validators/product-admin.validator.ts';
 
+import { notifySafely, notifyWishlistPriceDrops } from './notification.service.ts';
+
 /**
  * จัดการสินค้าในหลังบ้าน (STEP 14)
  *
@@ -696,6 +698,19 @@ export async function updateProduct(
       );
     })
     .catch(rethrowUnique);
+
+  /**
+   * ราคาเปลี่ยนแล้ว → บอกคนที่กดถูกใจไว้ ถ้าถูกลงกว่าตอนที่เขากด (STEP 22 → STEP 24)
+   *
+   * ⚠️ เรียกทุกครั้งที่แก้สินค้าโดยไม่เช็คก่อนว่าราคาขยับไหม เพราะตัวตัดสินจริงอยู่ใน
+   *    `notifyWishlistPriceDrops` ซึ่งเทียบราคาปัจจุบันกับ `priceWhenAdded` ของแต่ละคน
+   *    และกับราคาที่เคยแจ้งไปแล้ว (แก้แค่ชื่อสินค้าจึงไม่มีใครได้แจ้งเตือน)
+   * ⚠️ หลัง commit และกลืน error เอง — แจ้งเตือนล้มต้องไม่ทำให้การแก้สินค้าที่บันทึกแล้วพัง
+   */
+  await notifySafely(
+    () => notifyWishlistPriceDrops([productId]),
+    `product:${productId}:price-drop`,
+  );
 
   return getAdminProduct(productId);
 }

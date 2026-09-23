@@ -1,10 +1,18 @@
 import { getPrisma, Prisma } from '@teenstyle/database';
 
 import { toOrder, type OrderDto } from '../models/order.model.ts';
+import { toNumber } from '../models/pricing.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type { UpdateOrderStatusInput } from '../validators/admin.validator.ts';
 
 import { releaseReservationForOrder, restockForOrder } from './inventory.service.ts';
+import {
+  notifyOrderCancelled,
+  notifyOrderDelivered,
+  notifyOrderShipped,
+  notifyPaymentSuccess,
+  notifySafely,
+} from './notification.service.ts';
 import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
 
 /**
@@ -371,6 +379,58 @@ export async function updateOrderStatus(
   if (input.status === 'CANCELLED') {
     await scanAlertsAfterStockChange(
       current.items.map((item) => item.variantId).filter((id): id is string => id !== null),
+    );
+  }
+
+  /**
+   * แจ้งลูกค้าเรื่องสถานะที่เขารู้สึกได้จริง (STEP 24)
+   *
+   * ⚠️ ไม่แจ้งทุกขั้น — `PROCESSING` / `PACKING` เป็นงานภายในร้าน
+   *    ยิงแจ้งเตือนทุกครั้งที่พนักงานกดปุ่มจะกลายเป็น noise แล้วลูกค้าเลิกอ่านทั้งหมด
+   *    (บทเรียนเดียวกับ STEP 16 ข้อ 1 เรื่องเตือนเฉพาะของที่ขายอยู่จริง)
+   * ⚠️ เรียกหลังทรานแซกชัน commit และกลืน error เอง — แจ้งเตือนล้มต้องไม่ทำให้
+   *    การเปลี่ยนสถานะที่บันทึกไปแล้วกลายเป็น error
+   */
+  const target = {
+    userId: current.user.id,
+    orderId: current.id,
+    orderNumber: current.orderNumber,
+  };
+
+  if (
+    input.status === 'SHIPPING' &&
+    input.carrier !== undefined &&
+    input.trackingNumber !== undefined
+  ) {
+    await notifySafely(
+      () =>
+        notifyOrderShipped(target, {
+          carrier: input.carrier!,
+          trackingNumber: input.trackingNumber!,
+        }),
+      `order:${current.id}:shipping`,
+    );
+  }
+
+  if (input.status === 'DELIVERED') {
+    await notifySafely(() => notifyOrderDelivered(target), `order:${current.id}:delivered`);
+
+    /**
+     * COD: กด DELIVERED = ได้รับเงินแล้ว (กฎ STEP 13 ข้อ 4)
+     * ลูกค้าจึงควรได้ใบยืนยันว่าร้านรับเงินแล้วด้วย ไม่ใช่แค่ "ของถึงแล้ว"
+     */
+    if (current.paymentStatus !== 'PAID') {
+      await notifySafely(
+        () => notifyPaymentSuccess(target, toNumber(current.total)),
+        `order:${current.id}:cod-paid`,
+      );
+    }
+  }
+
+  if (input.status === 'CANCELLED') {
+    await notifySafely(
+      () => notifyOrderCancelled(target, 'shop'),
+      `order:${current.id}:cancelled-by-shop`,
     );
   }
 

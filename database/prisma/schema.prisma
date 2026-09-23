@@ -149,6 +149,11 @@ enum NotificationType {
   PRICE_DROP
   WISHLIST_UPDATE
   SYSTEM
+  /// เพิ่มใน STEP 24 — เหตุการณ์ที่ของเดิมไม่มีค่าให้ใช้ตรง ๆ
+  /// ถ้ายัดลง SYSTEM ทั้งหมด การกรองตามหมวดจะแยกไม่ออกว่าเรื่องไหนเกี่ยวกับคำสั่งซื้อ
+  ORDER_UPDATE
+  ORDER_CANCELLED
+  REVIEW_UPDATE
 }
 
 enum NotificationChannel {

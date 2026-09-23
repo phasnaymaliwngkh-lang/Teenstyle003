@@ -16,6 +16,8 @@ import {
 } from '../models/review.model.ts';
 import { ApiError } from '../utils/api-error.ts';
 
+import { notifyReviewModerated, notifySafely } from './notification.service.ts';
+
 /**
  * รีวิวสินค้า (STEP 23)
  *
@@ -757,7 +759,7 @@ export async function adminModerateReview(
 ): Promise<AdminReviewDto> {
   const prisma = getPrisma();
 
-  return prisma.$transaction(async (tx) => {
+  const after = await prisma.$transaction(async (tx) => {
     const before = await tx.review.findFirst({
       where: { id: reviewId, deletedAt: null },
       select: ADMIN_REVIEW_SELECT,
@@ -793,4 +795,26 @@ export async function adminModerateReview(
 
     return after;
   });
+
+  /**
+   * บอกเจ้าของรีวิวว่าผลเป็นอย่างไร (STEP 24)
+   *
+   * ⚠️ ถ้าไม่แจ้ง รีวิวที่ร้านซ่อนหรือไม่อนุมัติจะหายไปจากหน้าสินค้าเงียบ ๆ
+   *    โดยคนเขียนไม่มีทางรู้ว่าเกิดอะไรขึ้นหรือต้องแก้อะไร
+   *    เรียกหลัง commit และกลืน error เอง — แจ้งเตือนล้มต้องไม่ทำให้การตรวจที่บันทึกแล้วพัง
+   */
+  await notifySafely(
+    () =>
+      notifyReviewModerated({
+        userId: after.customer.id,
+        reviewId: after.id,
+        productName: after.product.name,
+        productSlug: after.product.slug,
+        status: after.status as 'APPROVED' | 'HIDDEN' | 'REJECTED',
+        adminNote: after.adminNote,
+      }),
+    `review:${after.id}:moderated`,
+  );
+
+  return after;
 }
