@@ -19,8 +19,13 @@ import { logger } from './utils/logger.ts';
 export function createApp(): Express {
   const app = express();
 
-  // อยู่หลัง reverse proxy (Railway / Render / Nginx) — ให้ req.ip และ rate limit ถูกต้อง
-  app.set('trust proxy', 1);
+  /**
+   * จำนวน proxy ที่อยู่หน้าเรา — ตั้งผ่าน `TRUST_PROXY_HOPS` (ค่าเริ่มต้น 1)
+   *
+   * ⚠️ ต้องตรงกับความจริง ไม่ใช่ตั้งเกินไว้เผื่อ ๆ ไม่งั้น `req.ip` ถูกปลอมได้
+   *    ซึ่งทำให้ rate limit ต่อ IP ไร้ผล และ IP ใน AdminLog ชี้คนผิด (ดู config/env.ts)
+   */
+  app.set('trust proxy', env.TRUST_PROXY_HOPS);
   app.disable('x-powered-by');
 
   app.use(

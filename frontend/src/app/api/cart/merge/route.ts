@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getSession } from "@/lib/dal";
+import { safeInternalPath } from "@/lib/safe-redirect";
 import { CART_COOKIE } from "@/lib/api-server";
 import { mergeCartOnServer } from "@/services/cart.server";
 
@@ -19,8 +20,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const session = await getSession();
 
   // กัน open redirect: รับเฉพาะ path ภายในเว็บเรา
-  const requested = request.nextUrl.searchParams.get("next") ?? "/";
-  const target = requested.startsWith("/") && !requested.startsWith("//") ? requested : "/";
+  // ⚠️ `next` มาจาก query string — ต้องผ่านด่านกลาง ไม่เช็คเอาเองที่นี่
+  //    (ด่านเดิมเช็คแค่ startsWith("/") ซึ่ง "/\evil.com" เล็ดลอดได้)
+  const target = safeInternalPath(request.nextUrl.searchParams.get("next"), "/");
 
   const destination = new URL(target, request.nextUrl.origin);
 

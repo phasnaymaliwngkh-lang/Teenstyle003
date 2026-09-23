@@ -1,6 +1,7 @@
 "use server";
 
 import { signIn, signOut } from "@/lib/auth";
+import { safeInternalPath } from "@/lib/safe-redirect";
 
 /**
  * Server Action สำหรับเข้า/ออกจากระบบ
@@ -9,16 +10,15 @@ import { signIn, signOut } from "@/lib/auth";
  * และ JavaScript ของ auth ไปฝั่ง client — ปุ่มยังทำงานได้แม้ JS ยังโหลดไม่เสร็จ
  */
 
-/** path ที่อนุญาตให้ redirect กลับได้ — กัน open redirect ไปโดเมนอื่น */
-function safeCallbackUrl(value: FormDataEntryValue | null): string {
-  if (typeof value !== "string") return "/after-signin";
-  // ต้องเป็น path ภายในเว็บเท่านั้น ห้าม //evil.com หรือ http://evil.com
-  if (!value.startsWith("/") || value.startsWith("//")) return "/after-signin";
-  return value;
-}
-
 export async function signInWithGoogle(formData: FormData): Promise<void> {
-  await signIn("google", { redirectTo: safeCallbackUrl(formData.get("callbackUrl")) });
+  /**
+   * ⚠️ ต้องผ่าน `safeInternalPath` เสมอ — `callbackUrl` มาจาก query string ของลิงก์
+   *    ที่ใครก็ส่งให้เหยื่อได้ · ด่านเดิมที่เช็คแค่ `startsWith("/")` ถูก `/\evil.com` เจาะได้
+   *    (ดูรายละเอียดใน lib/safe-redirect.ts)
+   */
+  await signIn("google", {
+    redirectTo: safeInternalPath(formData.get("callbackUrl"), "/after-signin"),
+  });
 }
 
 export async function signOutAction(): Promise<void> {

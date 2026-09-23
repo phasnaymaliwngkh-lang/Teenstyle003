@@ -23,7 +23,7 @@
     "start:backend": "npm run start --workspace backend",
     "typecheck": "npm run typecheck --workspace database && npm run typecheck --workspace backend && npm run typecheck --workspace frontend",
     "lint": "npm run lint --workspace backend && npm run lint --workspace frontend",
-    "test": "npm run test --workspace backend",
+    "test": "npm run test --workspace backend && npm run test --workspace frontend",
     "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,css,md,yml,yaml}\"",
     "db:check": "npm run check --workspace database",

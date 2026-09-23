@@ -174,9 +174,33 @@ adminRouter.post('/barcodes/assign', requirePermission('product:update'), assign
  * - นำเข้า (Import): นำเข้าสินค้าใหม่ หรือปรับปรุงสต็อกเป็นชุด (Stock Take)
  * - จำกัดขนาดไฟล์อัปโหลดไม่เกิน 5MB ป้องกัน DoS
  */
+/**
+ * ⚠️ จำกัดชนิดไฟล์ที่รับตั้งแต่ชั้นนอกสุด (STEP 28)
+ *
+ * เดิมรับไฟล์อะไรก็ได้ที่ไม่เกิน 5MB แล้วปล่อยให้ตัวแปลงไปเจอเองว่าอ่านไม่ออก
+ * ผลคือ ExcelJS ต้องแกะไฟล์แปลกปลอม (xlsx คือ zip — มีทั้ง zip bomb และ XML ที่ซ้อนลึก)
+ * ก่อนจะรู้ว่าใช้ไม่ได้ · ปฏิเสธที่ชั้น multer จึงถูกกว่าและปลอดภัยกว่า
+ *
+ * ตรวจทั้ง mimetype และนามสกุล เพราะเบราว์เซอร์บนวินโดวส์ส่ง mimetype ของ CSV
+ * มาไม่ตรงกันหลายแบบ (text/csv · application/vnd.ms-excel · application/octet-stream)
+ * — นามสกุลจึงเป็นเกณฑ์หลัก และ **ตัวตัดสินจริงยังเป็นตัวแปลงที่อ่านเนื้อไฟล์**
+ */
+const ALLOWED_UPLOAD_EXTENSIONS = ['.csv', '.xlsx', '.xls'];
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    const name = file.originalname.toLowerCase();
+    const allowed = ALLOWED_UPLOAD_EXTENSIONS.some((ext) => name.endsWith(ext));
+
+    if (!allowed) {
+      callback(new Error('รับเฉพาะไฟล์ .csv, .xlsx หรือ .xls เท่านั้น'));
+      return;
+    }
+
+    callback(null, true);
+  },
 });
 
 // ส่งออก (Export)

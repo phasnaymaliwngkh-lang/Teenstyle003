@@ -7,6 +7,7 @@ import { cache } from "react";
 
 import { auth } from "./auth";
 import { isStaffRole, type RoleName } from "./permissions";
+import { safeInternalPath } from "./safe-redirect";
 
 /**
  * Data Access Layer — จุดเดียวที่ใช้ตรวจ session และสิทธิ์ในฝั่ง server ของ Next.js
@@ -31,10 +32,16 @@ export const getSession = cache(async (): Promise<Session | null> => {
   return session;
 });
 
-/** path ที่ผู้ใช้กำลังเปิด — proxy.ts ใส่ไว้ใน header ให้ (ใช้ทำ callbackUrl) */
+/**
+ * path ที่ผู้ใช้กำลังเปิด — proxy.ts ใส่ไว้ใน header ให้ (ใช้ทำ callbackUrl)
+ *
+ * ⚠️ proxy เขียนทับค่าที่ client ส่งมาเสมอ (`headers.set`) แต่ proxy ไม่ได้รันทุกเส้นทาง
+ *    (matcher ข้าม /api และไฟล์ static) — เส้นทางเหล่านั้น client ตั้ง `x-pathname` เองได้
+ *    จึงกรองผ่าน `safeInternalPath` ที่ต้นทางด้วย ไม่รอไปกรองที่ปลายทางเท่านั้น
+ */
 async function currentPath(): Promise<string> {
   const headerList = await headers();
-  return headerList.get("x-pathname") ?? "/";
+  return safeInternalPath(headerList.get("x-pathname"), "/");
 }
 
 /** ต้องล็อกอิน — ถ้าไม่ ส่งไปหน้าเข้าสู่ระบบพร้อมจำ path เดิมไว้ */

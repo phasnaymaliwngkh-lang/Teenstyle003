@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { apiOriginOf, buildCsp } from "./lib/csp";
+
 /**
  * Proxy (Next.js 16 เปลี่ยนชื่อมาจาก middleware.ts — ความสามารถเหมือนเดิม)
  *
@@ -8,9 +10,10 @@ import { NextResponse, type NextRequest } from "next/server";
  *    การตรวจสิทธิ์จริงอยู่ที่ src/lib/dal.ts (layout/page) และที่ backend
  *    → cookie ปลอมจะผ่าน proxy ได้ แต่จะตกที่ DAL เสมอ
  *
- * หน้าที่ของไฟล์นี้มีแค่ 2 อย่าง
+ * หน้าที่ของไฟล์นี้มีแค่ 3 อย่าง
  *   1. ใส่ header x-pathname ให้ server component รู้ path ปัจจุบัน (ใช้ทำ callbackUrl)
  *   2. เด้งผู้ที่ยังไม่ล็อกอินออกจากหน้าที่ต้องล็อกอิน (ลดการโหลดหน้าที่จะ redirect อยู่ดี)
+ *   3. ออก nonce ใหม่ทุกคำขอ + ส่ง Content-Security-Policy (STEP 28)
  *
  * ส่วนการเด้ง "คนที่ล็อกอินแล้ว" ออกจาก /signin ทำที่หน้า /signin เอง — ดูเหตุผลด้านล่าง
  */
@@ -31,8 +34,27 @@ function hasSessionCookie(request: NextRequest): boolean {
 export function proxy(request: NextRequest): NextResponse {
   const { pathname, search } = request.nextUrl;
 
+  /**
+   * nonce ใหม่ทุกคำขอ — ใช้ซ้ำไม่ได้ ไม่งั้นผู้โจมตีที่รู้ค่าเดิมแปะ nonce เองได้
+   * ส่ง CSP ไปทั้งใน request header (Next อ่านไปแปะให้สคริปต์ของตัวเอง)
+   * และ response header (เบราว์เซอร์บังคับใช้)
+   */
+  const nonce = crypto.randomUUID();
+  const csp = buildCsp(nonce, {
+    isDev: process.env.NODE_ENV !== "production",
+    apiOrigin: apiOriginOf(process.env.NEXT_PUBLIC_API_URL),
+  });
+
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-pathname", `${pathname}${search}`);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("content-security-policy", csp);
+
+  /** ใส่ CSP ลง response ทุกเส้นทางที่ proxy ดูแล */
+  const withSecurityHeaders = (response: NextResponse): NextResponse => {
+    response.headers.set("content-security-policy", csp);
+    return response;
+  };
 
   const signedIn = hasSessionCookie(request);
   const isProtected = PROTECTED_PREFIXES.some(
@@ -42,7 +64,7 @@ export function proxy(request: NextRequest): NextResponse {
   if (isProtected && !signedIn) {
     const signInUrl = new URL("/signin", request.url);
     signInUrl.searchParams.set("callbackUrl", `${pathname}${search}`);
-    return NextResponse.redirect(signInUrl);
+    return withSecurityHeaders(NextResponse.redirect(signInUrl));
   }
 
   /**
@@ -56,7 +78,7 @@ export function proxy(request: NextRequest): NextResponse {
    * เพราะที่นั่นอ่านฐานข้อมูลได้ และรู้บทบาทจริงเพื่อส่งไปหน้าที่ถูกต้องได้เลย
    */
 
-  return NextResponse.next({ request: { headers: requestHeaders } });
+  return withSecurityHeaders(NextResponse.next({ request: { headers: requestHeaders } }));
 }
 
 export const config = {

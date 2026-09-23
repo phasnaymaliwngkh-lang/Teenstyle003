@@ -94,6 +94,18 @@ const EnvSchema = z.object({
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+
+  /**
+   * จำนวน reverse proxy ที่อยู่หน้า backend (STEP 28)
+   *
+   * ⚠️ **ค่านี้ต้องตรงกับจำนวน proxy จริง** ไม่ใช่ตั้งไว้เผื่อ ๆ
+   *    Express เชื่อ `X-Forwarded-For` ตามจำนวน hop ที่บอก ถ้าบอกเกินจริง
+   *    ผู้ใช้ส่ง header นี้มาเองแล้ว `req.ip` จะกลายเป็นค่าที่เขากำหนด ซึ่งทำให้
+   *      · rate limit ต่อ IP ถูกข้ามได้ (เปลี่ยน IP ปลอมทุกคำขอ)
+   *      · **IP ใน AdminLog เป็นค่าปลอม** → audit log ชี้คนผิด
+   *    ถ้ารันโดยไม่มี proxy เลย (เช่นรันตรงบนเครื่อง) ต้องตั้งเป็น 0
+   */
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(1),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

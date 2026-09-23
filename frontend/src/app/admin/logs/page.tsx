@@ -10,10 +10,7 @@ import { errorMessageOf } from "@/lib/api";
 import { requirePermission } from "@/lib/dal";
 import { createQueryHelpers, toSearchParams, type RawSearchParams } from "@/lib/query-params";
 import { cn } from "@/lib/utils";
-import {
-  fetchAdminLogFiltersOnServer,
-  fetchAdminLogsOnServer,
-} from "@/services/admin-log.server";
+import { fetchAdminLogFiltersOnServer, fetchAdminLogsOnServer } from "@/services/admin-log.server";
 import type { AdminLogFilters, AdminLogListResult } from "@/types/admin-log";
 
 export const metadata: Metadata = {
@@ -78,8 +75,7 @@ export default async function AdminLogsPage({
     result.status === "rejected" ? errorMessageOf(result.reason, "โหลดประวัติไม่สำเร็จ") : null;
 
   const data: AdminLogListResult | null = logs.status === "fulfilled" ? logs.value : null;
-  const filterData: AdminLogFilters | null =
-    filters.status === "fulfilled" ? filters.value : null;
+  const filterData: AdminLogFilters | null = filters.status === "fulfilled" ? filters.value : null;
 
   return (
     <main className="mx-auto w-full max-w-[1100px] px-4 py-8 sm:px-6">
@@ -108,8 +104,8 @@ export default async function AdminLogsPage({
         <p className="text-sm text-ink-soft">
           ประวัติเก็บ <span className="font-semibold">IP และอุปกรณ์ของพนักงาน</span>{" "}
           ซึ่งเป็นข้อมูลส่วนบุคคล — เปิดดูได้เฉพาะผู้มีสิทธิ์{" "}
-          <span className="font-mono text-xs">log:read</span> ·
-          นโยบายระยะเวลาเก็บข้อมูลจะกำหนดใน STEP 53
+          <span className="font-mono text-xs">log:read</span> · นโยบายระยะเวลาเก็บข้อมูลจะกำหนดใน
+          STEP 53
         </p>
       </div>
 
@@ -148,9 +144,7 @@ export default async function AdminLogsPage({
         </label>
         {(["group", "action", "targetType", "targetId", "userId"] as const).map((key) => {
           const value = params.get(key);
-          return value === null ? null : (
-            <input key={key} type="hidden" name={key} value={value} />
-          );
+          return value === null ? null : <input key={key} type="hidden" name={key} value={value} />;
         })}
         <button
           type="submit"
@@ -212,9 +206,7 @@ export default async function AdminLogsPage({
                       key={actor.userId ?? "deleted"}
                       // บัญชีที่ถูกลบไม่มี id ให้กรอง — แสดงจำนวนไว้แต่กดไม่ได้
                       href={
-                        actor.userId === null
-                          ? null
-                          : withParam(params, "userId", actor.userId)
+                        actor.userId === null ? null : withParam(params, "userId", actor.userId)
                       }
                       active={params.get("userId") === actor.userId}
                     >
@@ -245,9 +237,7 @@ export default async function AdminLogsPage({
               {data.items.length === 0 ? (
                 <div className="mt-4 rounded-[var(--radius-card)] border border-dashed border-line bg-lilac-50 px-6 py-12 text-center">
                   <p className="font-extrabold">ไม่มีรายการในเงื่อนไขนี้</p>
-                  <p className="mt-2 text-sm text-muted">
-                    ลองขยายช่วงวันที่ หรือล้างตัวกรอง
-                  </p>
+                  <p className="mt-2 text-sm text-muted">ลองขยายช่วงวันที่ หรือล้างตัวกรอง</p>
                 </div>
               ) : (
                 <ul className="mt-4 space-y-3">

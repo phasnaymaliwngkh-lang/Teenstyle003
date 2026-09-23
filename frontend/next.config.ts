@@ -77,7 +77,23 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          // CSP มี frame-ancestors 'none' อยู่แล้ว — อันนี้ไว้ให้เบราว์เซอร์เก่าที่ยังไม่รู้จัก
           { key: "X-Frame-Options", value: "DENY" },
+          /**
+           * บังคับ https อย่างน้อยหนึ่งปี (STEP 28)
+           * ⚠️ ส่งเฉพาะ production — ถ้าเบราว์เซอร์จำค่านี้จาก localhost
+           *    จะเปิด http://localhost ไม่ได้อีกเลยจนกว่าจะล้าง HSTS ในเบราว์เซอร์เอง
+           * ยังไม่ใส่ preload เพราะการถอนออกจากรายการ preload ใช้เวลาเป็นเดือน
+           * ควรใส่หลังโดเมนจริงรัน https นิ่งแล้ว (งานของ STEP 38)
+           */
+          ...(process.env.NODE_ENV === "production"
+            ? [
+                {
+                  key: "Strict-Transport-Security",
+                  value: "max-age=31536000; includeSubDomains",
+                },
+              ]
+            : []),
           // จำกัดสิทธิ์อุปกรณ์ — camera เปิดไว้เพราะ STEP 17 ต้องสแกน barcode/QR
           {
             key: "Permissions-Policy",
