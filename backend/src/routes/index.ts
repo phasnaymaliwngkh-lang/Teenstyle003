@@ -43,7 +43,11 @@ const API_ROUTES = [
     status: 'ready (overview · orders · products · inventory · reviews)',
     step: 13,
   },
-  { path: '/api/reports', status: 'planned', step: 26 },
+  {
+    path: '/api/admin/analytics',
+    status: 'ready (สรุป · สินค้า · ลูกค้า · แยกมิติ · ส่งออกไฟล์)',
+    step: 26,
+  },
 ] as const;
 
 export const apiRouter = Router();

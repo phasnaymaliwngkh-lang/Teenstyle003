@@ -58,6 +58,25 @@ export const STORE_SHIPPING_DAYS = 'จันทร์ – เสาร์';
 /** จำนวนวันที่ลูกค้าแจ้งเปลี่ยน/คืนสินค้าได้ นับจากวันที่ขนส่งขึ้นสถานะ "ส่งมอบสำเร็จ" */
 export const RETURN_WINDOW_DAYS = 7;
 
+/**
+ * โซนเวลาที่ใช้นิยาม "หนึ่งวันทำการของร้าน" (STEP 26)
+ *
+ * ⚠️ **แหล่งความจริงเดียว — ทั้งฝั่ง SQL และ TypeScript ต้องใช้ค่านี้ค่าเดียวกัน**
+ *
+ *    คอลัมน์เวลาของโปรเจกต์นี้เป็น `timestamp without time zone` (ค่าเริ่มต้นของ Prisma
+ *    บน PostgreSQL) ซึ่งเก็บ **หน้าปัดเวลา UTC** ไว้ · `date_trunc('day', ...)` เปล่า ๆ
+ *    จึงตัดวันแบบ UTC → ยอดขายของร้านไทยช่วง 00:00–07:00 น. ไปกองอยู่ใน "เมื่อวาน" ทุกวัน
+ *    กราฟและยอดรายวันผิดทั้งแผ่นโดยไม่มีอะไรฟ้อง
+ *    → ต้องแปลงสองทอดเสมอ: `"paidAt" AT TIME ZONE 'UTC' AT TIME ZONE ${STORE_TIME_ZONE}`
+ *      (ทอดเดียวแปลผิดทาง เพราะคอลัมน์ไม่มีโซนติดมา)
+ *
+ *    ฝั่ง TypeScript ห้ามฮาร์ดโค้ด `+07:00` แม้ประเทศไทยจะไม่มี DST
+ *    เพราะถ้าร้านย้ายโซนเวลา ค่าคงที่นั้นจะเพี้ยนเงียบ ๆ ในขณะที่ SQL ยังถูกอยู่
+ *    ให้ใช้ `zonedDayStart()` / `zonedDayEnd()` / `utcTs()` ใน `models/analytics.model.ts`
+ *    ซึ่งอ่านค่านี้และจัดการรายละเอียดข้างต้นให้แล้ว
+ */
+export const STORE_TIME_ZONE = 'Asia/Bangkok';
+
 /** ช่องทางติดต่อที่เปิดใช้งานจริงเท่านั้น */
 export function availableContactChannels(): StoreContactChannel[] {
   return STORE_CONTACT_CHANNELS.filter((channel) => channel.value !== null);

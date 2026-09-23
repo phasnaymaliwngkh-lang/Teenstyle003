@@ -94,6 +94,12 @@ export default async function AdminDashboardPage() {
 
         <div className="flex flex-wrap gap-2">
           <Link
+            href="/admin/analytics"
+            className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            รายงานยอดขาย
+          </Link>
+          <Link
             href="/admin/customers"
             className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
           >

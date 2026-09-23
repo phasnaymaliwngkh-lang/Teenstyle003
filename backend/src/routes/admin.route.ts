@@ -50,6 +50,13 @@ import {
   updateCustomerRoleHandler,
   updateCustomerStatusHandler,
 } from '../controllers/admin-customer.controller.ts';
+import {
+  customerRankingHandler,
+  exportAnalyticsHandler,
+  productPerformanceHandler,
+  salesBreakdownHandler,
+  salesSummaryHandler,
+} from '../controllers/analytics.controller.ts';
 import { adminSupportRouter } from './admin-support.route.ts';
 import { adminKnowledgeRouter } from './knowledge.route.ts';
 import multer from 'multer';
@@ -237,3 +244,27 @@ adminRouter.patch(
   requirePermission('user:role:manage'),
   updateCustomerRoleHandler,
 );
+
+/**
+ * รายงานยอดขาย (STEP 26)
+ *
+ * ใช้สิทธิ์ `analytics:read` ชุดเดียวกับหน้าภาพรวมร้าน (ADMIN ขึ้นไปตาม seed)
+ * **พนักงานหน้าร้านไม่ควรเห็นยอดขายทั้งร้านและอันดับลูกค้ารายคน** ซึ่งเป็นข้อมูลเชิงธุรกิจ
+ * ต่างจาก `customer:read` ที่ให้ EMPLOYEE ดูได้เพราะต้องใช้ตอบคำถามลูกค้า
+ *
+ * ทุกเส้นทางเป็น GET เพราะหน้ารายงานเป็น Server Component ที่เรียกแบบ server-to-server
+ * ซึ่งไม่มี header `Origin` → `verifyOrigin` จะบล็อก POST (บทเรียนจาก STEP 17 ข้อ 7)
+ */
+adminRouter.get('/analytics/summary', requirePermission('analytics:read'), salesSummaryHandler);
+adminRouter.get(
+  '/analytics/products',
+  requirePermission('analytics:read'),
+  productPerformanceHandler,
+);
+adminRouter.get(
+  '/analytics/customers',
+  requirePermission('analytics:read'),
+  customerRankingHandler,
+);
+adminRouter.get('/analytics/breakdown', requirePermission('analytics:read'), salesBreakdownHandler);
+adminRouter.get('/analytics/export', requirePermission('analytics:read'), exportAnalyticsHandler);

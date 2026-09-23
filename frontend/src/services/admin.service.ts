@@ -228,3 +228,18 @@ export function importAdminProducts(file: File, dryRun = false): Promise<Product
 export function importAdminInventory(file: File, dryRun = false): Promise<InventoryImportResult> {
   return uploadFile<InventoryImportResult>("/api/admin/import/inventory", file, dryRun);
 }
+
+/**
+ * ดาวน์โหลดรายงานยอดขายของช่วงที่เลือก (STEP 26)
+ *
+ * ใช้ตัวช่วยดาวน์โหลดตัวเดียวกับการส่งออกของ STEP 18 เพื่อให้เรื่อง cookie
+ * ชื่อไฟล์จาก `Content-Disposition` และการจัดการ error เป็นแบบเดียวกันทั้งระบบ
+ */
+export function downloadAnalyticsReport(query: string, format: FileFormat): Promise<void> {
+  const q = query.replace(/^\?/, "");
+
+  return triggerFileDownload(
+    `/api/admin/analytics/export?format=${format}${q ? `&${q}` : ""}`,
+    `analytics_report.${format}`,
+  );
+}

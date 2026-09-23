@@ -4,7 +4,26 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 25 เสร็จ — Customer Management (`/account/profile`, `/account/addresses`, `/admin/customers`)**
+**ล่าสุด: STEP 26 เสร็จ — Analytics (`/admin/analytics` + ส่งออก CSV/Excel)**
+รายงานยอดขายที่ตัวเลขทุกตัวมาจากคำสั่งซื้อจริง ไม่มีกราฟหรือยอดตัวอย่างแม้แต่จุดเดียว ·
+**เจอบั๊กโซนเวลาที่จะทำให้รายงานผิดทั้งแผ่นโดยไม่มีอะไรฟ้อง** — คอลัมน์เวลาของโปรเจกต์เป็น
+`timestamp without time zone` (ค่าเริ่มต้นของ Prisma) ที่เก็บหน้าปัด UTC ไว้ ต้องแปลงสองทอด
+`AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok'` และ **ห้ามใส่ `Date` ลง `$queryRaw` ตรง ๆ**
+เพราะ PostgreSQL ตีความด้วย TimeZone ของ session แล้วจุดเวลาเลื่อนตามเครื่องที่รัน ·
+ที่อันตรายที่สุดคือ **บนเซิร์ฟเวอร์ที่ TimeZone เป็น UTC โค้ดแบบผิดจะให้ผลถูก** บั๊กจึงผ่าน CI
+แล้วไปโผล่ตอน deploy — มี test ที่สร้างออเดอร์ "ได้เงินตี 2 ครึ่งตามเวลาไทย" ยืนยันว่าอยู่ในวันที่ถูก
+และตรวจกับแอปจริงแล้วเห็นชัดว่า UTC จะตัดเป็นวันที่ 19 ส่วนเวลาไทยตัดเป็นวันที่ 20 ·
+**ยอดขายตัดรอบตาม `paidAt` ไม่ใช่ `createdAt`** (สำคัญกับ COD ที่ได้เงินตอนส่งถึง) ·
+**ช่วงที่ไม่มีคำสั่งซื้อเป็นจุด 0 ในกราฟ ไม่ใช่หายไป** ไม่งั้นกราฟดูเหมือนขายได้ต่อเนื่อง ·
+**ช่วงก่อนหน้าเป็น 0 → ไม่แสดงเปอร์เซ็นต์ แต่บอกว่าเทียบไม่ได้** (ไม่ใช่ +100%) ·
+**อันดับสินค้าและลูกค้าเรียงก่อนแบ่งหน้าด้วย SQL** — ปิดหนี้ที่ STEP 25 กันไว้ ·
+ยอดตามบิลกับยอดเฉพาะสินค้าไม่เท่ากันโดยธรรมชาติ (ต่างที่ค่าส่งลบส่วนลด) และหน้าเว็บอธิบายไว้ ·
+จัดกลุ่มสินค้าด้วย `productId` เท่านั้น ไม่ใส่ชื่อ snapshot ลง GROUP BY (สินค้าเปลี่ยนชื่อจะแตกแถว) ·
+ใช้สิทธิ์ `analytics:read` (ADMIN ขึ้นไป) ไม่ใช่ `customer:read` ·
+กราฟวาดด้วย SVG เอง ไม่เพิ่ม dependency และมีตารางข้อมูลจริงคู่กันให้ screen reader ·
+ส่งออก Excel 5 ชีต / CSV 1 ชีต จากฟังก์ชันเดียวกับที่หน้าเว็บใช้ · test 506 เคส (เพิ่ม 39) ผ่านทั้งหมด
+
+**STEP 25:** Customer Management (`/account/profile`, `/account/addresses`, `/admin/customers`)
 ลูกค้าดูแลข้อมูลตัวเองได้ และร้านจัดการบัญชีผู้ใช้ได้ โดยทุกด่านสำคัญอยู่ที่ server ·
 **ลูกค้าแก้ได้แค่ชื่อ เบอร์โทร วันเกิด และสวิตช์การแนะนำ** — `email` แก้ไม่ได้เพราะเป็นตัวระบุ
 บัญชี Google ที่ใช้ผูกบัญชี ส่วน `role` `status` `points` `loyaltyTier` `totalSpent`
@@ -224,7 +243,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 |   17 | Barcode / QR                    |  ✅   |
 |   18 | Import / Export (CSV, Excel)    |  ✅   |
 |   25 | Customer Management             |  ✅   |
-|   26 | Analytics                       |  ⬜   |
+|   26 | Analytics                       |  ✅   |
 |   27 | Admin Logs (Audit)              |  🚧   |
 |   41 | Promotion / Coupon              |  ⬜   |
 |   42 | Loyalty / Points                |  ⬜   |
@@ -248,7 +267,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 | ---: | --------------------------------- | :---: | ------------------------------------------------------------------------------------------------------------------------------------------ |
 |   24 | Notifications                     |  ✅   | ฟีดในบัญชี + กระดิ่งบน navbar · IN_APP เท่านั้น (อีเมลจริง STEP 50) · ประกาศของพนักงานไม่หลุดเข้าฟีดลูกค้า                                 |
 |   28 | Security                          |  🚧   | helmet · cors · rate limit · Zod env · CSRF (Origin) · IDOR · STEP 11: ตรวจลายเซ็น webhook + ไม่เก็บ card data · STEP 25: กัน privilege escalation + เพิกถอน session ตอนระงับบัญชี |
-|   29 | REST API                          |  🚧   | +6..12 storefront/orders · +13..16 admin · +17 `admin/barcodes/*` · +22 `wishlist` · +23 `reviews` + `admin/reviews` · +24 `notifications` · +25 `users/me/profile` + `users/me/addresses` + `admin/customers` |
+|   29 | REST API                          |  🚧   | +6..12 storefront/orders · +13..16 admin · +17 `admin/barcodes/*` · +22 `wishlist` · +23 `reviews` + `admin/reviews` · +24 `notifications` · +25 `users/me/profile` + `users/me/addresses` + `admin/customers` · +26 `admin/analytics/*` |
 |   30 | Error Handling                    |  ✅   | global errorHandler + `{ success, message, errorCode }` + 400/401/403/404/409/422/429/500                                                  |
 |   31 | Responsive                        |  🚧   | จะครบเมื่อมีหน้าจริงตั้งแต่ STEP 4                                                                                                         |
 |   32 | Loading / Empty / Error / Retry   |  ✅   | โครงใช้ซ้ำได้ใน components/shared/section.tsx · ทดสอบ error state แล้วตอน backend ล่ม                                                      |
@@ -256,7 +275,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 |   34 | Performance (cache, index, Redis) |  ⬜   |                                                                                                                                            |
 |   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                                                |
 |   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                                              |
-|   37 | Testing                           |  🚧   | vitest + supertest 467 เคส · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                              |
+|   37 | Testing                           |  🚧   | vitest + supertest 506 เคส · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                              |
 |   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                                              |
 |   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                                            |
 |   40 | Final Audit                       |  ⬜   |                                                                                                                                            |

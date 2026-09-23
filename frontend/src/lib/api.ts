@@ -124,3 +124,29 @@ export async function apiFetch<TData>(
     clearTimeout(timeout);
   }
 }
+
+/**
+ * ข้อความ error ที่อธิบายสาเหตุจริงให้ผู้ใช้ได้
+ *
+ * ⚠️ `ApiClientError.message` ของข้อผิดพลาดจาก Zod เป็นข้อความรวม
+ *    ("ข้อมูลที่ส่งมาไม่ถูกต้อง") ซึ่งไม่บอกว่าต้องแก้อะไร
+ *    สาเหตุจริงอยู่ใน `details[].message` เช่น "ดูรายงานได้ครั้งละไม่เกิน 366 วัน"
+ *    → หน้าไหนที่ผู้ใช้กรอกค่าเองให้ใช้ฟังก์ชันนี้แทนการอ่าน `.message` ตรง ๆ
+ *    (บทเรียนเดียวกับ STEP 15: ข้อความ error ต้องบอกให้ผู้ใช้แก้ถูก)
+ */
+export function errorMessageOf(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiClientError)) return fallback;
+
+  if (Array.isArray(error.details)) {
+    const first = error.details.find(
+      (item): item is { message: string } =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as { message?: unknown }).message === "string",
+    );
+
+    if (first) return first.message;
+  }
+
+  return error.message;
+}

@@ -4,6 +4,13 @@ import { getPrisma, isValidGtin, Prisma } from '@teenstyle/database';
 import ExcelJS from 'exceljs';
 
 import { resolveStockStatus } from '../models/product.model.ts';
+import {
+  MIME_CSV,
+  MIME_XLSX,
+  styleWorksheet,
+  workbookToBuffer,
+  type ExportResult,
+} from '../models/spreadsheet.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type {
   ExportInventoryQuery,
@@ -31,11 +38,7 @@ import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
  *   5. บันทึก AdminLog สำหรับทุกการนำเข้า
  */
 
-export interface ExportResult {
-  buffer: Buffer;
-  filename: string;
-  mimeType: string;
-}
+export type { ExportResult };
 
 export interface ImportErrorDetail {
   row: number;
@@ -103,45 +106,8 @@ export interface InventoryImportResult {
 
 /* ─────────────────────────── File Helpers ─────────────────────────── */
 
-const MIME_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-const MIME_CSV = 'text/csv; charset=utf-8';
-const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf]);
-
-function styleWorksheet(worksheet: ExcelJS.Worksheet): void {
-  // สไตล์ header: พื้นหลัง lilac, ตัวหนา, เส้นขอบล่าง
-  const headerRow = worksheet.getRow(1);
-  headerRow.font = { bold: true, color: { argb: 'FF5B21B6' } }; // brand-dark
-  headerRow.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FFEDE9FE' }, // lilac
-  };
-  headerRow.alignment = { vertical: 'middle' };
-  headerRow.height = 24;
-
-  // ปรับความกว้างคอลัมน์อัตโนมัติตามความยาวเนื้อหา
-  worksheet.columns.forEach((column) => {
-    let maxLength = 12;
-    if (column.header) {
-      maxLength = Math.max(maxLength, String(column.header).length + 4);
-    }
-    column.eachCell?.({ includeEmpty: false }, (cell) => {
-      const valStr = cell.value ? String(cell.value) : '';
-      maxLength = Math.max(maxLength, Math.min(valStr.length + 2, 50));
-    });
-    column.width = maxLength;
-  });
-}
-
-async function workbookToBuffer(workbook: ExcelJS.Workbook, format: FileFormat): Promise<Buffer> {
-  if (format === 'csv') {
-    const rawCsv = (await workbook.csv.writeBuffer()) as unknown as Buffer;
-    return Buffer.concat([UTF8_BOM, Buffer.from(rawCsv)]);
-  }
-
-  const rawXlsx = (await workbook.xlsx.writeBuffer()) as unknown as Buffer;
-  return Buffer.from(rawXlsx);
-}
+// สไตล์หัวตาราง · UTF-8 BOM · MIME type ย้ายไป models/spreadsheet.ts ตอน STEP 26
+// (รายงานยอดขายใช้ชุดเดียวกัน ไฟล์ที่ส่งออกจากทุกที่จึงหน้าตาเหมือนกัน)
 
 function isZipBuffer(buf: Buffer): boolean {
   return (
