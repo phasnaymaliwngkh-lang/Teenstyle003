@@ -2,6 +2,7 @@ import { getPrisma, Prisma } from '@teenstyle/database';
 
 import { resolveStockStatus } from '../models/product.model.ts';
 import { ApiError } from '../utils/api-error.ts';
+import { writeAdminLog } from '../models/admin-log.model.ts';
 import type {
   AdjustStockInput,
   InventoryListQuery,
@@ -485,17 +486,13 @@ export async function adjustStock(
       data: { totalStock: { increment: delta } },
     });
 
-    await tx.adminLog.create({
-      data: {
-        userId: actor.id,
-        action: `inventory.${input.type.toLowerCase()}`,
-        targetType: 'INVENTORY',
-        targetId: variantId,
-        before: { quantity: before, sku: variant.sku, product: variant.product.name },
-        after: { quantity: after, delta, reason: input.reason },
-        ...(actor.ip !== undefined ? { ipAddress: actor.ip } : {}),
-        ...(actor.userAgent !== undefined ? { userAgent: actor.userAgent } : {}),
-      },
+    await writeAdminLog(tx, {
+      actor,
+      action: `inventory.${input.type.toLowerCase()}`,
+      targetType: 'Inventory',
+      targetId: variantId,
+      before: { quantity: before, sku: variant.sku, product: variant.product.name },
+      after: { quantity: after, delta, reason: input.reason },
     });
   });
 

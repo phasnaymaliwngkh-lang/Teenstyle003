@@ -7,6 +7,7 @@ import { renderSymbol, symbologyForGtin, type Symbology } from '../models/barcod
 import { resolveVariantPrice } from '../models/pricing.ts';
 import { resolveStockStatus } from '../models/product.model.ts';
 import { ApiError } from '../utils/api-error.ts';
+import { writeAdminLog } from '../models/admin-log.model.ts';
 import type { LabelRequestInput } from '../validators/barcode.validator.ts';
 
 import type { AdminActor } from './product-admin.service.ts';
@@ -442,17 +443,13 @@ export async function assignInternalBarcode(
       return await prisma.$transaction(async (tx) => {
         await tx.productVariant.update({ where: { id: variantId }, data: { barcode: candidate } });
 
-        await tx.adminLog.create({
-          data: {
-            userId: actor.id,
-            action: 'product.variant.barcode.assign',
-            targetType: 'PRODUCT',
-            targetId: variant.productId,
-            before: { variantId, sku: variant.sku, barcode: null },
-            after: { variantId, sku: variant.sku, barcode: candidate, source: 'INTERNAL' },
-            ...(actor.ip !== undefined ? { ipAddress: actor.ip } : {}),
-            ...(actor.userAgent !== undefined ? { userAgent: actor.userAgent } : {}),
-          },
+        await writeAdminLog(tx, {
+          actor,
+          action: 'product.variant.barcode.assign',
+          targetType: 'Product',
+          targetId: variant.productId,
+          before: { variantId, sku: variant.sku, barcode: null },
+          after: { variantId, sku: variant.sku, barcode: candidate, source: 'INTERNAL' },
         });
 
         return {

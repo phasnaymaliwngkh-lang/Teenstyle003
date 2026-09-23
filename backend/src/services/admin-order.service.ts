@@ -2,6 +2,7 @@ import { getPrisma, Prisma } from '@teenstyle/database';
 
 import { toOrder, type OrderDto } from '../models/order.model.ts';
 import { toNumber } from '../models/pricing.ts';
+import { writeAdminLog } from '../models/admin-log.model.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type { UpdateOrderStatusInput } from '../validators/admin.validator.ts';
 
@@ -352,22 +353,18 @@ export async function updateOrderStatus(
     });
 
     // audit trail: ใครเปลี่ยนอะไร เมื่อไร (STEP 27 จะทำหน้าดู log)
-    await tx.adminLog.create({
-      data: {
-        userId: actor.id,
-        action: 'order.status.update',
-        targetType: 'ORDER',
-        targetId: current.id,
-        before: { status: current.status, paymentStatus: current.paymentStatus },
-        after: {
-          status: input.status,
-          ...(input.trackingNumber !== undefined
-            ? { carrier: input.carrier, trackingNumber: input.trackingNumber }
-            : {}),
-          ...(input.adminNote !== undefined ? { adminNote: input.adminNote } : {}),
-        },
-        ...(actor.ip !== undefined ? { ipAddress: actor.ip } : {}),
-        ...(actor.userAgent !== undefined ? { userAgent: actor.userAgent } : {}),
+    await writeAdminLog(tx, {
+      actor,
+      action: 'order.status.update',
+      targetType: 'Order',
+      targetId: current.id,
+      before: { status: current.status, paymentStatus: current.paymentStatus },
+      after: {
+        status: input.status,
+        ...(input.trackingNumber !== undefined
+          ? { carrier: input.carrier, trackingNumber: input.trackingNumber }
+          : {}),
+        ...(input.adminNote !== undefined ? { adminNote: input.adminNote } : {}),
       },
     });
   });

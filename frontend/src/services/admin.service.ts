@@ -243,3 +243,18 @@ export function downloadAnalyticsReport(query: string, format: FileFormat): Prom
     `analytics_report.${format}`,
   );
 }
+
+/**
+ * ดาวน์โหลดประวัติการแก้ไขของช่วง/ตัวกรองที่กำลังดูอยู่ (STEP 27)
+ *
+ * ⚠️ ไฟล์นี้มี IP และ User-Agent ของพนักงาน — ต้องมีสิทธิ์ `log:read`
+ *    และระยะเวลาเก็บข้อมูลเป็นเรื่องที่ STEP 53 จะกำหนด
+ */
+export function downloadAdminLogs(query: string, format: FileFormat): Promise<void> {
+  const q = query.replace(/^\?/, "");
+
+  return triggerFileDownload(
+    `/api/admin/logs/export?format=${format}${q ? `&${q}` : ""}`,
+    `admin_logs.${format}`,
+  );
+}

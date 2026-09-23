@@ -4,7 +4,27 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 26 เสร็จ — Analytics (`/admin/analytics` + ส่งออก CSV/Excel)**
+**ล่าสุด: STEP 27 เสร็จ — Admin Logs / Audit (`/admin/logs`)**
+ตาราง `AdminLog` ถูกเขียนมาตั้งแต่ STEP 13 แต่ยังไม่มีใครอ่านได้ — STEP 27 ทำให้อ่านย้อนหลังได้จริง
+พร้อมแก้หนี้สองอย่างที่เจอจากข้อมูลจริง ·
+**หนี้ที่ 1: `targetType` เคยถูกเขียนสองแบบสำหรับเรื่องเดียวกัน** (`KnowledgeArticle` 64 แถว
+vs `KNOWLEDGE_ARTICLE` 5 แถว · `PRODUCT`/`ORDER` ตัวใหญ่ ปนกับ `User`/`Review` ตัวผสม)
+ถ้าตัวกรองเทียบตรง ๆ แถวอีกครึ่งจะหายไปเงียบ ๆ ซึ่งอันตรายกว่าไม่มีหน้า audit เลย —
+แก้ด้วยการ **ไม่แตะข้อมูลเก่า** (append-only) + ตัวเขียนกลาง `writeAdminLog()` ที่ targetType
+เป็น union พิมพ์ผิดแล้วคอมไพล์ไม่ผ่าน + รวมชื่อเก่าตอนอ่านด้วย `aliasesOf()`
+(ทดสอบกับข้อมูลจริง: กรอง "คลังความรู้ AI" ได้ครบ 91 แถว = 76 ชื่อใหม่ + 15 ชื่อเก่า) ·
+**หนี้ที่ 2: `before` กับ `after` ของ `product.update` มีคีย์คนละชุด** ทำให้หน้าประวัติ
+รายงานว่า "ชื่อสินค้าถูกล้างเป็นค่าว่าง" ทั้งที่ไม่มีใครแตะชื่อ (เจอตอนยิงคำสั่งจริงผ่านแอป) —
+แก้ทั้ง `diffFields()` (ช่องที่ไม่มีใน after = ไม่ได้ถูกรายงาน ไม่ใช่ถูกล้าง)
+และตัวเขียนให้เก็บค่าเดิมเฉพาะช่องที่ถูกแก้จริง ·
+**อ่านอย่างเดียว** ไม่มี endpoint สร้าง/แก้/ลบ (มี test ยืนยันว่าได้ 404) ·
+**แถวที่ผู้ทำรายการถูกลบบัญชีแล้วต้องยังแสดง** พร้อมข้อความ "(บัญชีถูกลบแล้ว)" ไม่ใช่ซ่อนทิ้ง ·
+ตัวเลือกในตัวกรองนับจากข้อมูลจริงในช่วงที่เลือก · ลิงก์ไปของชิ้นนั้นคำนวณที่ backend
+และเป็น null เมื่อยังไม่มีหน้ารายตัว (คำสั่งซื้อต้องแปลง id เป็น orderNumber ก่อน) ·
+ใช้สิทธิ์ `log:read` (ADMIN ขึ้นไป) เพราะ log เก็บ IP · User-Agent · และเหตุผลที่แอดมินกรอก ·
+รีแฟกเตอร์จุดที่เขียน log ทั้ง 8 ไฟล์ให้ผ่านตัวเขียนกลาง · test 536 เคส (เพิ่ม 30) ผ่านทั้งหมด
+
+**STEP 26:** Analytics (`/admin/analytics` + ส่งออก CSV/Excel)
 รายงานยอดขายที่ตัวเลขทุกตัวมาจากคำสั่งซื้อจริง ไม่มีกราฟหรือยอดตัวอย่างแม้แต่จุดเดียว ·
 **เจอบั๊กโซนเวลาที่จะทำให้รายงานผิดทั้งแผ่นโดยไม่มีอะไรฟ้อง** — คอลัมน์เวลาของโปรเจกต์เป็น
 `timestamp without time zone` (ค่าเริ่มต้นของ Prisma) ที่เก็บหน้าปัด UTC ไว้ ต้องแปลงสองทอด
@@ -244,7 +264,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 |   18 | Import / Export (CSV, Excel)    |  ✅   |
 |   25 | Customer Management             |  ✅   |
 |   26 | Analytics                       |  ✅   |
-|   27 | Admin Logs (Audit)              |  🚧   |
+|   27 | Admin Logs (Audit)              |  ✅   |
 |   41 | Promotion / Coupon              |  ⬜   |
 |   42 | Loyalty / Points                |  ⬜   |
 |   44 | Shipping Management             |  ⬜   |
@@ -267,7 +287,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 | ---: | --------------------------------- | :---: | ------------------------------------------------------------------------------------------------------------------------------------------ |
 |   24 | Notifications                     |  ✅   | ฟีดในบัญชี + กระดิ่งบน navbar · IN_APP เท่านั้น (อีเมลจริง STEP 50) · ประกาศของพนักงานไม่หลุดเข้าฟีดลูกค้า                                 |
 |   28 | Security                          |  🚧   | helmet · cors · rate limit · Zod env · CSRF (Origin) · IDOR · STEP 11: ตรวจลายเซ็น webhook + ไม่เก็บ card data · STEP 25: กัน privilege escalation + เพิกถอน session ตอนระงับบัญชี |
-|   29 | REST API                          |  🚧   | +6..12 storefront/orders · +13..16 admin · +17 `admin/barcodes/*` · +22 `wishlist` · +23 `reviews` + `admin/reviews` · +24 `notifications` · +25 `users/me/profile` + `users/me/addresses` + `admin/customers` · +26 `admin/analytics/*` |
+|   29 | REST API                          |  🚧   | +6..12 storefront/orders · +13..16 admin · +17 `admin/barcodes/*` · +22 `wishlist` · +23 `reviews` + `admin/reviews` · +24 `notifications` · +25 `users/me/profile` + `users/me/addresses` + `admin/customers` · +26 `admin/analytics/*` · +27 `admin/logs/*` |
 |   30 | Error Handling                    |  ✅   | global errorHandler + `{ success, message, errorCode }` + 400/401/403/404/409/422/429/500                                                  |
 |   31 | Responsive                        |  🚧   | จะครบเมื่อมีหน้าจริงตั้งแต่ STEP 4                                                                                                         |
 |   32 | Loading / Empty / Error / Retry   |  ✅   | โครงใช้ซ้ำได้ใน components/shared/section.tsx · ทดสอบ error state แล้วตอน backend ล่ม                                                      |
@@ -275,7 +295,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 |   34 | Performance (cache, index, Redis) |  ⬜   |                                                                                                                                            |
 |   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                                                |
 |   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                                              |
-|   37 | Testing                           |  🚧   | vitest + supertest 506 เคส · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                              |
+|   37 | Testing                           |  🚧   | vitest + supertest 536 เคส · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                              |
 |   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                                              |
 |   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                                            |
 |   40 | Final Audit                       |  ⬜   |                                                                                                                                            |

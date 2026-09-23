@@ -107,12 +107,20 @@ export default async function AdminCustomerPage({
           </div>
         </div>
 
-        <Link
-          href={`/admin/orders?q=${encodeURIComponent(customer.email)}`}
-          className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
-        >
-          ดูคำสั่งซื้อทั้งหมด
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/admin/logs?targetType=User&targetId=${customer.id}`}
+            className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            ประวัติการแก้ไขบัญชีนี้
+          </Link>
+          <Link
+            href={`/admin/orders?q=${encodeURIComponent(customer.email)}`}
+            className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            ดูคำสั่งซื้อทั้งหมด
+          </Link>
+        </div>
       </header>
 
       {/* ─── ช่องทางติดต่อ ─── */}

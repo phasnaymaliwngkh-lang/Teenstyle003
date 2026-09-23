@@ -455,7 +455,8 @@ describe('audit trail', () => {
     await adjust({ type: 'STOCK_IN', quantity: 7, reason: 'รับเข้าเพื่อตรวจ AdminLog' });
 
     const log = await prisma.adminLog.findFirstOrThrow({
-      where: { targetType: 'INVENTORY', targetId: variantId },
+      // STEP 27: targetType เป็นค่ามาตรฐานแล้ว — ค้นทั้งชื่อใหม่และชื่อเดิมที่เคยเขียนไว้
+      where: { targetType: { in: ['Inventory', 'INVENTORY'] }, targetId: variantId },
       orderBy: { createdAt: 'desc' },
       select: { userId: true, action: true, before: true, after: true },
     });

@@ -30,7 +30,10 @@ coverage/
 .nyc_output/
 
 # ─── Logs ───────────────────────────────────────────────────────
-logs/
+# ⚠️ ต้องมี `/` นำหน้า — `logs/` เฉย ๆ จะ match โฟลเดอร์ชื่อ logs **ทุกที่ในโปรเจกต์**
+#    รวมถึงโค้ดจริงอย่าง frontend/src/app/admin/logs/ (หน้า audit ของ STEP 27)
+#    ซึ่งจะหายไปจาก commit เงียบ ๆ แล้วเว็บที่ deploy ขึ้นไปจะ 404 ทั้งที่เครื่องตัวเองปกติ
+/logs/
 *.log
 npm-debug.log*
 yarn-debug.log*

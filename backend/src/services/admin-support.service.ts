@@ -1,6 +1,7 @@
 import { getPrisma, type Prisma } from '@teenstyle/database';
 
 import { ApiError } from '../utils/api-error.ts';
+import { writeAdminLog } from '../models/admin-log.model.ts';
 
 export interface AdminActor {
   id: string;
@@ -235,17 +236,13 @@ export async function assignSupportAgent(
       },
     });
 
-    await tx.adminLog.create({
-      data: {
-        userId: actor.id,
-        action: 'support.ticket.assign',
-        targetType: 'AIConversation',
-        targetId: id,
-        before: { assignedToId: existing.assignedToId },
-        after: { assignedToId: actor.id },
-        ipAddress: actor.ip,
-        userAgent: actor.userAgent,
-      },
+    await writeAdminLog(tx, {
+      actor,
+      action: 'support.ticket.assign',
+      targetType: 'AIConversation',
+      targetId: id,
+      before: { assignedToId: existing.assignedToId },
+      after: { assignedToId: actor.id },
     });
 
     return {
@@ -296,16 +293,12 @@ export async function sendAgentReply(
       },
     });
 
-    await tx.adminLog.create({
-      data: {
-        userId: actor.id,
-        action: 'support.ticket.reply',
-        targetType: 'AIConversation',
-        targetId: id,
-        after: { messageId: createdMsg.id, length: content.length },
-        ipAddress: actor.ip,
-        userAgent: actor.userAgent,
-      },
+    await writeAdminLog(tx, {
+      actor,
+      action: 'support.ticket.reply',
+      targetType: 'AIConversation',
+      targetId: id,
+      after: { messageId: createdMsg.id, length: content.length },
     });
 
     return {
@@ -359,17 +352,13 @@ export async function updateSupportStatus(
       });
     }
 
-    await tx.adminLog.create({
-      data: {
-        userId: actor.id,
-        action: 'support.ticket.status',
-        targetType: 'AIConversation',
-        targetId: id,
-        before: { status: existing.status },
-        after: { status },
-        ipAddress: actor.ip,
-        userAgent: actor.userAgent,
-      },
+    await writeAdminLog(tx, {
+      actor,
+      action: 'support.ticket.status',
+      targetType: 'AIConversation',
+      targetId: id,
+      before: { status: existing.status },
+      after: { status },
     });
 
     return {

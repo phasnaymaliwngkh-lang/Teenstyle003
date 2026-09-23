@@ -4,6 +4,7 @@ import { getPrisma, isValidGtin, Prisma } from '@teenstyle/database';
 import ExcelJS from 'exceljs';
 
 import { resolveStockStatus } from '../models/product.model.ts';
+import { writeAdminLog } from '../models/admin-log.model.ts';
 import {
   MIME_CSV,
   MIME_XLSX,
@@ -957,22 +958,17 @@ export async function importProducts(
     }
 
     // เขียน Audit log
-    await tx.adminLog.create({
-      data: {
-        userId: actor.id,
-        action: 'product.import',
-        targetType: 'PRODUCT',
-        targetId: 'BATCH',
-        before: Prisma.JsonNull,
-        after: {
-          createdProducts,
-          updatedProducts,
-          createdVariants,
-          updatedVariants,
-          totalRows: validRows.length,
-        },
-        ...(actor.ip ? { ipAddress: actor.ip } : {}),
-        ...(actor.userAgent ? { userAgent: actor.userAgent } : {}),
+    await writeAdminLog(tx, {
+      actor,
+      action: 'product.import',
+      targetType: 'Product',
+      targetId: 'BATCH',
+      after: {
+        createdProducts,
+        updatedProducts,
+        createdVariants,
+        updatedVariants,
+        totalRows: validRows.length,
       },
     });
   });
@@ -1267,19 +1263,14 @@ export async function importInventory(
       });
     }
 
-    await tx.adminLog.create({
-      data: {
-        userId: actor.id,
-        action: 'inventory.import_adjust',
-        targetType: 'INVENTORY',
-        targetId: 'BATCH',
-        before: Prisma.JsonNull,
-        after: {
-          adjustedCount: validExecutions.length,
-          totalRows: candidateRows.length,
-        },
-        ...(actor.ip ? { ipAddress: actor.ip } : {}),
-        ...(actor.userAgent ? { userAgent: actor.userAgent } : {}),
+    await writeAdminLog(tx, {
+      actor,
+      action: 'inventory.import_adjust',
+      targetType: 'Inventory',
+      targetId: 'BATCH',
+      after: {
+        adjustedCount: validExecutions.length,
+        totalRows: candidateRows.length,
       },
     });
   });

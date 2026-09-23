@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 
 import { env } from '../config/env.ts';
 import { ApiError } from '../utils/api-error.ts';
+import { writeAdminLog } from '../models/admin-log.model.ts';
 import { logger } from '../utils/logger.ts';
 import {
   INITIAL_KNOWLEDGE_ARTICLES,
@@ -511,16 +512,12 @@ export async function adminCreateArticle(
 
       const dto = toArticleDto(created);
 
-      await tx.adminLog.create({
-        data: {
-          userId: actor.id ?? null,
-          action: 'knowledge.create',
-          targetType: 'KnowledgeArticle',
-          targetId: dto.id,
-          after: dto as unknown as Prisma.InputJsonValue,
-          ipAddress: actor.ip,
-          userAgent: actor.userAgent,
-        },
+      await writeAdminLog(tx, {
+        actor,
+        action: 'knowledge.create',
+        targetType: 'KnowledgeArticle',
+        targetId: dto.id,
+        after: dto as unknown as Prisma.InputJsonValue,
       });
 
       return dto;
@@ -589,17 +586,13 @@ export async function adminUpdateArticle(
 
       const after = toArticleDto(updated);
 
-      await tx.adminLog.create({
-        data: {
-          userId: actor.id ?? null,
-          action: 'knowledge.update',
-          targetType: 'KnowledgeArticle',
-          targetId: id,
-          before: before as unknown as Prisma.InputJsonValue,
-          after: after as unknown as Prisma.InputJsonValue,
-          ipAddress: actor.ip,
-          userAgent: actor.userAgent,
-        },
+      await writeAdminLog(tx, {
+        actor,
+        action: 'knowledge.update',
+        targetType: 'KnowledgeArticle',
+        targetId: id,
+        before: before as unknown as Prisma.InputJsonValue,
+        after: after as unknown as Prisma.InputJsonValue,
       });
 
       return after;
@@ -634,16 +627,12 @@ export async function adminDeleteArticle(
   await prisma.$transaction(async (tx) => {
     await tx.knowledgeArticle.delete({ where: { id } });
 
-    await tx.adminLog.create({
-      data: {
-        userId: actor.id ?? null,
-        action: 'knowledge.delete',
-        targetType: 'KnowledgeArticle',
-        targetId: id,
-        before: before as unknown as Prisma.InputJsonValue,
-        ipAddress: actor.ip,
-        userAgent: actor.userAgent,
-      },
+    await writeAdminLog(tx, {
+      actor,
+      action: 'knowledge.delete',
+      targetType: 'KnowledgeArticle',
+      targetId: id,
+      before: before as unknown as Prisma.InputJsonValue,
     });
   });
 
@@ -685,16 +674,12 @@ export async function adminResetDefaults(actor: KnowledgeActor = {}): Promise<{ 
       });
     }
 
-    await tx.adminLog.create({
-      data: {
-        userId: actor.id ?? null,
-        action: 'knowledge.reset',
-        targetType: 'KnowledgeArticle',
-        before: { articleCount: removed } as Prisma.InputJsonValue,
-        after: { articleCount: INITIAL_KNOWLEDGE_ARTICLES.length } as Prisma.InputJsonValue,
-        ipAddress: actor.ip,
-        userAgent: actor.userAgent,
-      },
+    await writeAdminLog(tx, {
+      actor,
+      action: 'knowledge.reset',
+      targetType: 'KnowledgeArticle',
+      before: { articleCount: removed },
+      after: { articleCount: INITIAL_KNOWLEDGE_ARTICLES.length },
     });
   });
 

@@ -312,7 +312,8 @@ describe('PATCH /api/admin/orders/:orderNumber/status', () => {
     });
 
     expect(log.userId).toBe(staff.id);
-    expect(log.targetType).toBe('ORDER');
+    // STEP 27: targetType เป็นค่ามาตรฐานจาก writeAdminLog แล้ว (เดิมเขียน 'ORDER')
+    expect(log.targetType).toBe('Order');
     expect(JSON.stringify(log.before)).toContain('PROCESSING');
     expect(JSON.stringify(log.after)).toContain('PACKING');
   });

@@ -57,6 +57,12 @@ import {
   salesBreakdownHandler,
   salesSummaryHandler,
 } from '../controllers/analytics.controller.ts';
+import {
+  adminLogFiltersHandler,
+  exportAdminLogsHandler,
+  listAdminLogsHandler,
+  targetHistoryHandler,
+} from '../controllers/admin-log.controller.ts';
 import { adminSupportRouter } from './admin-support.route.ts';
 import { adminKnowledgeRouter } from './knowledge.route.ts';
 import multer from 'multer';
@@ -268,3 +274,22 @@ adminRouter.get(
 );
 adminRouter.get('/analytics/breakdown', requirePermission('analytics:read'), salesBreakdownHandler);
 adminRouter.get('/analytics/export', requirePermission('analytics:read'), exportAnalyticsHandler);
+
+/**
+ * Audit log (STEP 27)
+ *
+ * ใช้สิทธิ์ `log:read` (ADMIN ขึ้นไปตาม seed) เพราะ log เก็บ **IP · User-Agent ·
+ * และเนื้อหาของ before/after** ซึ่งรวมข้อมูลส่วนบุคคลและเหตุผลที่แอดมินกรอกไว้
+ * พนักงานหน้าร้านไม่ควรเห็นว่าใครถูกระงับบัญชีเพราะอะไร
+ *
+ * ⚠️ **มีแต่ GET** — ไม่มีทางสร้าง แก้ หรือลบ log ผ่าน API
+ * ⚠️ ลำดับสำคัญ: เส้นทางคงที่ (`/filters`, `/export`, `/target/...`) ต้องมาก่อนเส้นทางอื่น
+ */
+adminRouter.get('/logs/filters', requirePermission('log:read'), adminLogFiltersHandler);
+adminRouter.get('/logs/export', requirePermission('log:read'), exportAdminLogsHandler);
+adminRouter.get(
+  '/logs/target/:targetType/:targetId',
+  requirePermission('log:read'),
+  targetHistoryHandler,
+);
+adminRouter.get('/logs', requirePermission('log:read'), listAdminLogsHandler);

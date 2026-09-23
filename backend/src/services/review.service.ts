@@ -15,6 +15,7 @@ import {
   type ReviewSummaryDto,
 } from '../models/review.model.ts';
 import { ApiError } from '../utils/api-error.ts';
+import { writeAdminLog } from '../models/admin-log.model.ts';
 
 import { notifyReviewModerated, notifySafely } from './notification.service.ts';
 
@@ -780,17 +781,13 @@ export async function adminModerateReview(
 
     const after = toAdminReviewDto(updated);
 
-    await tx.adminLog.create({
-      data: {
-        userId: actor.id ?? null,
-        action: 'review.moderate',
-        targetType: 'Review',
-        targetId: reviewId,
-        before: toAdminReviewDto(before) as unknown as Prisma.InputJsonValue,
-        after: after as unknown as Prisma.InputJsonValue,
-        ipAddress: actor.ip,
-        userAgent: actor.userAgent,
-      },
+    await writeAdminLog(tx, {
+      actor,
+      action: 'review.moderate',
+      targetType: 'Review',
+      targetId: reviewId,
+      before: toAdminReviewDto(before) as unknown as Prisma.InputJsonValue,
+      after: after as unknown as Prisma.InputJsonValue,
     });
 
     return after;

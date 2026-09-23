@@ -3,6 +3,7 @@ import { getPrisma, Prisma } from '@teenstyle/database';
 import { AVAILABLE_STOCK_SQL } from '../models/availability.ts';
 import { resolveProductPrice, resolveVariantPrice, toNumber } from '../models/pricing.ts';
 import { resolveStockStatus } from '../models/product.model.ts';
+import { writeAdminLog } from '../models/admin-log.model.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type {
   AddVariantInput,
@@ -461,18 +462,7 @@ async function writeLog(
   before: Prisma.InputJsonValue | null,
   after: Prisma.InputJsonValue,
 ): Promise<void> {
-  await tx.adminLog.create({
-    data: {
-      userId: actor.id,
-      action,
-      targetType: 'PRODUCT',
-      targetId,
-      ...(before !== null ? { before } : {}),
-      after,
-      ...(actor.ip !== undefined ? { ipAddress: actor.ip } : {}),
-      ...(actor.userAgent !== undefined ? { userAgent: actor.userAgent } : {}),
-    },
-  });
+  await writeAdminLog(tx, { actor, action, targetType: 'Product', targetId, before, after });
 }
 
 /**
@@ -603,6 +593,12 @@ export async function updateProduct(
           status: true,
           minimumStock: true,
           publishedAt: true,
+          // ช่องด้านล่างดึงมาเพื่อบันทึก "ค่าเดิม" ลง audit log ให้ครบทุกช่องที่ PATCH แก้ได้
+          description: true,
+          shortDescription: true,
+          categoryId: true,
+          brandId: true,
+          tags: true,
           images: { select: { id: true } },
           variants: { select: { isActive: true, deletedAt: true } },
         },
@@ -679,22 +675,49 @@ export async function updateProduct(
         },
       });
 
+      /**
+       * ⚠️ `before` ต้องมี **คีย์เดียวกับ `after`** ไม่ใช่สแนปช็อตเต็มของสินค้า
+       *    เดิมเก็บ before เป็นชุดคงที่ (ชื่อ · slug · SKU · ราคา · สถานะ) แต่ after
+       *    เก็บเฉพาะช่องที่ผู้ใช้ส่งมาแก้ → หน้าประวัติเทียบแล้วรายงานว่า
+       *    "ชื่อสินค้าถูกล้างเป็นค่าว่าง" ทั้งที่ไม่มีใครแตะชื่อ (เจอจริงตอนตรวจ STEP 27)
+       *    ตอนนี้เก็บค่าเดิมเฉพาะช่องที่ถูกแก้จริง ประวัติจึงอ่านได้ว่า "จาก X เป็น Y"
+       */
+      const after: Record<string, unknown> = {
+        ...input,
+        images: input.images === undefined ? undefined : input.images.length,
+      };
+
+      const currentValues: Record<string, unknown> = {
+        name: current.name,
+        slug: current.slug,
+        sku: current.sku,
+        description: current.description,
+        shortDescription: current.shortDescription,
+        price: toNumber(current.price),
+        salePrice: current.salePrice === null ? null : toNumber(current.salePrice),
+        categoryId: current.categoryId,
+        brandId: current.brandId,
+        minimumStock: current.minimumStock,
+        tags: current.tags,
+        status: current.status,
+        images: current.images.length,
+      };
+
+      const before: Record<string, unknown> = {};
+      for (const key of Object.keys(after)) {
+        if (after[key] === undefined) continue;
+        if (Object.prototype.hasOwnProperty.call(currentValues, key)) {
+          before[key] = currentValues[key];
+        }
+      }
+
       await writeLog(
         tx,
         actor,
         'product.update',
         productId,
-        {
-          name: current.name,
-          slug: current.slug,
-          sku: current.sku,
-          price: toNumber(current.price),
-          status: current.status,
-        },
-        {
-          ...input,
-          images: input.images === undefined ? undefined : input.images.length,
-        } as Prisma.InputJsonValue,
+        before as Prisma.InputJsonValue,
+        after as Prisma.InputJsonValue,
       );
     })
     .catch(rethrowUnique);

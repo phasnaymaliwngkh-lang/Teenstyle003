@@ -43,6 +43,7 @@ const API_ROUTES = [
     status: 'ready (overview · orders · products · inventory · reviews)',
     step: 13,
   },
+  { path: '/api/admin/logs', status: 'ready (อ่านอย่างเดียว · ส่งออกไฟล์ได้)', step: 27 },
   {
     path: '/api/admin/analytics',
     status: 'ready (สรุป · สินค้า · ลูกค้า · แยกมิติ · ส่งออกไฟล์)',

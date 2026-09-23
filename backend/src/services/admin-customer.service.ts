@@ -12,6 +12,7 @@ import {
   type CustomerOrderStats,
   type RoleNameCode,
 } from '../models/customer.model.ts';
+import { writeAdminLog } from '../models/admin-log.model.ts';
 import { toNumber } from '../models/pricing.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type {
@@ -340,20 +341,16 @@ export async function adminUpdateCustomerStatus(
     const revoked =
       input.status === 'ACTIVE' ? { count: 0 } : await tx.session.deleteMany({ where: { userId } });
 
-    await tx.adminLog.create({
-      data: {
-        userId: actor.id,
-        action: 'customer.status.update',
-        targetType: 'User',
-        targetId: userId,
-        before: { status: target.status } as Prisma.InputJsonValue,
-        after: {
-          status: input.status,
-          reason: input.reason,
-          revokedSessions: revoked.count,
-        } as Prisma.InputJsonValue,
-        ipAddress: actor.ip,
-        userAgent: actor.userAgent,
+    await writeAdminLog(tx, {
+      actor,
+      action: 'customer.status.update',
+      targetType: 'User',
+      targetId: userId,
+      before: { status: target.status },
+      after: {
+        status: input.status,
+        reason: input.reason,
+        revokedSessions: revoked.count,
       },
     });
   });
@@ -394,17 +391,13 @@ export async function adminUpdateCustomerRole(
 
     await tx.user.update({ where: { id: userId }, data: { roleId: role.id } });
 
-    await tx.adminLog.create({
-      data: {
-        userId: actor.id,
-        action: 'customer.role.update',
-        targetType: 'User',
-        targetId: userId,
-        before: { role: target.roleName } as Prisma.InputJsonValue,
-        after: { role: input.role, reason: input.reason } as Prisma.InputJsonValue,
-        ipAddress: actor.ip,
-        userAgent: actor.userAgent,
-      },
+    await writeAdminLog(tx, {
+      actor,
+      action: 'customer.role.update',
+      targetType: 'User',
+      targetId: userId,
+      before: { role: target.roleName },
+      after: { role: input.role, reason: input.reason },
     });
   });
 
