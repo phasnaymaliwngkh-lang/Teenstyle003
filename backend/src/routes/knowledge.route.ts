@@ -20,7 +20,17 @@ import { verifyOrigin } from '../middlewares/verify-origin.ts';
 export const publicKnowledgeRouter = Router();
 
 publicKnowledgeRouter.get('/articles', listArticlesHandler);
-publicKnowledgeRouter.get('/articles/:slug', getArticleHandler);
+/**
+ * อ่านบทความฉบับเต็ม — **เส้นทางนี้บวก `viewCount` ที่ฐานข้อมูล**
+ *
+ * จึงต้องมี `strictRateLimiter` ตามกฎ STEP 21 ข้อ 9 (endpoint ที่เพิ่มตัวนับต้องคุมความถี่)
+ * ไม่งั้นยิงรัว ๆ แล้วดันยอดเข้าชมได้ ซึ่งเป็นเลขที่แอดมินใช้ตัดสินใจว่าบทความไหนสำคัญ
+ *
+ * ⚠️ **ต้องถูกเรียกจากเบราว์เซอร์เท่านั้น ห้ามเรียกแบบ server-to-server จาก Server Component**
+ *    limit นับต่อ IP — ถ้าเรียกจากฝั่งเซิร์ฟเวอร์ของ Next ทุกคำขอจะมาจาก IP เดียว
+ *    แล้วผู้ใช้ทั้งเว็บจะแชร์โควตา 20 ครั้ง/นาทีร่วมกัน (ผู้เรียกปัจจุบันคือ faq-viewer.tsx ซึ่งเป็น client component)
+ */
+publicKnowledgeRouter.get('/articles/:slug', strictRateLimiter, getArticleHandler);
 publicKnowledgeRouter.get('/categories', listCategoriesHandler);
 
 /**

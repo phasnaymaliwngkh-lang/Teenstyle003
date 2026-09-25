@@ -26,13 +26,19 @@ describe('GET /health', () => {
 });
 
 describe('GET /api', () => {
-  it('คืนรายการ endpoint ของ API', async () => {
+  /**
+   * STEP 29 เปลี่ยน shape จาก `endpoints` (รายการที่เขียนด้วยมือ ซึ่งปนของที่ยังไม่มีเข้าไปด้วย)
+   * เป็น `groups` ที่นับจาก router จริง + `planned` ที่แยกออกมาชัดเจน
+   * รายละเอียดที่ลึกกว่านี้อยู่ใน api-contract.test.ts
+   */
+  it('คืนสารบัญของ API พร้อมจำนวน endpoint ที่นับจาก router จริง', async () => {
     const response = await request(app).get('/api');
 
     expect(response.status).toBe(200);
     expect(response.body.success).toBe(true);
-    expect(Array.isArray(response.body.data.endpoints)).toBe(true);
-    expect(response.body.data.endpoints.length).toBeGreaterThan(0);
+    expect(Array.isArray(response.body.data.groups)).toBe(true);
+    expect(response.body.data.groups.length).toBeGreaterThan(0);
+    expect(response.body.data.totalEndpoints).toBeGreaterThan(0);
   });
 });
 

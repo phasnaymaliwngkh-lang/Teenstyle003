@@ -66,6 +66,8 @@ import {
 import { adminSupportRouter } from './admin-support.route.ts';
 import { adminKnowledgeRouter } from './knowledge.route.ts';
 import multer from 'multer';
+import { mountRouter } from '../models/api-map.ts';
+import { describeMiddleware } from '../middlewares/describe.ts';
 import { requireAuth } from '../middlewares/authenticate.ts';
 import { requirePermission, requireStaff } from '../middlewares/authorize.ts';
 import { verifyOrigin } from '../middlewares/verify-origin.ts';
@@ -203,6 +205,9 @@ const upload = multer({
   },
 });
 
+/** ติดป้ายไว้ให้แผนผัง API ระบุได้ว่าสองเส้นทางนี้รับไฟล์ (STEP 29) */
+const uploadSingleFile = describeMiddleware(upload.single('file'), { upload: 'file' });
+
 // ส่งออก (Export)
 adminRouter.get('/export/products', requirePermission('product:read'), exportProductsHandler);
 adminRouter.get('/export/inventory', requirePermission('inventory:read'), exportInventoryHandler);
@@ -218,21 +223,21 @@ adminRouter.post(
   '/import/products',
   requirePermission('product:create'),
   requirePermission('product:update'),
-  upload.single('file'),
+  uploadSingleFile,
   importProductsHandler,
 );
 adminRouter.post(
   '/import/inventory',
   requirePermission('inventory:adjust'),
-  upload.single('file'),
+  uploadSingleFile,
   importInventoryHandler,
 );
 
 // ฝ่ายบริการลูกค้า & Human Handoff (STEP 20)
-adminRouter.use('/support', adminSupportRouter);
+mountRouter(adminRouter, '/support', adminSupportRouter);
 
 // AI Knowledge Base Management (STEP 21)
-adminRouter.use('/knowledge', adminKnowledgeRouter);
+mountRouter(adminRouter, '/knowledge', adminKnowledgeRouter);
 
 /**
  * ตรวจรีวิวสินค้า (STEP 23)

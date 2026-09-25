@@ -26,6 +26,7 @@ import Link from "next/link";
 
 import {
   askKnowledgeQuestion,
+  fetchKnowledgeArticle,
   fetchKnowledgeArticles,
   fetchKnowledgeCategories,
   voteKnowledgeHelpful,
@@ -180,6 +181,31 @@ export function FaqViewer() {
       cancelled = true;
     };
   }, [selectedCategory, activeSearch]);
+
+  /**
+   * เปิดอ่านบทความฉบับเต็ม — **และเป็นจุดเดียวที่ยอดเข้าชมถูกนับ**
+   *
+   * รายการบทความ (`GET /articles`) ส่งเนื้อหาเต็มมาให้แล้ว จึงเคยเปิดอ่านจากข้อมูลในมือตรง ๆ
+   * ผลคือ `GET /articles/:slug` ซึ่งเป็นตัวเดียวที่บวก `viewCount` **ไม่มีใครเรียกเลย**
+   * แล้วเลข "เข้าชม N ครั้ง" บนหน้านี้กับยอดรวมบน /admin/knowledge เป็น 0 ตลอดกาล
+   * ทั้งที่มีคนอ่านจริง (ปัญหาชนิดเดียวกับ `User.totalSpent` ของ STEP 25)
+   *
+   * เปิดหน้าต่างก่อนแล้วค่อยยิง เพื่อไม่ให้ผู้ใช้ต้องรอ · ถ้ายิงไม่ผ่านก็ยังอ่านต่อได้จากข้อมูลเดิม
+   * (การนับยอดล้มต้องไม่ทำให้อ่านบทความไม่ได้ — แพตเทิร์นเดียวกับ `notifySafely` ของ STEP 24)
+   */
+  const openArticle = useCallback((article: KnowledgeArticle) => {
+    setReadingArticle(article);
+
+    void (async () => {
+      try {
+        const fresh = await fetchKnowledgeArticle(article.slug);
+        setReadingArticle((current) => (current?.id === fresh.id ? fresh : current));
+        setArticles((prev) => prev.map((item) => (item.id === fresh.id ? fresh : item)));
+      } catch (err) {
+        console.error("Failed to record article view:", err);
+      }
+    })();
+  }, []);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -444,7 +470,7 @@ export function FaqViewer() {
                     onClick={() => {
                       const found = articles.find((a) => a.id === src.id);
                       if (found) {
-                        setReadingArticle(found);
+                        openArticle(found);
                       }
                     }}
                     className="flex items-start gap-2.5 p-3 rounded-xl border border-line bg-white hover:border-brand-soft hover:bg-lilac-50/30 text-left transition group"
@@ -639,7 +665,7 @@ export function FaqViewer() {
                   <div className="flex flex-col items-end gap-2 shrink-0">
                     <button
                       type="button"
-                      onClick={() => setReadingArticle(article)}
+                      onClick={() => openArticle(article)}
                       className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-line px-3.5 py-1.5 text-xs font-bold text-ink hover:border-brand hover:bg-lilac-50 hover:text-brand transition shadow-2xs"
                     >
                       <FileText className="size-3.5" />

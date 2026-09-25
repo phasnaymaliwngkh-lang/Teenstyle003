@@ -12,6 +12,7 @@ import {
   csResetHandler,
 } from '../controllers/ai-cs.controller.ts';
 import { publicKnowledgeRouter } from './knowledge.route.ts';
+import { mountRouter } from '../models/api-map.ts';
 import { attachUser } from '../middlewares/authenticate.ts';
 import { strictRateLimiter } from '../middlewares/rate-limit.ts';
 import { verifyOrigin } from '../middlewares/verify-origin.ts';
@@ -41,4 +42,4 @@ aiRouter.post('/cs/escalate', verifyOrigin, csEscalateHandler);
 aiRouter.post('/cs/reset', verifyOrigin, csResetHandler);
 
 // AI Knowledge Base endpoints (STEP 21)
-aiRouter.use('/knowledge', publicKnowledgeRouter);
+mountRouter(aiRouter, '/knowledge', publicKnowledgeRouter);

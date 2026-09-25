@@ -1,6 +1,7 @@
-import { Router } from 'express';
+import { Router, type Application } from 'express';
 
 import { API_VERSION } from '../config/index.ts';
+import { buildApiMap, methodsUnder, mountRouter, routesUnder } from '../models/api-map.ts';
 import { sendSuccess } from '../utils/api-response.ts';
 
 import { adminRouter } from './admin.route.ts';
@@ -8,81 +9,194 @@ import { aiRouter } from './ai.route.ts';
 import { cartRouter } from './cart.route.ts';
 import { categoryRouter, lookRouter, productRouter } from './catalog.route.ts';
 import { healthRouter } from './health.route.ts';
-import { checkoutRouter, orderRouter } from './order.route.ts';
 import { notificationRouter } from './notification.route.ts';
+import { checkoutRouter, orderRouter } from './order.route.ts';
 import { paymentRouter } from './payment.route.ts';
 import { reviewRouter } from './review.route.ts';
 import { userRouter } from './user.route.ts';
 import { wishlistRouter } from './wishlist.route.ts';
 
 /**
- * แผนผัง REST API ทั้งหมดตาม STEP 29
- * ค่า status บอกตรง ๆ ว่า endpoint ไหนพร้อมใช้แล้ว เพื่อไม่ให้เข้าใจผิดว่ามีของที่ยังไม่มี
+ * REST API ทั้งหมดของร้าน (STEP 29)
+ *
+ * ตารางด้านล่างเป็นทั้ง **ตัว mount จริง** และ **คำอธิบายของแต่ละกลุ่ม** ในที่เดียวกัน
+ * เพราะเดิมเป็นรายการที่เขียนแยกไว้ต่างหากแล้วเพี้ยนจากความจริงเงียบ ๆ:
+ * มันประกาศ `/api/inventory` ว่า "planned" ทั้งที่คลังสินค้าเปิดใช้มาตั้งแต่ STEP 15
+ * (อยู่ที่ `/api/admin/inventory`) — คนอ่านจะเรียกเส้นทางที่ไม่มีจริงแล้วได้ 404
+ *
+ * ตอนนี้จำนวน endpoint และเมธอดของทุกกลุ่ม **อ่านจาก router จริง** ผ่าน `buildApiMap()`
+ * เขียนโน้ตให้กลุ่มที่ไม่มีอยู่จริงไม่ได้ (เทสต์จับ) และลืมเขียนโน้ตให้กลุ่มที่มีอยู่ก็ไม่ได้
  */
-const API_ROUTES = [
-  { path: '/api/auth', status: 'ready (จัดการที่ Next.js /api/auth/*)', step: 3 },
-  { path: '/api/users', status: 'ready (+ /me/profile และ /me/addresses ใน STEP 25)', step: 3 },
-  { path: '/api/products', status: 'ready', step: 6 },
-  { path: '/api/categories', status: 'ready', step: 48 },
-  { path: '/api/brands', status: 'planned', step: 48 },
-  { path: '/api/looks', status: 'ready', step: 7 },
-  { path: '/api/cart', status: 'ready', step: 9 },
-  { path: '/api/checkout', status: 'ready', step: 10 },
-  { path: '/api/orders', status: 'ready (สร้าง/รายการ/ติดตาม/จ่าย/ยกเลิก)', step: 12 },
-  { path: '/api/payments', status: 'partial (COD พร้อมใช้ · Stripe รอตั้งค่า key)', step: 11 },
-  { path: '/api/shipments', status: 'planned', step: 44 },
-  { path: '/api/inventory', status: 'planned', step: 15 },
-  // ลูกค้าดูแลข้อมูลตัวเองที่ /api/users/me · ร้านจัดการลูกค้าที่ /api/admin/customers
-  { path: '/api/admin/customers', status: 'ready', step: 25 },
-  { path: '/api/reviews', status: 'ready', step: 23 },
-  { path: '/api/wishlist', status: 'ready', step: 22 },
-  { path: '/api/ai', status: 'ready (AI Stylist STEP 19 · AI CS STEP 20)', step: 20 },
-  { path: '/api/notifications', status: 'ready (IN_APP · อีเมลจริงเป็นงานของ STEP 50)', step: 24 },
+type ApiGroup = {
+  path: string;
+  router: Router;
+  /** STEP ที่ทำกลุ่มนี้ */
+  step: number;
+  note: string;
+};
+
+const API_GROUPS: readonly ApiGroup[] = [
   {
-    path: '/api/admin',
-    status: 'ready (overview · orders · products · inventory · reviews)',
-    step: 13,
+    path: '/users',
+    router: userRouter,
+    step: 25,
+    note: 'ข้อมูลของผู้ใช้ที่ล็อกอินอยู่ — โปรไฟล์และสมุดที่อยู่ (ต้องล็อกอินทุกเส้นทาง)',
   },
-  { path: '/api/admin/logs', status: 'ready (อ่านอย่างเดียว · ส่งออกไฟล์ได้)', step: 27 },
   {
-    path: '/api/admin/analytics',
-    status: 'ready (สรุป · สินค้า · ลูกค้า · แยกมิติ · ส่งออกไฟล์)',
-    step: 26,
+    path: '/products',
+    router: productRouter,
+    step: 6,
+    note: 'แคตตาล็อกสินค้า ค้นหา ตัวกรอง ตรวจสต็อก และรีวิวของสินค้า (เปิดให้ทุกคน)',
+  },
+  { path: '/categories', router: categoryRouter, step: 6, note: 'หมวดหมู่สินค้าแบบต้นไม้' },
+  {
+    path: '/looks',
+    router: lookRouter,
+    step: 7,
+    note: 'ลุคแนะนำ พร้อมการตรวจว่าซื้อครบชุดได้จริงหรือไม่',
+  },
+  {
+    path: '/cart',
+    router: cartRouter,
+    step: 9,
+    note: 'ตะกร้าสินค้า — ใช้ได้ทั้งแบบล็อกอินและ guest (cookie `cart-token`)',
+  },
+  { path: '/checkout', router: checkoutRouter, step: 10, note: 'สรุปยอดก่อนสั่งซื้อ' },
+  {
+    path: '/orders',
+    router: orderRouter,
+    step: 12,
+    note: 'สร้างคำสั่งซื้อ ประวัติ ติดตามสถานะ ชำระเงิน และยกเลิก',
+  },
+  {
+    path: '/payments',
+    router: paymentRouter,
+    step: 11,
+    note: 'ช่องทางชำระเงินที่เปิดใช้จริง และ webhook ของ Stripe (COD พร้อมใช้ · Stripe รอตั้งค่า key)',
+  },
+  {
+    path: '/reviews',
+    router: reviewRouter,
+    step: 23,
+    note: 'เขียน แก้ ลบรีวิวของตัวเอง และโหวตว่ามีประโยชน์',
+  },
+  { path: '/wishlist', router: wishlistRouter, step: 22, note: 'รายการที่ถูกใจ (ต้องล็อกอิน)' },
+  {
+    path: '/notifications',
+    router: notificationRouter,
+    step: 24,
+    note: 'การแจ้งเตือนของตัวเอง — ช่องทาง IN_APP เท่านั้น (อีเมลจริงเป็นงานของ STEP 50)',
+  },
+  {
+    path: '/ai',
+    router: aiRouter,
+    step: 21,
+    note: 'AI Stylist · AI Customer Service · คลังความรู้และ FAQ (guest ใช้ได้)',
+  },
+  {
+    path: '/admin',
+    router: adminRouter,
+    step: 27,
+    note: 'หลังบ้านทั้งหมด — ต้องล็อกอิน เป็นพนักงานขึ้นไป และมีสิทธิ์ตรงกับงานนั้น',
+  },
+];
+
+/**
+ * กลุ่มที่ยังไม่มีจริง — **แยกออกจาก `groups` โดยเจตนา**
+ *
+ * เดิมปนอยู่ในรายการเดียวกันโดยมีแค่ฟิลด์ `status: 'planned'` กำกับ
+ * ซึ่งอ่านผ่าน ๆ แล้วเข้าใจว่าเรียกได้ (กฎเดียวกับ STEP 4 ข้อ 2: ห้ามใส่ลิงก์ไปหน้าที่ยังไม่มี)
+ */
+const PLANNED_GROUPS = [
+  {
+    path: '/api/brands',
+    step: 48,
+    note: 'รายการแบรนด์แยกกลุ่ม — ตอนนี้กรองแบรนด์ผ่าน /api/products ได้แล้ว',
+  },
+  { path: '/api/shipments', step: 44, note: 'จัดการใบจัดส่งและผู้ให้บริการขนส่ง' },
+  { path: '/api/coupons', step: 41, note: 'คูปองและส่วนลด' },
+  { path: '/api/returns', step: 43, note: 'คืนสินค้าและคืนเงิน' },
+] as const;
+
+/** endpoint ที่เป็นของ Next.js ไม่ใช่ Express — ต้องบอกไว้ ไม่งั้นดูเหมือน API นี้ไม่มีระบบล็อกอิน */
+const EXTERNAL_GROUPS = [
+  {
+    path: '/api/auth/*',
+    note: 'Auth.js v5 บน Next.js (Google OAuth + session ในฐานข้อมูล) — ไม่ได้ผ่าน Express',
+  },
+  {
+    path: '/api/cart/merge',
+    note: 'Next.js Route Handler ที่เรียก POST /api/cart/merge ของ Express ต่อ แล้วลบ cookie `cart-token` ของเบราว์เซอร์',
   },
 ] as const;
 
 export const apiRouter = Router();
 
-/** GET /api — index ของ API บอกว่ามี endpoint อะไรและสถานะเป็นอย่างไร */
-apiRouter.get('/', (_req, res) => {
+type ApiIndexGroup = {
+  path: string;
+  step: number;
+  note: string;
+  endpoints: number;
+  methods: string[];
+};
+
+/**
+ * แผนผังที่ส่งให้ `GET /api` — คิดครั้งเดียวแล้วเก็บไว้ เพราะ router ไม่เปลี่ยนหลังบูต
+ */
+let cachedIndex: { groups: ApiIndexGroup[]; endpoints: number } | null = null;
+
+function apiIndex(app: Application): { groups: ApiIndexGroup[]; endpoints: number } {
+  if (cachedIndex) return cachedIndex;
+
+  const { routes } = buildApiMap(app);
+
+  cachedIndex = {
+    groups: API_GROUPS.map((group) => {
+      const prefix = `/api${group.path}`;
+      return {
+        path: prefix,
+        step: group.step,
+        note: group.note,
+        endpoints: routesUnder(routes, prefix).length,
+        methods: methodsUnder(routes, prefix),
+      };
+    }),
+    endpoints: routesUnder(routes, '/api').length,
+  };
+
+  return cachedIndex;
+}
+
+/** GET /api — สารบัญของ API ที่ตัวเลขทุกตัวมาจาก router จริง */
+apiRouter.get('/', (req, res) => {
+  const index = apiIndex(req.app);
+
   sendSuccess(
     res,
     {
       name: 'TEENSTYLE AI REST API',
       version: API_VERSION,
-      endpoints: API_ROUTES,
+      documentation: 'docs/09-api-reference.md',
+      totalEndpoints: index.endpoints,
+      groups: index.groups,
+      external: EXTERNAL_GROUPS,
+      planned: PLANNED_GROUPS,
     },
     'TEENSTYLE AI REST API',
   );
 });
 
-apiRouter.use('/users', userRouter);
-apiRouter.use('/admin', adminRouter);
-apiRouter.use('/products', productRouter);
-apiRouter.use('/categories', categoryRouter);
-apiRouter.use('/looks', lookRouter);
-apiRouter.use('/cart', cartRouter);
-apiRouter.use('/checkout', checkoutRouter);
-apiRouter.use('/orders', orderRouter);
-apiRouter.use('/payments', paymentRouter);
-apiRouter.use('/ai', aiRouter);
-apiRouter.use('/wishlist', wishlistRouter);
-apiRouter.use('/reviews', reviewRouter);
-apiRouter.use('/notifications', notificationRouter);
-
-// STEP 12+ : จะ mount router เพิ่มที่นี่ เช่น apiRouter.use('/shipments', shipmentRouter)
+for (const group of API_GROUPS) {
+  mountRouter(apiRouter, group.path, group.router);
+}
 
 export const rootRouter = Router();
 
-rootRouter.use('/health', healthRouter);
-rootRouter.use('/api', apiRouter);
+mountRouter(rootRouter, '/health', healthRouter);
+mountRouter(rootRouter, '/api', apiRouter);
+
+/** ใช้ในเทสต์เพื่อตรวจว่าโน้ตของทุกกลุ่มตรงกับกลุ่มที่ mount ไว้จริง */
+export const API_GROUP_PREFIXES: readonly string[] = API_GROUPS.map((group) => `/api${group.path}`);
+
+/** endpoint ที่ประกาศว่า "ยังไม่มี" ต้องไม่มีอยู่จริง — เทสต์ตรวจข้อนี้ */
+export const PLANNED_GROUP_PREFIXES: readonly string[] = PLANNED_GROUPS.map((group) => group.path);

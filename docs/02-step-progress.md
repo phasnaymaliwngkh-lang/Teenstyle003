@@ -4,7 +4,37 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 28 เสร็จ — Security (ตรวจทั้งระบบ + ปิดช่องโหว่ที่เจอจริง)**
+**ล่าสุด: STEP 29 เสร็จ — REST API (รวมเป็นสัญญาที่ตรวจได้ ไม่ใช่คำอธิบายที่เชื่อกันเอง)**
+endpoint ครบมาตั้งแต่ STEP 6–27 แล้ว งานของ STEP นี้คือทำให้ **คำอธิบาย API ไม่มีทางโกหก**
+และทำให้กฎที่เคยเป็นวินัยของคนเขียนกลายเป็นสิ่งที่เทสต์ตรวจได้ทุกเส้นทาง ·
+เพิ่ม [`buildApiMap()`](../backend/src/models/api-map.ts) ที่เดินบน `app.router` ของ Express จริง
+แล้วคืนเมธอด · path เต็ม · ต้องล็อกอินไหม · บทบาท · สิทธิ์ · CSRF · rate limit · รับไฟล์ไหม ของทุกเส้นทาง
+(middleware ที่เป็นด่านติดป้ายไว้ด้วย `describeMiddleware()` เพราะ `requirePermission('x')`
+คืน arrow function ที่ไม่มีชื่อ จึงเดาจากชื่อฟังก์ชันไม่ได้) ·
+**เขียนเอกสาร [docs/09-api-reference.md](09-api-reference.md) ครบทั้ง 119 เส้นทาง**
+พร้อมข้อตกลงร่วมเรื่อง response shape, error code ทั้ง 9 ตัว, การยืนยันตัวตน, CSRF, rate limit,
+การแบ่งหน้า, เงิน/วันเวลา/ไฟล์ — และ **ล็อกด้วย [api-contract.test.ts](../backend/tests/api-contract.test.ts)
+(23 เคส) ที่เทียบเอกสารกับ router ทีละแถว**: เพิ่ม endpoint แล้วไม่เขียนลงเอกสารเทสต์ล้ม ·
+เขียน endpoint ที่ไม่มีจริงเทสต์ล้ม · เขียนสิทธิ์ผิดเทสต์ล้ม ·
+**แก้ `GET /api` ที่โฆษณาของที่ไม่มีจริง** — รายการเดิมเขียนด้วยมือและเพี้ยนไปแล้ว:
+ประกาศ `/api/inventory` ว่า `planned` ทั้งที่คลังสินค้าเปิดใช้จริงมาตั้งแต่ STEP 15
+(อยู่ที่ `/api/admin/inventory`) และปนของที่ยังไม่มีไว้ในรายการเดียวกับของที่เรียกได้
+โดยมีแค่ฟิลด์ `status` กำกับ → แยกเป็น `groups` (มีจริง นับจาก router) · `external` (อยู่บน Next.js) ·
+`planned` (เรียกแล้วได้ 404 และเทสต์ยิงยืนยันทุกอัน) ·
+**ตรวจลำดับ route ด้วยเครื่องแล้ว** — แผนผังคืนรายการ route ที่ Express เรียกไปไม่ถึงเพราะถูก
+`/:param` ที่ลงทะเบียนก่อนจับไปแล้ว (กับดักที่มีคอมเมนต์ "⚠️ ลำดับสำคัญ" เตือนไว้ 5 ที่
+และพังแบบไม่มี error ให้เห็นเลย) · ตรวจแล้วตอนนี้ไม่มีเส้นทางไหนถูกบัง ·
+**เจอตัวนับที่ไม่มีใครเรียก**: `viewCount` ของบทความคลังความรู้ถูกแสดง 2 ที่ (การ์ดบน `/faq`
+และยอดรวมบน `/admin/knowledge`) แต่เส้นทางเดียวที่บวกค่านี้ (`GET /api/ai/knowledge/articles/:slug`)
+**ไม่มีใครเรียกเลย** เพราะรายการบทความส่งเนื้อหาเต็มมาให้แล้ว → ตรวจฐานข้อมูลจริงพบว่า
+บทความทั้ง 12 บทความรวมกันได้ยอดเข้าชม **0** ทั้งที่มีคนอ่าน (ปัญหาชนิดเดียวกับ `User.totalSpent`
+ของ STEP 25) แก้โดยให้ปุ่ม "อ่านคู่มือฉบับเต็ม" เรียก endpoint นั้นจริง และใส่ `strictRateLimiter`
+ให้ตามกฎ STEP 21 ข้อ 9 (endpoint ที่เพิ่มตัวนับต้องคุมความถี่) ·
+บันทึกไว้ด้วยว่า **`strictRateLimiter` ใช้กับเส้นทางที่เรียกแบบ server-to-server ไม่ได้**
+เพราะ limit นับต่อ IP แล้วผู้ใช้ทั้งเว็บจะแชร์โควตา 20 ครั้ง/นาทีร่วมกัน ·
+test 587 เคส (backend 578 + frontend 9) ผ่านทั้งหมด
+
+**STEP 28:** Security (ตรวจทั้งระบบ + ปิดช่องโหว่ที่เจอจริง)
 ไม่ใช่ฟีเจอร์ใหม่ แต่เป็นการไล่ตรวจด่านความปลอดภัยทั้งระบบเป็นรอบเดียว
 แล้วเขียนผลไว้ที่ [docs/08-security.md](08-security.md) ทั้งสิ่งที่มี สิ่งที่แก้ และ**ความเสี่ยงที่ยอมรับไว้พร้อมเหตุผล** ·
 **เจอ open redirect จริง 2 ช่องทาง** ที่ด่านเดิม (เช็คแค่ `startsWith("/")` และ `!startsWith("//")`) กันไม่ได้:
@@ -309,25 +339,25 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 
 ## Platform / Quality
 
-| STEP | หัวข้อ                            | สถานะ | หมายเหตุ                                                                                                                                                                                                                                                      |
-| ---: | --------------------------------- | :---: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-|   24 | Notifications                     |  ✅   | ฟีดในบัญชี + กระดิ่งบน navbar · IN_APP เท่านั้น (อีเมลจริง STEP 50) · ประกาศของพนักงานไม่หลุดเข้าฟีดลูกค้า                                                                                                                                                    |
-|   28 | Security                          |  ✅   | ตรวจทั้งระบบแล้ว + ปิด open redirect 2 ช่องทาง · CSP แบบ nonce · HSTS · TRUST_PROXY_HOPS · จำกัดชนิดไฟล์อัปโหลด · security.test.ts 19 เคส — รายละเอียดใน [08-security.md](08-security.md)                                                                     |
-|   29 | REST API                          |  🚧   | +6..12 storefront/orders · +13..16 admin · +17 `admin/barcodes/*` · +22 `wishlist` · +23 `reviews` + `admin/reviews` · +24 `notifications` · +25 `users/me/profile` + `users/me/addresses` + `admin/customers` · +26 `admin/analytics/*` · +27 `admin/logs/*` |
-|   30 | Error Handling                    |  ✅   | global errorHandler + `{ success, message, errorCode }` + 400/401/403/404/409/422/429/500                                                                                                                                                                     |
-|   31 | Responsive                        |  🚧   | จะครบเมื่อมีหน้าจริงตั้งแต่ STEP 4                                                                                                                                                                                                                            |
-|   32 | Loading / Empty / Error / Retry   |  ✅   | โครงใช้ซ้ำได้ใน components/shared/section.tsx · ทดสอบ error state แล้วตอน backend ล่ม                                                                                                                                                                         |
-|   33 | SEO                               |  🚧   | STEP 6/8: metadata ต่อสินค้า/ลุค + slug ที่ไม่มีจริงคืน HTTP 404 จริง (ไม่ใช่ soft 404)                                                                                                                                                                       |
-|   34 | Performance (cache, index, Redis) |  ⬜   |                                                                                                                                                                                                                                                               |
-|   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                                                                                                                                                                   |
-|   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                                                                                                                                                                 |
-|   37 | Testing                           |  🚧   | vitest + supertest 564 เคส (backend 555 + frontend 9) · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                                                                                                                      |
-|   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                                                                                                                                                                 |
-|   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                                                                                                                                                               |
-|   40 | Final Audit                       |  ⬜   |                                                                                                                                                                                                                                                               |
-|   50 | Backup / Recovery                 |  ⬜   |                                                                                                                                                                                                                                                               |
-|   51 | Monitoring                        |  🚧   | `/health` พร้อมแล้ว                                                                                                                                                                                                                                           |
-|   52 | Background Jobs (BullMQ)          |  ⬜   |                                                                                                                                                                                                                                                               |
-|   53 | Privacy / Consent                 |  ⬜   |                                                                                                                                                                                                                                                               |
-|   54 | Accessibility                     |  🚧   |                                                                                                                                                                                                                                                               |
-|   55 | Production Readiness Audit        |  ⬜   |                                                                                                                                                                                                                                                               |
+| STEP | หัวข้อ                            | สถานะ | หมายเหตุ                                                                                                                                                                                                                       |
+| ---: | --------------------------------- | :---: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+|   24 | Notifications                     |  ✅   | ฟีดในบัญชี + กระดิ่งบน navbar · IN_APP เท่านั้น (อีเมลจริง STEP 50) · ประกาศของพนักงานไม่หลุดเข้าฟีดลูกค้า                                                                                                                     |
+|   28 | Security                          |  ✅   | ตรวจทั้งระบบแล้ว + ปิด open redirect 2 ช่องทาง · CSP แบบ nonce · HSTS · TRUST_PROXY_HOPS · จำกัดชนิดไฟล์อัปโหลด · security.test.ts 19 เคส — รายละเอียดใน [08-security.md](08-security.md)                                      |
+|   29 | REST API                          |  ✅   | 119 เส้นทาง · เอกสารครบใน [09-api-reference.md](09-api-reference.md) ที่ถูกเทียบกับ router จริงทีละแถวด้วย api-contract.test.ts · `GET /api` นับจาก router ไม่ใช่รายการที่เขียนด้วยมือ · ตรวจลำดับ route ว่าไม่มีเส้นทางถูกบัง |
+|   30 | Error Handling                    |  ✅   | global errorHandler + `{ success, message, errorCode }` + 400/401/403/404/409/422/429/500                                                                                                                                      |
+|   31 | Responsive                        |  🚧   | จะครบเมื่อมีหน้าจริงตั้งแต่ STEP 4                                                                                                                                                                                             |
+|   32 | Loading / Empty / Error / Retry   |  ✅   | โครงใช้ซ้ำได้ใน components/shared/section.tsx · ทดสอบ error state แล้วตอน backend ล่ม                                                                                                                                          |
+|   33 | SEO                               |  🚧   | STEP 6/8: metadata ต่อสินค้า/ลุค + slug ที่ไม่มีจริงคืน HTTP 404 จริง (ไม่ใช่ soft 404)                                                                                                                                        |
+|   34 | Performance (cache, index, Redis) |  ⬜   |                                                                                                                                                                                                                                |
+|   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                                                                                                                                    |
+|   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                                                                                                                                  |
+|   37 | Testing                           |  🚧   | vitest + supertest 587 เคส (backend 578 + frontend 9) · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                                                                                       |
+|   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                                                                                                                                  |
+|   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                                                                                                                                |
+|   40 | Final Audit                       |  ⬜   |                                                                                                                                                                                                                                |
+|   50 | Backup / Recovery                 |  ⬜   |                                                                                                                                                                                                                                |
+|   51 | Monitoring                        |  🚧   | `/health` พร้อมแล้ว                                                                                                                                                                                                            |
+|   52 | Background Jobs (BullMQ)          |  ⬜   |                                                                                                                                                                                                                                |
+|   53 | Privacy / Consent                 |  ⬜   |                                                                                                                                                                                                                                |
+|   54 | Accessibility                     |  🚧   |                                                                                                                                                                                                                                |
+|   55 | Production Readiness Audit        |  ⬜   |                                                                                                                                                                                                                                |

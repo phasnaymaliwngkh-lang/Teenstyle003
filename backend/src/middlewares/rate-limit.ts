@@ -2,6 +2,7 @@ import rateLimit from 'express-rate-limit';
 
 import { env, isTest } from '../config/index.ts';
 import { ERROR_CODES } from '../utils/api-error.ts';
+import { describeMiddleware } from './describe.ts';
 import type { ApiErrorBody } from '../utils/api-response.ts';
 
 const tooManyRequestsBody: ApiErrorBody = {
@@ -34,3 +35,6 @@ export const strictRateLimiter = rateLimit({
   message: tooManyRequestsBody,
   skip: () => isTest,
 });
+
+/** ติดป้ายให้ตัวสร้างแผนผัง API รู้ว่าเส้นทางไหนคุมความถี่แบบเข้ม (STEP 29) */
+describeMiddleware(strictRateLimiter, { rateLimit: 'strict' });

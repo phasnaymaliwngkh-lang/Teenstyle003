@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 
 import { findUserBySessionToken, type AuthenticatedUser } from '../services/auth.service.ts';
 import { ApiError } from '../utils/api-error.ts';
+import { describeMiddleware } from './describe.ts';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -79,3 +80,10 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     next(error);
   }
 }
+
+/**
+ * ติดป้ายให้ตัวสร้างแผนผัง API อ่านได้ว่าเส้นทางไหนบังคับล็อกอิน (STEP 29)
+ * ดูเหตุผลที่ต้องติดป้ายใน middlewares/describe.ts
+ */
+describeMiddleware(requireAuth, { auth: 'required' });
+describeMiddleware(attachUser, { auth: 'optional' });

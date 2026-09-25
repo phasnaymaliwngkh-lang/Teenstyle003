@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 
 import { env, isProduction } from '../config/env.ts';
 import { ApiError } from '../utils/api-error.ts';
+import { describeMiddleware } from './describe.ts';
 
 /**
  * ป้องกัน CSRF สำหรับ endpoint ที่ใช้ cookie เป็นตัวระบุตัวตน (STEP 9 — ตะกร้า)
@@ -54,3 +55,6 @@ export function verifyOrigin(req: Request, _res: Response, next: NextFunction): 
 
   next();
 }
+
+/** ติดป้ายให้ตัวสร้างแผนผัง API รู้ว่าเส้นทางนี้มีด่าน CSRF แล้ว (STEP 29) */
+describeMiddleware(verifyOrigin, { csrf: true });

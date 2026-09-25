@@ -42,3 +42,6 @@
 | [04-google-oauth-setup.md](04-google-oauth-setup.md) | ตั้งค่า Google OAuth (ต้องทำเองก่อน STEP 3) |
 | [05-run-and-test.md](05-run-and-test.md)             | วิธีรันและทดสอบ                             |
 | [06-deployment.md](06-deployment.md)                 | นำขึ้น production                           |
+| [07-payment-setup.md](07-payment-setup.md)           | ตั้งค่า Stripe และบัตรทดสอบ                 |
+| [08-security.md](08-security.md)                     | ด่านความปลอดภัยและความเสี่ยงที่ยอมรับไว้    |
+| [09-api-reference.md](09-api-reference.md)           | REST API ทุกเส้นทาง สิทธิ์ และข้อตกลงร่วม   |
