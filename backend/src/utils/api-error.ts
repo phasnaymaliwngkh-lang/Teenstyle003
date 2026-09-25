@@ -9,6 +9,8 @@ export const ERROR_CODES = {
   NOT_FOUND: 'NOT_FOUND',
   CONFLICT: 'CONFLICT',
   VALIDATION_ERROR: 'VALIDATION_ERROR',
+  PAYLOAD_TOO_LARGE: 'PAYLOAD_TOO_LARGE',
+  UNSUPPORTED_MEDIA_TYPE: 'UNSUPPORTED_MEDIA_TYPE',
   TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
   INTERNAL_ERROR: 'INTERNAL_ERROR',
   SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
@@ -60,6 +62,16 @@ export class ApiError extends Error {
 
   static validation(message = 'ข้อมูลที่ส่งมาไม่ถูกต้อง', details?: unknown): ApiError {
     return new ApiError(422, message, ERROR_CODES.VALIDATION_ERROR, details);
+  }
+
+  /** body ใหญ่เกินที่รับได้ (413) — ต่างจาก 400 เพราะผู้ใช้แก้ได้ด้วยการส่งน้อยลง ไม่ใช่แก้รูปแบบ */
+  static payloadTooLarge(message = 'ข้อมูลที่ส่งมามีขนาดใหญ่เกินกำหนด'): ApiError {
+    return new ApiError(413, message, ERROR_CODES.PAYLOAD_TOO_LARGE);
+  }
+
+  /** ชนิดหรือ charset ของ body ที่อ่านไม่ได้ (415) */
+  static unsupportedMediaType(message = 'ชนิดข้อมูลที่ส่งมาไม่รองรับ'): ApiError {
+    return new ApiError(415, message, ERROR_CODES.UNSUPPORTED_MEDIA_TYPE);
   }
 
   static tooManyRequests(message = 'ส่งคำขอถี่เกินไป กรุณารอสักครู่'): ApiError {

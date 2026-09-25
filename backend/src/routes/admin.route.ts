@@ -71,6 +71,7 @@ import { describeMiddleware } from '../middlewares/describe.ts';
 import { requireAuth } from '../middlewares/authenticate.ts';
 import { requirePermission, requireStaff } from '../middlewares/authorize.ts';
 import { verifyOrigin } from '../middlewares/verify-origin.ts';
+import { ApiError } from '../utils/api-error.ts';
 
 export const adminRouter = Router();
 
@@ -197,7 +198,12 @@ const upload = multer({
     const allowed = ALLOWED_UPLOAD_EXTENSIONS.some((ext) => name.endsWith(ext));
 
     if (!allowed) {
-      callback(new Error('รับเฉพาะไฟล์ .csv, .xlsx หรือ .xls เท่านั้น'));
+      /**
+       * ⚠️ ต้องโยน ApiError ไม่ใช่ Error เปล่า — multer ส่ง error ตัวนี้ต่อให้ next() ตรง ๆ
+       *    Error เปล่าจะถูกจัดเป็น 500 'เกิดข้อผิดพลาดภายในระบบ' ซึ่งทั้งผิดสถานะ
+       *    (เป็นความผิดของคำขอ ไม่ใช่ของเรา) และไม่บอกผู้ใช้ว่าต้องส่งไฟล์ชนิดไหน (เจอตอน STEP 30)
+       */
+      callback(ApiError.badRequest('รับเฉพาะไฟล์ .csv, .xlsx หรือ .xls เท่านั้น'));
       return;
     }
 

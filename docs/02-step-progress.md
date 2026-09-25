@@ -4,7 +4,35 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 29 เสร็จ — REST API (รวมเป็นสัญญาที่ตรวจได้ ไม่ใช่คำอธิบายที่เชื่อกันเอง)**
+**ล่าสุด: STEP 30 เสร็จ — Error Handling (ตรวจทั้งระบบ ไม่ใช่แค่มี errorHandler)**
+โครง `errorHandler` + `{ success, message, errorCode }` มีมาตั้งแต่ STEP 1 แล้ว
+งานของ STEP นี้คือไล่ดูว่า **error จริง ๆ ที่เกิดขึ้นได้ ตอบอะไรกลับไปบ้าง** —
+แล้วเจอว่ามี **5 เส้นทางที่ตอบ 500 "เกิดข้อผิดพลาดภายในระบบ" ทั้งที่เป็นความผิดของคำขอ**:
+อัปโหลดไฟล์ผิดชนิด (ด่านที่เพิ่มใน STEP 28 โยน `Error` เปล่าจึงกลายเป็น 500 → ผู้ใช้ไม่รู้ว่ารับชนิดไหน
+และเทสต์เดิมรับทั้ง 400 และ 403 จึงไม่เคยแตะเส้นทางนี้จริง) · JSON body เกิน 1MB → ควรเป็น 413 ·
+`charset` ที่อ่านไม่ได้ → ควรเป็น 415 · body ที่บอกว่าบีบอัดมาแต่บีบอัดไม่จริง → ควรเป็น 400 ·
+และ **path ที่ percent-encode ไม่ใช่ UTF-8** (`/api/products/%E4%C1%E8` = "ไม่" แบบ TIS-620
+ซึ่งเกิดเองจากลิงก์เก่าและบ็อต) — Express ตั้ง `status = 400` มาให้แล้วแต่ไม่ตั้ง `expose`
+จึงหลุดเป็น 500 **พร้อม log ระดับ error** ที่อ่านว่า "ระบบเราพัง" → การเฝ้าระวังของ STEP 51
+จะเตือนผิดเรื่องจนกลายเป็นเสียงรบกวน · รวมตัวแปลง error ไว้ที่ `normalizeError()` ที่เดียว
+เป็นฟังก์ชันบริสุทธิ์เพื่อให้เทสต์ยิง error สังเคราะห์เข้าได้ตรง ๆ และเพิ่ม **ตาข่ายรับ error ของ Prisma**
+(P2002 → 409 · P2025 → 404 · P2003 → 409 · P2034 → 409 บอกให้ลองใหม่ · **ต่อฐานข้อมูลไม่ได้ → 503 ไม่ใช่ 500**
+เพราะ 503 แปลว่าลองใหม่ได้) โดยย้ำไว้ว่าเป็น**ตาข่ายกันตก ไม่ใช่ที่เขียนข้อความให้ผู้ใช้อ่าน** —
+service ยังต้องดัก error ของตัวเองเหมือนเดิม · เพิ่ม `errorCode` ใหม่ 2 ตัว (`PAYLOAD_TOO_LARGE`,
+`UNSUPPORTED_MEDIA_TYPE`) และ **ห้ามให้ข้อความอังกฤษของไลบรารีหลุดถึงผู้ใช้** ตัวแปลงอ่านแค่สถานะ ·
+**ฝั่ง frontend เดิมไม่มี `error.tsx` เลยแม้แต่ไฟล์เดียว** — หน้าที่พังจึงแสดงหน้า error เริ่มต้นของ Next
+และ URL ที่ไม่ตรง route ใดเลยได้หน้า 404 ภาษาอังกฤษที่ไปต่อไม่ได้ →
+เพิ่ม `error.tsx` ของหน้าร้าน (ยังมี navbar) · ของหลังบ้าน (ยังมีแถบ admin + ยังผ่าน `requireStaff()`) ·
+ของหน้านอกกลุ่ม · `global-error.tsx` สำหรับตอน root layout พัง (สไตล์ inline ทั้งหมดเพราะใช้ CSS
+ของแอปไม่ได้แล้ว) และ `not-found.tsx` ที่รากเป็นภาษาไทยพร้อมทางไปต่อ 4 ทาง ·
+ทุกแผงแสดง `digest` เพราะ **ตอน production Next แทนข้อความ error ด้วยข้อความกลาง** แล้วให้แฮชมาแทน
+ซึ่งเป็นสิ่งเดียวที่โยงหน้าจอของผู้ใช้กับ log ได้ · บันทึกกับดักไว้ว่า `error.tsx` **เรนเดอร์ที่ client**
+สำหรับ error ตอน SSR จึงตรวจด้วย curl ไม่ได้ (HTML มีแต่โครงเปล่า + error marker ใน RSC payload) ·
+**ยืนยันบน production build แล้วว่าการเพิ่ม error boundary ไม่ทำให้ HTTP 404 เพี้ยน**
+(ต่างจาก `loading.tsx` ของ STEP 6) ทั้งหน้าสินค้า หน้าลุค และ URL ที่ไม่มี route ยังได้ 404 ครบ ·
+test 621 เคส (backend 612 + frontend 9) ผ่านทั้งหมด
+
+**STEP 29:** REST API (รวมเป็นสัญญาที่ตรวจได้ ไม่ใช่คำอธิบายที่เชื่อกันเอง)
 endpoint ครบมาตั้งแต่ STEP 6–27 แล้ว งานของ STEP นี้คือทำให้ **คำอธิบาย API ไม่มีทางโกหก**
 และทำให้กฎที่เคยเป็นวินัยของคนเขียนกลายเป็นสิ่งที่เทสต์ตรวจได้ทุกเส้นทาง ·
 เพิ่ม [`buildApiMap()`](../backend/src/models/api-map.ts) ที่เดินบน `app.router` ของ Express จริง
@@ -339,25 +367,25 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 
 ## Platform / Quality
 
-| STEP | หัวข้อ                            | สถานะ | หมายเหตุ                                                                                                                                                                                                                       |
-| ---: | --------------------------------- | :---: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-|   24 | Notifications                     |  ✅   | ฟีดในบัญชี + กระดิ่งบน navbar · IN_APP เท่านั้น (อีเมลจริง STEP 50) · ประกาศของพนักงานไม่หลุดเข้าฟีดลูกค้า                                                                                                                     |
-|   28 | Security                          |  ✅   | ตรวจทั้งระบบแล้ว + ปิด open redirect 2 ช่องทาง · CSP แบบ nonce · HSTS · TRUST_PROXY_HOPS · จำกัดชนิดไฟล์อัปโหลด · security.test.ts 19 เคส — รายละเอียดใน [08-security.md](08-security.md)                                      |
-|   29 | REST API                          |  ✅   | 119 เส้นทาง · เอกสารครบใน [09-api-reference.md](09-api-reference.md) ที่ถูกเทียบกับ router จริงทีละแถวด้วย api-contract.test.ts · `GET /api` นับจาก router ไม่ใช่รายการที่เขียนด้วยมือ · ตรวจลำดับ route ว่าไม่มีเส้นทางถูกบัง |
-|   30 | Error Handling                    |  ✅   | global errorHandler + `{ success, message, errorCode }` + 400/401/403/404/409/422/429/500                                                                                                                                      |
-|   31 | Responsive                        |  🚧   | จะครบเมื่อมีหน้าจริงตั้งแต่ STEP 4                                                                                                                                                                                             |
-|   32 | Loading / Empty / Error / Retry   |  ✅   | โครงใช้ซ้ำได้ใน components/shared/section.tsx · ทดสอบ error state แล้วตอน backend ล่ม                                                                                                                                          |
-|   33 | SEO                               |  🚧   | STEP 6/8: metadata ต่อสินค้า/ลุค + slug ที่ไม่มีจริงคืน HTTP 404 จริง (ไม่ใช่ soft 404)                                                                                                                                        |
-|   34 | Performance (cache, index, Redis) |  ⬜   |                                                                                                                                                                                                                                |
-|   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                                                                                                                                    |
-|   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                                                                                                                                  |
-|   37 | Testing                           |  🚧   | vitest + supertest 587 เคส (backend 578 + frontend 9) · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                                                                                       |
-|   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                                                                                                                                  |
-|   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                                                                                                                                |
-|   40 | Final Audit                       |  ⬜   |                                                                                                                                                                                                                                |
-|   50 | Backup / Recovery                 |  ⬜   |                                                                                                                                                                                                                                |
-|   51 | Monitoring                        |  🚧   | `/health` พร้อมแล้ว                                                                                                                                                                                                            |
-|   52 | Background Jobs (BullMQ)          |  ⬜   |                                                                                                                                                                                                                                |
-|   53 | Privacy / Consent                 |  ⬜   |                                                                                                                                                                                                                                |
-|   54 | Accessibility                     |  🚧   |                                                                                                                                                                                                                                |
-|   55 | Production Readiness Audit        |  ⬜   |                                                                                                                                                                                                                                |
+| STEP | หัวข้อ                            | สถานะ | หมายเหตุ                                                                                                                                                                                                                                   |
+| ---: | --------------------------------- | :---: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+|   24 | Notifications                     |  ✅   | ฟีดในบัญชี + กระดิ่งบน navbar · IN_APP เท่านั้น (อีเมลจริง STEP 50) · ประกาศของพนักงานไม่หลุดเข้าฟีดลูกค้า                                                                                                                                 |
+|   28 | Security                          |  ✅   | ตรวจทั้งระบบแล้ว + ปิด open redirect 2 ช่องทาง · CSP แบบ nonce · HSTS · TRUST_PROXY_HOPS · จำกัดชนิดไฟล์อัปโหลด · security.test.ts 19 เคส — รายละเอียดใน [08-security.md](08-security.md)                                                  |
+|   29 | REST API                          |  ✅   | 119 เส้นทาง · เอกสารครบใน [09-api-reference.md](09-api-reference.md) ที่ถูกเทียบกับ router จริงทีละแถวด้วย api-contract.test.ts · `GET /api` นับจาก router ไม่ใช่รายการที่เขียนด้วยมือ · ตรวจลำดับ route ว่าไม่มีเส้นทางถูกบัง             |
+|   30 | Error Handling                    |  ✅   | `normalizeError()` ที่เดียว — ApiError · Zod · body-parser · multer · URIError · ตาข่าย Prisma (ต่อ DB ไม่ได้ → 503) · **แก้ 5 เส้นทางที่เคยตอบ 500 ทั้งที่เป็นความผิดของคำขอ** · frontend มี error boundary ครบทุกชั้น + หน้า 404 ภาษาไทย |
+|   31 | Responsive                        |  🚧   | จะครบเมื่อมีหน้าจริงตั้งแต่ STEP 4                                                                                                                                                                                                         |
+|   32 | Loading / Empty / Error / Retry   |  ✅   | โครงใช้ซ้ำได้ใน components/shared/section.tsx · ทดสอบ error state แล้วตอน backend ล่ม · STEP 30 เพิ่ม error boundary ทุกชั้น (`error.tsx`, `global-error.tsx`) และหน้า 404 ที่ราก                                                          |
+|   33 | SEO                               |  🚧   | STEP 6/8: metadata ต่อสินค้า/ลุค + slug ที่ไม่มีจริงคืน HTTP 404 จริง (ไม่ใช่ soft 404)                                                                                                                                                    |
+|   34 | Performance (cache, index, Redis) |  ⬜   |                                                                                                                                                                                                                                            |
+|   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                                                                                                                                                |
+|   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                                                                                                                                              |
+|   37 | Testing                           |  🚧   | vitest + supertest 621 เคส (backend 612 + frontend 9) · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                                                                                                   |
+|   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                                                                                                                                              |
+|   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                                                                                                                                            |
+|   40 | Final Audit                       |  ⬜   |                                                                                                                                                                                                                                            |
+|   50 | Backup / Recovery                 |  ⬜   |                                                                                                                                                                                                                                            |
+|   51 | Monitoring                        |  🚧   | `/health` พร้อมแล้ว                                                                                                                                                                                                                        |
+|   52 | Background Jobs (BullMQ)          |  ⬜   |                                                                                                                                                                                                                                            |
+|   53 | Privacy / Consent                 |  ⬜   |                                                                                                                                                                                                                                            |
+|   54 | Accessibility                     |  🚧   |                                                                                                                                                                                                                                            |
+|   55 | Production Readiness Audit        |  ⬜   |                                                                                                                                                                                                                                            |
