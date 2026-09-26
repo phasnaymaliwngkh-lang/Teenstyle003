@@ -17,9 +17,11 @@ import Link from "next/link";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { requireUser } from "@/lib/dal";
 import { isStaffRole } from "@/lib/permissions";
+import { NOINDEX_NOFOLLOW } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "บัญชีของฉัน",
+  robots: NOINDEX_NOFOLLOW,
 };
 
 const TIER_LABEL: Record<string, string> = {

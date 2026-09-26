@@ -9,10 +9,12 @@ import { ClearCartButton } from "@/features/cart/components/clear-cart-button";
 import { ApiClientError } from "@/lib/api";
 import { fetchCartOnServer } from "@/services/cart.server";
 import type { Cart } from "@/types/catalog";
+import { NOINDEX_FOLLOW } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "ตะกร้าสินค้า",
   description: "ตรวจรายการสินค้าในตะกร้า แก้จำนวน และดูยอดรวมก่อนสั่งซื้อ",
+  robots: NOINDEX_FOLLOW,
 };
 
 /**

@@ -3,8 +3,9 @@ import type { Metadata } from "next";
 import { ComingSoon } from "@/components/shared/coming-soon";
 
 export const metadata: Metadata = {
-  title: "About — เกี่ยวกับ TEENSTYLE AI",
+  title: "เกี่ยวกับเรา",
   description: "ร้านค้าออนไลน์แฟชั่นสำหรับวัยรุ่น พร้อม AI Stylist และ AI Customer Service",
+  alternates: { canonical: "/about" },
 };
 
 export default function AboutPage() {

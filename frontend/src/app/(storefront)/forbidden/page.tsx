@@ -4,9 +4,11 @@ import Link from "next/link";
 
 import { getSession } from "@/lib/dal";
 import { landingPathForRole } from "@/lib/permissions";
+import { NOINDEX_NOFOLLOW } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "ไม่มีสิทธิ์เข้าถึง",
+  robots: NOINDEX_NOFOLLOW,
 };
 
 /**

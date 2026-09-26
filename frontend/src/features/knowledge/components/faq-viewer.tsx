@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   Bot,
@@ -68,16 +68,33 @@ const SUGGESTED_QUESTIONS = [
   "ติดตามสถานะพัสดุได้อย่างไร?",
 ];
 
-export function FaqViewer() {
+export interface FaqViewerProps {
+  /**
+   * ข้อมูลชุดแรกที่เรนเดอร์มาจาก server (STEP 33)
+   *
+   * มีไว้เพื่อให้ **เนื้อหาคำถาม/คำตอบอยู่ใน HTML ตั้งแต่ครั้งแรก** ไม่ใช่โผล่หลัง hydrate
+   * (ก่อนหน้านี้ search engine เห็นแต่โครงหน้าเปล่า ๆ)
+   * undefined = โหลดเองแบบเดิม (ใช้ตอน server ดึงข้อมูลไม่สำเร็จ)
+   */
+  initialArticles?: KnowledgeArticle[];
+  initialCategories?: Array<KnowledgeCategoryMeta & { articleCount: number }>;
+}
+
+export function FaqViewer({ initialArticles, initialCategories }: FaqViewerProps = {}) {
   const [categories, setCategories] = useState<
     Array<KnowledgeCategoryMeta & { articleCount: number }>
-  >([]);
-  const [articles, setArticles] = useState<KnowledgeArticle[]>([]);
+  >(initialCategories ?? []);
+  const [articles, setArticles] = useState<KnowledgeArticle[]>(initialArticles ?? []);
   const [selectedCategory, setSelectedCategory] = useState<KnowledgeCategory | "ALL">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(initialArticles === undefined);
+  /**
+   * ข้อมูลชุดแรกมาจาก server แล้ว จึงไม่ต้องยิงซ้ำตอน mount
+   * (ตัวกรองเริ่มต้นตรงกับที่ server ดึงมา — ALL และไม่มีคำค้น)
+   */
+  const skipInitialFetch = useRef(initialArticles !== undefined);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // AI Ask state
@@ -119,6 +136,8 @@ export function FaqViewer() {
 
   // Load Categories on mount
   useEffect(() => {
+    if (initialCategories !== undefined) return;
+
     let cancelled = false;
     void (async () => {
       try {
@@ -133,7 +152,7 @@ export function FaqViewer() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialCategories]);
 
   // Load Articles when category or activeSearch changes
   const loadArticles = useCallback(async () => {
@@ -155,6 +174,11 @@ export function FaqViewer() {
   }, [selectedCategory, activeSearch]);
 
   useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
+
     let cancelled = false;
     void (async () => {
       try {

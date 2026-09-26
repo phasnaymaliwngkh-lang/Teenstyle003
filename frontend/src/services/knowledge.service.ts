@@ -57,6 +57,30 @@ export async function fetchKnowledgeArticles(
   });
 }
 
+/**
+ * เวอร์ชันสำหรับเรนเดอร์ฝั่ง server ของหน้า /faq (STEP 33)
+ *
+ * ต่างจาก `fetchKnowledgeArticles` ที่ใช้ `no-store` เพราะฝั่ง client ต้องเห็นผลกรองสด ๆ
+ * — ฝั่ง server เป็นเนื้อหาที่บ็อตของ search engine มาอ่าน จึงแคชสั้น ๆ ได้
+ * และไม่ควรยิง API ใหม่ทุกครั้งที่มีคนเปิดหน้า
+ */
+export async function fetchKnowledgeArticlesOnServer(
+  limit: number,
+): Promise<KnowledgeSearchResult> {
+  return apiFetch<KnowledgeSearchResult>(`/api/ai/knowledge/articles?limit=${limit}`, {
+    next: { revalidate: 60, tags: ["knowledge"] },
+  });
+}
+
+export async function fetchKnowledgeCategoriesOnServer(): Promise<
+  Array<KnowledgeCategoryMeta & { articleCount: number }>
+> {
+  return apiFetch<Array<KnowledgeCategoryMeta & { articleCount: number }>>(
+    "/api/ai/knowledge/categories",
+    { next: { revalidate: 60, tags: ["knowledge"] } },
+  );
+}
+
 export async function fetchKnowledgeArticle(slug: string): Promise<KnowledgeArticle> {
   return apiFetch<KnowledgeArticle>(`/api/ai/knowledge/articles/${encodeURIComponent(slug)}`, {
     cache: "no-store",

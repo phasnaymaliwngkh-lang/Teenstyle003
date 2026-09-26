@@ -16,10 +16,13 @@ import { VariantPicker } from "@/features/products/components/variant-picker";
 import { ProductRatingBadge } from "@/features/reviews/components/product-rating-badge";
 import { ReviewSection } from "@/features/reviews/components/review-section";
 import { WishlistHeart } from "@/features/wishlist/components/wishlist-heart";
+import { JsonLd } from "@/components/shared/json-ld";
 import { ApiClientError } from "@/lib/api";
 import { getSession } from "@/lib/dal";
 import { toSearchParams, type RawSearchParams } from "@/lib/query-params";
+import { breadcrumbJsonLd, productJsonLd } from "@/lib/seo";
 import { fetchProductDetail, searchShopProducts } from "@/services/catalog.service";
+import { fetchProductReviewsOnServer } from "@/services/review.server";
 import { fetchWishlistedIdsOnServer } from "@/services/wishlist.server";
 import type { ProductDetail } from "@/types/catalog";
 import { formatBaht, STOCK_LABEL } from "@/utils/format";
@@ -29,6 +32,28 @@ type PageProps = {
   /** ส่วนรีวิวใช้ `reviewSort` / `reviewRating` / `reviewPage` (STEP 23) */
   searchParams: Promise<RawSearchParams>;
 };
+
+/**
+ * คะแนนรีวิวสำหรับ structured data (STEP 33)
+ *
+ * ใช้ cache key เดียวกับ `ProductRatingBadge` (limit=1, ไม่ล็อกอิน) จึงไม่เพิ่มคำขอจริง
+ * อ่านไม่ได้ → คืน null แล้ว `productJsonLd` จะ **ไม่ประกาศ aggregateRating เลย**
+ * (กฎ STEP 23 ข้อ 4: 0 ดาวหมายถึง "แย่มาก" ไม่ใช่ "ยังไม่มีข้อมูล")
+ */
+async function loadRatingForJsonLd(
+  slug: string,
+): Promise<{ average: number; total: number } | null> {
+  try {
+    const result = await fetchProductReviewsOnServer(
+      slug,
+      new URLSearchParams({ limit: "1" }),
+      false,
+    );
+    return result.summary.total > 0 ? result.summary : null;
+  } catch {
+    return null;
+  }
+}
 
 type LoadResult =
   | { kind: "found"; product: ProductDetail }
@@ -67,12 +92,28 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const { product } = loaded;
 
+  /*
+   * description ของสินค้าส่วนใหญ่สั้นกว่า 50 ตัวอักษร (shortDescription เขียนไว้สำหรับการ์ดสินค้า)
+   * ซึ่งสั้นเกินกว่าที่ SERP จะอธิบายอะไรได้ → เติมบริบทที่ **เป็นความจริงและมาจากฐานข้อมูล**
+   * (หมวดหมู่ · แบรนด์) ต่อท้าย ไม่ใช่แต่งคำโฆษณาเพิ่ม (STEP 33)
+   */
+  const summary = product.shortDescription ?? product.description;
+  const context = [product.brand?.name, product.category.name].filter(Boolean).join(" · ");
+  const description = `${summary} — ${context} จาก TEENSTYLE AI ราคาและสต็อกอัปเดตจากคลังจริง`;
+
   return {
     title: product.name,
-    description: product.shortDescription ?? product.description.slice(0, 160),
+    description: description.slice(0, 160),
+    /*
+     * canonical ต้องไม่มี query ของส่วนรีวิว (reviewSort/reviewRating/reviewPage) ติดไปด้วย
+     * ไม่งั้นการเปลี่ยนหน้ารีวิวจะกลายเป็นสินค้าชิ้นใหม่ในสายตา Google ทุกครั้ง (STEP 33)
+     */
+    alternates: { canonical: `/product/${product.slug}` },
     openGraph: {
+      // og:type = "website" ตามค่าที่ root ตั้งไว้ไม่ผิด แต่หน้าสินค้าควรบอกว่าเป็นสินค้า
+      type: "article",
       title: product.name,
-      description: product.shortDescription ?? undefined,
+      description,
       images: product.images[0] ? [{ url: product.images[0].url }] : undefined,
     },
   };
@@ -115,6 +156,33 @@ export default async function ProductPage({ params, searchParams }: PageProps) {
         <SectionError message={loaded.message} />
       ) : (
         <>
+          <JsonLd
+            data={[
+              productJsonLd({
+                name: loaded.product.name,
+                slug: loaded.product.slug,
+                sku: loaded.product.sku,
+                description: loaded.product.shortDescription ?? loaded.product.description,
+                images: loaded.product.images.map((image) => image.url),
+                // ราคาที่ประกาศต้องเป็นราคาที่เก็บเงินจริง (salePrice ?? price) — backend คิดมาให้แล้ว
+                price: loaded.product.finalPrice,
+                stockStatus: loaded.product.stockStatus,
+                brandName: loaded.product.brand?.name ?? null,
+                categoryName: loaded.product.category.name,
+                rating: await loadRatingForJsonLd(loaded.product.slug),
+              }),
+              breadcrumbJsonLd([
+                { name: "หน้าแรก", path: "/" },
+                { name: "เลือกซื้อสินค้า", path: "/shop" },
+                {
+                  name: loaded.product.category.name,
+                  path: `/shop?category=${loaded.product.category.slug}`,
+                },
+                { name: loaded.product.name, path: `/product/${loaded.product.slug}` },
+              ]),
+            ]}
+          />
+
           <ProductDetailSection
             product={loaded.product}
             isSignedIn={session !== null}

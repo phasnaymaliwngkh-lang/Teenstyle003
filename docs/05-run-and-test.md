@@ -113,6 +113,22 @@ node scripts/audit-responsive.mjs --only=/admin
 ถ้าไม่มีข้อมูล (สคริปต์พิมพ์รายการที่ข้ามให้เห็น) และเลย์เอาต์มักแตกเพราะ **ข้อมูลจริงที่ยาว**
 เช่นชื่อคนไทยเต็ม อีเมลยาว ที่อยู่คอนโด — ตรวจตอนฐานข้อมูลว่างจะไม่เจออะไร
 
+## ตรวจ SEO ทุกหน้า (STEP 33)
+
+```powershell
+npm run dev                  # หรือ npm start (ควรตรวจกับ production build ก่อน deploy)
+node scripts/audit-seo.mjs
+node scripts/audit-seo.mjs --json=out.json
+```
+
+ตรวจในมุมของบ็อตที่ยังไม่ได้ล็อกอิน: title/description/canonical/robots/OG/JSON-LD ของทุกหน้า
+สาธารณะและทุก URL ใน sitemap · เทียบข้ามหน้าเพื่อหา **title หรือ og:title ที่ซ้ำกัน**
+(สัญญาณว่าหน้าเหล่านั้นแยกไม่ออกในสายตา Google) · ตรวจ **ห่วงโซ่ canonical** และ
+ความขัดแย้งระหว่าง sitemap กับ Disallow ใน robots.txt · exit code 1 เมื่อพบปัญหา
+
+ที่สคริปต์ตรวจแทนไม่ได้ (ต้องดูเอง): ภาพ og:image สวยไหม · ข้อความ description อ่านแล้วอยากคลิกไหม ·
+และ **ค่า `NEXT_PUBLIC_SITE_URL` ตอน deploy ต้องเป็นโดเมนจริง** ไม่ใช่ localhost
+
 ## Checklist ของ STEP 1 (ผลการตรวจจริง)
 
 | ข้อ                         | คำสั่ง / วิธีตรวจ                                                  | ผล                        |

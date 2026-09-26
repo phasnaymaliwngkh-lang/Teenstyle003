@@ -4,7 +4,8 @@ import { CheckCircle2, Headphones, ShieldCheck, UserCheck } from "lucide-react";
 import { CsChat } from "@/features/customer-service/components/cs-chat";
 
 export const metadata: Metadata = {
-  title: "ฝ่ายบริการลูกค้า — AI Customer Service & Human Handoff | TEENSTYLE AI",
+  title: "ฝ่ายบริการลูกค้า — AI Customer Service",
+  alternates: { canonical: "/customer-service" },
   description:
     "สอบถามข้อมูลสินค้า เช็คสถานะคำสั่งซื้อ ค่าจัดส่ง และนโยบายการคืนสินค้า พร้อมระบบส่งต่อให้เจ้าหน้าที่คนจริงดูแลคุณทันที",
 };

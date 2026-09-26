@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
+import { JsonLd } from "@/components/shared/json-ld";
 import {
   SectionEmpty,
   SectionError,
@@ -15,6 +16,7 @@ import { LookBuilder } from "@/features/looks/components/look-builder";
 import { LookCard } from "@/features/looks/components/look-card";
 import { styleLabel, styleShort } from "@/features/looks/lib/labels";
 import { ApiClientError } from "@/lib/api";
+import { breadcrumbJsonLd, lookJsonLd } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { fetchLookDetail, searchLooks } from "@/services/catalog.service";
 import type { LookDetail } from "@/types/catalog";
@@ -56,6 +58,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   return {
     title: `${look.name} — ${styleShort(look.style)} Look`,
+    alternates: { canonical: `/looks/${look.slug}` },
     description:
       look.description ??
       `ไอเดียการแต่งตัวสไตล์ ${styleShort(look.style)} รวม ${look.itemCount} ชิ้น ราคารวม ${look.totalPrice} บาท`,
@@ -94,6 +97,28 @@ export default async function LookDetailPage({ params }: PageProps) {
 
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6 sm:py-10">
+      <JsonLd
+        data={[
+          lookJsonLd({
+            name: look.name,
+            slug: look.slug,
+            description:
+              look.description ??
+              `ไอเดียการแต่งตัวสไตล์ ${styleShort(look.style)} รวม ${look.itemCount} ชิ้น`,
+            image: look.imageUrl,
+            // ราคารวมประกาศได้เฉพาะตอนที่ซื้อครบชุดได้จริง (กฎ STEP 8 ข้อ 4)
+            totalPrice: look.allItemsAvailable ? look.totalPrice : null,
+            productNames: look.items.map((item) => item.name),
+          }),
+          breadcrumbJsonLd([
+            { name: "หน้าแรก", path: "/" },
+            { name: "Look Ideas", path: "/looks" },
+            { name: styleShort(look.style), path: `/looks?style=${look.style}` },
+            { name: look.name, path: `/looks/${look.slug}` },
+          ]),
+        ]}
+      />
+
       <nav aria-label="เส้นทางนำทาง" className="flex flex-wrap items-center gap-1 text-xs">
         <Link href="/" className="text-muted transition hover:text-brand">
           หน้าแรก

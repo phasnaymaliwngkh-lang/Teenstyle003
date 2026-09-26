@@ -24,6 +24,11 @@ export default defineConfig({
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     restoreMocks: true,
   },
+  /**
+   * tsconfig ของ Next ตั้ง jsx: "preserve" (ให้ Next แปลงเอง) — vite จึงแปลง .tsx ไม่ได้
+   * ต้องบอกให้ใช้ JSX runtime อัตโนมัติที่นี่ ไม่งั้น import คอมโพเนนต์เข้ามาเทสต์ไม่ได้เลย
+   */
+  oxc: { jsx: { runtime: 'automatic' } },
   resolve: {
     alias: { '@': path.resolve(here, 'src') },
   },

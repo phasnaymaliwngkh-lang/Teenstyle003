@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Store } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
@@ -5,6 +6,17 @@ import { Suspense } from "react";
 import { AlertBell } from "@/features/admin/components/alert-bell";
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { requireStaff } from "@/lib/dal";
+import { NOINDEX_NOFOLLOW } from "@/lib/seo";
+
+/**
+ * ทุกหน้าใต้ /admin ต้องไม่ขึ้นดัชนี — ประกาศที่ layout ที่เดียว (STEP 33)
+ *
+ * ทำไมต้องอยู่ที่นี่: /admin/knowledge และ /admin/support เป็น client component
+ * ซึ่ง **export metadata ไม่ได้** ตอนตรวจจึงพบว่าสองหน้านั้นไม่มี noindex เลย
+ * (หน้าอื่นใส่ไว้เองทีละหน้า — ซึ่งเป็นวิธีที่ลืมได้ทุกครั้งที่เพิ่มหน้าใหม่)
+ * ประกาศที่ layout แล้วหน้าย่อยจะสืบทอดไปเอง และหน้าไหนจะทับด้วยค่าของตัวเองก็ยังได้
+ */
+export const metadata: Metadata = { robots: NOINDEX_NOFOLLOW };
 
 /**
  * Layout ของระบบหลังบ้าน (STEP 4 — โครงเบื้องต้น)

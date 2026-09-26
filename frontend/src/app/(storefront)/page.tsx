@@ -9,7 +9,12 @@ import { LooksSection } from "@/features/home/components/looks-section";
 import { ProductSection } from "@/features/home/components/product-section";
 
 export const metadata: Metadata = {
-  title: "TeenStyle ✧ — Find your style, be you 💜",
+  /*
+   * absolute = ไม่ให้ template ของ root layout เติม "| TeenStyle ✧" ต่อท้าย
+   * เดิมได้ชื่อว่า "TeenStyle ✧ — Find your style, be you 💜 | TeenStyle ✧" (แบรนด์ซ้ำสองครั้ง)
+   */
+  title: { absolute: "TeenStyle ✧ — ร้านเสื้อผ้าแฟชั่นวัยรุ่น พร้อม AI Stylist" },
+  alternates: { canonical: "/" },
   description:
     "ร้านค้าออนไลน์แฟชั่นวัยรุ่น เสื้อผ้าหลากหลายสไตล์ พร้อม AI Stylist ช่วยแนะนำการแต่งตัว และ AI Customer Service ตอบทุกคำถาม",
 };

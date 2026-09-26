@@ -4,7 +4,8 @@ import { CheckCircle2, ShieldCheck, Sparkles } from "lucide-react";
 import { StylistChat } from "@/features/ai-stylist/components/stylist-chat";
 
 export const metadata: Metadata = {
-  title: "AI Stylist — ให้ AI ช่วยเลือกชุด | TEENSTYLE AI",
+  title: "AI Stylist — ให้ AI ช่วยเลือกชุด",
+  alternates: { canonical: "/ai-stylist" },
   description:
     "บอกสไตล์ สี โอกาสใช้งาน และงบประมาณ แล้วให้ AI Stylist แนะนำสินค้าจริงจากฐานข้อมูลที่เหมาะกับคุณ ไม่แต่งข้อมูลปลอม",
 };

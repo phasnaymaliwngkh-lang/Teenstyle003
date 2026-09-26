@@ -9,10 +9,12 @@ import { ApiClientError } from "@/lib/api";
 import { getSession } from "@/lib/dal";
 import { fetchCheckoutSummaryOnServer } from "@/services/order.server";
 import type { CheckoutSummary } from "@/types/catalog";
+import { NOINDEX_FOLLOW } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "ชำระเงิน",
   description: "ยืนยันที่อยู่จัดส่ง วิธีจัดส่ง และตรวจยอดก่อนสั่งซื้อ",
+  robots: NOINDEX_FOLLOW,
 };
 
 /**

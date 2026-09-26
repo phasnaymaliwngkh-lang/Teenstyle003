@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 
 import { ComingSoon } from "@/components/shared/coming-soon";
+import { NOINDEX_FOLLOW } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "ค้นหาสินค้า",
+  robots: NOINDEX_FOLLOW,
 };
 
 export default function SearchPage() {

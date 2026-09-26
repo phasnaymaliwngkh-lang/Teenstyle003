@@ -1,9 +1,11 @@
 import { LockKeyhole } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { NOINDEX_NOFOLLOW } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "ต้องเข้าสู่ระบบก่อน",
+  robots: NOINDEX_NOFOLLOW,
 };
 
 /**

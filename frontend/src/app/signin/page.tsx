@@ -7,10 +7,12 @@ import { signInWithGoogle } from "@/features/auth/actions";
 import { isAuthSecretConfigured, isGoogleConfigured } from "@/lib/auth";
 import { getSession } from "@/lib/dal";
 import { landingPathForRole } from "@/lib/permissions";
+import { NOINDEX_FOLLOW } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "เข้าสู่ระบบ",
   description: "เข้าสู่ระบบ TEENSTYLE AI ด้วยบัญชี Google",
+  robots: NOINDEX_FOLLOW,
 };
 
 /** ข้อความ error ที่ Auth.js ส่งกลับมาทาง query string */

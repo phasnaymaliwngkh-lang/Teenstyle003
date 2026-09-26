@@ -13,13 +13,69 @@ import {
 } from "@/features/shop/lib/query";
 import { ProductCard } from "@/features/products/components/product-card";
 import { ApiClientError } from "@/lib/api";
+import { canonicalPath, NOINDEX_FOLLOW } from "@/lib/seo";
 import { fetchShopFilters, searchShopProducts } from "@/services/catalog.service";
 
-export const metadata: Metadata = {
-  title: "Shop — เลือกซื้อเสื้อผ้าแฟชั่น",
-  description:
-    "เลือกซื้อเสื้อผ้าและสินค้าแฟชั่นวัยรุ่นหลากหลายสไตล์ กรองตามหมวดหมู่ แบรนด์ ไซซ์ สี และช่วงราคา",
-};
+/**
+ * metadata ของ /shop ขึ้นกับ query string จึงต้องเป็น generateMetadata (STEP 33)
+ *
+ *   - canonical เก็บเฉพาะ `category` กับ `page` ที่ทำให้เนื้อหาต่างกันจริง
+ *     ส่วน sort/สี/ไซซ์/ช่วงราคา คือสินค้าชุดเดิมที่จัดใหม่ → ชี้กลับหน้าเดียวกัน
+ *     ไม่งั้นหน้าเดียวแตกเป็นหลายพัน URL ที่เนื้อหาซ้ำกันเอง
+ *   - มีคำค้น (?q=) = ผลค้นหาภายใน → noindex แต่ยัง follow
+ *     (Google ระบุชัดว่าหน้าผลค้นหาภายในไม่ควรอยู่ในดัชนี)
+ */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<RawSearchParams>;
+}): Promise<Metadata> {
+  const raw = await searchParams;
+  const query = typeof raw.q === "string" ? raw.q.trim() : "";
+  const categorySlug = typeof raw.category === "string" ? raw.category : "";
+
+  /*
+   * หน้าหมวดหมู่ต้องมีชื่อเรื่องของตัวเอง (STEP 33)
+   *
+   * /shop?category=<slug> ทั้ง 10 หมวดถูกส่งเข้า sitemap เป็นคนละหน้า แต่ตอนตรวจพบว่า
+   * ทุกหน้าใช้ title/description ชุดเดียวกับ /shop เป๊ะ ๆ — ในสายตา Google คือหน้าซ้ำ
+   * ที่แยกไม่ออกว่าอันไหนคืออะไร (และมีสิทธิ์ถูกยุบทิ้งทั้งหมดเหลืออันเดียว)
+   * ชื่อหมวดอ่านจาก API เดียวกับที่หน้าใช้ — ไม่ใช่ตารางชื่อที่พิมพ์ไว้ในโค้ด
+   */
+  let categoryName: string | null = null;
+  if (categorySlug !== "") {
+    try {
+      const filters = await fetchShopFilters();
+      categoryName = filters.categories.find((item) => item.slug === categorySlug)?.name ?? null;
+    } catch {
+      categoryName = null; // อ่านไม่ได้ → ใช้ชื่อกลางของ /shop ไปก่อน ดีกว่าหน้าพัง
+    }
+  }
+
+  if (query !== "") {
+    return {
+      title: `ผลการค้นหา "${query}"`,
+      description: `ผลการค้นหาสินค้าสำหรับคำว่า "${query}" ใน TEENSTYLE AI`,
+      alternates: { canonical: canonicalPath("/shop", raw, ["category", "page"]) },
+      robots: NOINDEX_FOLLOW,
+    };
+  }
+
+  if (categoryName !== null) {
+    return {
+      title: `${categoryName} — เลือกซื้อออนไลน์`,
+      description: `รวม${categoryName}สำหรับวัยรุ่นหลากหลายสไตล์ เลือกตามแบรนด์ ไซซ์ สี และช่วงราคา ราคาและสต็อกอัปเดตจากคลังจริง`,
+      alternates: { canonical: canonicalPath("/shop", raw, ["category", "page"]) },
+    };
+  }
+
+  return {
+    title: "Shop — เลือกซื้อเสื้อผ้าแฟชั่น",
+    description:
+      "เลือกซื้อเสื้อผ้าและสินค้าแฟชั่นวัยรุ่นหลากหลายสไตล์ กรองตามหมวดหมู่ แบรนด์ ไซซ์ สี และช่วงราคา",
+    alternates: { canonical: canonicalPath("/shop", raw, ["category", "page"]) },
+  };
+}
 
 /**
  * หน้า /shop (STEP 6)

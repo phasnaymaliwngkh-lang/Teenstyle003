@@ -4,7 +4,38 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 31 เสร็จ — Responsive (วัดของจริงทุกหน้า ไม่ใช่เปิดดูแล้วเดา)**
+**ล่าสุด: STEP 33 เสร็จ — SEO (ทำให้ทุกหน้าบอก Google ตรงกับความจริง และตรวจได้ด้วยเครื่อง)**
+เขียน [`scripts/audit-seo.mjs`](../scripts/audit-seo.mjs) ที่ไล่เปิดทุกหน้าสาธารณะ + ทุก URL ใน sitemap
+**ในมุมของบ็อตที่ยังไม่ได้ล็อกอิน** แล้วตรวจ title/description/canonical/robots/OG/JSON-LD
+พร้อมเทียบข้ามหน้า (title ซ้ำ · og:title ซ้ำ · ห่วงโซ่ canonical · sitemap ขัดกับ robots.txt) ·
+**ของที่เจอตอนตรวจครั้งแรก:** ① ทุกหน้าในเว็บแชร์ **การ์ด OG ใบเดียวกัน** เพราะ root layout
+ประกาศ `openGraph.title/description` ไว้ตายตัว → Next จึงไม่เติมค่าจากหน้านั้น ๆ ให้ (แชร์หน้าสินค้า
+ก็ได้ข้อความ "Find your style, be you" เหมือนกันหมด) ② **ชื่อแบรนด์ซ้ำสองครั้งใน title** ของ 5 หน้า
+เพราะเขียน "| TEENSTYLE AI" มาเองทั้งที่ root มี template เติมให้อยู่แล้ว ③ **11 หน้าหมวดหมู่
+(`/shop?category=…`) ใช้ title/description ชุดเดียวกับ `/shop` เป๊ะ ๆ** — เป็นหน้าซ้ำที่ Google
+แยกไม่ออก ④ **ไม่มี canonical สักหน้าเดียวทั้งเว็บ** ทั้งที่ `/shop` มี filter/sort ที่สร้าง URL ได้เป็นพัน
+⑤ **`/cart` `/checkout` `/search` `/signin` ไม่มี noindex** และ `/admin/knowledge` `/admin/support`
+ก็ไม่มีเพราะเป็น client component ที่ export metadata ไม่ได้ (แก้โดยประกาศที่ `admin/layout.tsx` ทีเดียว)
+⑥ **ไม่มี robots.txt และ sitemap.xml เลย** ⑦ **หน้า `/faq` ไม่มีเนื้อหาอยู่ใน HTML เลยสักตัวอักษร**
+เพราะบทความถูกดึงด้วย client component หลัง hydrate — ทั้งที่คลังความรู้คือเนื้อหาที่มีโอกาส
+ติดอันดับมากที่สุดของเว็บ (แก้โดยให้ server ดึงแล้วส่งเป็นค่าเริ่มต้นให้ viewer) ·
+**สิ่งที่เพิ่ม:** `robots.ts` · `sitemap.ts` ที่อ่านจากฐานข้อมูลจริง (33 URL: หน้าคงที่ 7 + สินค้า 12 +
+ลุค 4 + หมวดหมู่ 10) · `opengraph-image.tsx` สร้างภาพแชร์ด้วย next/og · canonical ทุกหน้า
+ผ่าน `canonicalPath()` ที่เก็บเฉพาะ query ที่ทำให้เนื้อหาต่างกันจริง · structured data ครบ
+(OnlineStore + WebSite ทุกหน้า · Product + BreadcrumbList ที่หน้าสินค้า · ItemList ที่หน้าลุค ·
+FAQPage ที่ `/faq`) · **ยึดกฎเดิมของโปรเจกต์: ห้ามประกาศสิ่งที่ไม่มีจริง** — ยังไม่มีรีวิวไม่ใส่
+`aggregateRating` · ยังไม่มีหน้าค้นหาจริงไม่ประกาศ `SearchAction` · โซเชียลยัง placeholder ไม่ใส่ `sameAs` ·
+ไม่รู้วันแก้ล่าสุดไม่ใส่ `lastModified` · **ฝัง JSON-LD โดยไม่ใช้ `dangerouslySetInnerHTML`**
+(ซึ่งเอกสาร Next แนะนำ แต่โปรเจกต์ห้ามตั้งแต่ STEP 28) เพราะทดลองแล้วว่า React 19 ไม่ escape
+ข้อความใน `<script>` เป็น HTML entity (JSON ยังใช้ได้) และเขียน `</script` ในข้อมูลเป็น `script`
+ให้เอง จึงปิดแท็กก่อนเวลาไม่ได้ — มีเทสต์ยิง `</script><img onerror=…>` ล็อกไว้ ·
+**ยืนยันกับของจริงบน production build:** ตรวจ 39 หน้าไม่พบปัญหา · ราคาใน JSON-LD ตรงกับ API ·
+ตั้งของให้หมดจริงแล้ว `availability` เปลี่ยนเป็น `OutOfStock` · ใส่รีวิว 4 ดาวแล้วมี `aggregateRating`
+ตรงค่า (ลบออกแล้วหายไป) · ตั้งสินค้าเป็น `ARCHIVED` แล้ว **sitemap ลดจาก 33 เหลือ 32 เองภายใน 60 วิ**
+(พิสูจน์ว่า sitemap ตามฐานข้อมูลจริง ไม่ได้แข็งค้างจากตอน build) · หน้าหลังบ้านตอนล็อกอินจริง
+ตอบ `noindex, nofollow` ครบทุกหน้า · test 652 เคส (backend 612 + frontend 40) ผ่านทั้งหมด
+
+**STEP 31:** Responsive (วัดของจริงทุกหน้า ไม่ใช่เปิดดูแล้วเดา)
 เขียนเครื่องมือ [`scripts/audit-responsive.mjs`](../scripts/audit-responsive.mjs) ที่เปิด **Chrome จริง**
 ในเครื่องผ่าน CDP (ไม่มี puppeteer/playwright เป็น dependency เพราะ Node 24 มี `WebSocket` เป็น global)
 แล้วไล่เปิด **ทุกหน้าในแอป (44 หน้า)** ทีละความกว้าง โดยล็อกอินตามบทบาทที่หน้านั้นต้องการ
@@ -408,11 +439,11 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 |   30 | Error Handling                    |  ✅   | `normalizeError()` ที่เดียว — ApiError · Zod · body-parser · multer · URIError · ตาข่าย Prisma (ต่อ DB ไม่ได้ → 503) · **แก้ 5 เส้นทางที่เคยตอบ 500 ทั้งที่เป็นความผิดของคำขอ** · frontend มี error boundary ครบทุกชั้น + หน้า 404 ภาษาไทย                                                            |
 |   31 | Responsive                        |  ✅   | ตรวจ 44 หน้า × 360/768/1280 ด้วย Chrome จริงผ่าน [`scripts/audit-responsive.mjs`](../scripts/audit-responsive.mjs) — ไม่มีหน้าล้น ไม่มีเนื้อหาถูกตัด ไม่มีปุ่มเล็กกว่า 44px · ถอด `overflow-x: hidden` ที่ `body` ซึ่งกลบปัญหาไว้ · ล็อกด้วย responsive.test.ts · **320px ยังล้น 16 หน้า (นอกเกณฑ์)** |
 |   32 | Loading / Empty / Error / Retry   |  ✅   | โครงใช้ซ้ำได้ใน components/shared/section.tsx · ทดสอบ error state แล้วตอน backend ล่ม · STEP 30 เพิ่ม error boundary ทุกชั้น (`error.tsx`, `global-error.tsx`) และหน้า 404 ที่ราก                                                                                                                     |
-|   33 | SEO                               |  🚧   | STEP 6/8: metadata ต่อสินค้า/ลุค + slug ที่ไม่มีจริงคืน HTTP 404 จริง (ไม่ใช่ soft 404)                                                                                                                                                                                                               |
+|   33 | SEO                               |  ✅   | robots.txt + sitemap.xml จากฐานข้อมูลจริง (ISR 60 วิ) · canonical ทุกหน้า · structured data (Product/ItemList/FAQPage/Breadcrumb/OnlineStore) · og:image จาก next/og · noindex ครบทุกหน้าส่วนตัว · ตรวจด้วย [`scripts/audit-seo.mjs`](../scripts/audit-seo.mjs) 39 หน้าไม่พบปัญหา                     |
 |   34 | Performance (cache, index, Redis) |  ⬜   |                                                                                                                                                                                                                                                                                                       |
 |   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                                                                                                                                                                                                           |
 |   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                                                                                                                                                                                                         |
-|   37 | Testing                           |  🚧   | vitest + supertest 626 เคส (backend 612 + frontend 14) · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                                                                                                                                                             |
+|   37 | Testing                           |  🚧   | vitest + supertest 652 เคส (backend 612 + frontend 40) · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                                                                                                                                                             |
 |   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                                                                                                                                                                                                         |
 |   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                                                                                                                                                                                                       |
 |   40 | Final Audit                       |  ⬜   |                                                                                                                                                                                                                                                                                                       |

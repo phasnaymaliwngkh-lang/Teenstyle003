@@ -12,13 +12,26 @@ import {
   type RawSearchParams,
 } from "@/features/looks/lib/query";
 import { ApiClientError } from "@/lib/api";
+import { canonicalPath, NOINDEX_FOLLOW } from "@/lib/seo";
 import { fetchLookFilters, searchLooks } from "@/services/catalog.service";
 
-export const metadata: Metadata = {
-  title: "Look Ideas — ไอเดียการแต่งตัว",
-  description:
-    "ไอเดียการแต่งตัวที่จัดชุดไว้แล้ว เลือกตามสไตล์ Street, Korean, Minimal, Party พร้อมราคารวมของทั้งลุคจากสินค้าจริงในร้าน",
-};
+/** metadata ขึ้นกับ query string — เหตุผลเดียวกับ /shop (ดูคอมเมนต์ที่นั่น) */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<RawSearchParams>;
+}): Promise<Metadata> {
+  const raw = await searchParams;
+  const query = typeof raw.q === "string" ? raw.q.trim() : "";
+
+  return {
+    title: query === "" ? "Look Ideas — ไอเดียการแต่งตัว" : `ค้นหาลุค "${query}"`,
+    description:
+      "ไอเดียการแต่งตัวที่จัดชุดไว้แล้ว เลือกตามสไตล์ Street, Korean, Minimal, Party พร้อมราคารวมของทั้งลุคจากสินค้าจริงในร้าน",
+    alternates: { canonical: canonicalPath("/looks", raw, ["style", "page"]) },
+    robots: query === "" ? undefined : NOINDEX_FOLLOW,
+  };
+}
 
 /**
  * หน้า /looks (STEP 7)
