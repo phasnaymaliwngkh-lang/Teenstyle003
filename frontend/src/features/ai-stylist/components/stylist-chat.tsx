@@ -129,7 +129,7 @@ export function StylistChat() {
             type="button"
             onClick={handleReset}
             disabled={loading}
-            className="flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-line bg-white px-3 py-1.5 text-xs font-semibold text-muted-light transition hover:border-danger/40 hover:bg-danger/5 hover:text-danger disabled:opacity-50"
+            className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius-pill)] border border-line bg-white px-3.5 text-xs font-semibold text-muted-light transition hover:border-danger/40 hover:bg-danger/5 hover:text-danger disabled:opacity-50"
             title="เริ่มคุยใหม่"
           >
             <RotateCcw className="size-3.5" aria-hidden />
@@ -260,13 +260,13 @@ export function StylistChat() {
             onChange={(e) => setInputText(e.target.value)}
             disabled={loading}
             placeholder="พิมพ์บอกสไตล์ สี โอกาสใช้งาน หรืองบประมาณ..."
-            className="flex-1 rounded-[var(--radius-pill)] border border-line bg-lilac-50 px-4 py-2.5 text-sm text-ink outline-none transition focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
+            className="h-11 flex-1 rounded-[var(--radius-pill)] border border-line bg-lilac-50 px-4 text-sm text-ink outline-none transition focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
           />
 
           <button
             type="submit"
             disabled={loading || !inputText.trim()}
-            className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand text-white shadow-sm transition hover:bg-brand-dark hover:shadow disabled:opacity-40"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand text-white shadow-sm transition hover:bg-brand-dark hover:shadow disabled:opacity-40"
             aria-label="ส่งข้อความ"
           >
             {loading ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}

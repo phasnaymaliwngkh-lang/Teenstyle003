@@ -70,7 +70,7 @@ export function ExportPanel() {
                   <button
                     type="button"
                     onClick={() => setProductFormat("xlsx")}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border py-2 text-xs font-semibold transition ${
+                    className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border text-xs font-semibold transition ${
                       productFormat === "xlsx"
                         ? "border-brand bg-lilac/30 text-brand-dark"
                         : "border-line text-muted hover:border-brand-soft"
@@ -82,7 +82,7 @@ export function ExportPanel() {
                   <button
                     type="button"
                     onClick={() => setProductFormat("csv")}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border py-2 text-xs font-semibold transition ${
+                    className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border text-xs font-semibold transition ${
                       productFormat === "csv"
                         ? "border-brand bg-lilac/30 text-brand-dark"
                         : "border-line text-muted hover:border-brand-soft"
@@ -99,7 +99,7 @@ export function ExportPanel() {
                 <select
                   value={productStatus}
                   onChange={(e) => setProductStatus(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand"
+                  className="mt-1 h-11 w-full rounded-lg border border-line bg-white px-3 text-sm text-ink outline-none focus:border-brand"
                 >
                   <option value="ALL">ทุกสถานะ (ทั้งหมด)</option>
                   <option value="ACTIVE">เปิดขาย (ACTIVE)</option>
@@ -120,7 +120,7 @@ export function ExportPanel() {
                 productStatus !== "ALL" ? `status=${productStatus}` : "",
               )
             }
-            className="btn-brand mt-6 flex w-full items-center justify-center gap-2 rounded-[var(--radius-pill)] py-2.5 text-sm font-bold text-white transition disabled:opacity-50"
+            className="btn-brand mt-6 flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-pill)] text-sm font-bold text-white transition disabled:opacity-50"
           >
             {loading === "products" ? (
               <Loader2 className="size-4 animate-spin" />
@@ -151,7 +151,7 @@ export function ExportPanel() {
                   <button
                     type="button"
                     onClick={() => setInventoryFormat("xlsx")}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border py-2 text-xs font-semibold transition ${
+                    className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border text-xs font-semibold transition ${
                       inventoryFormat === "xlsx"
                         ? "border-brand bg-lilac/30 text-brand-dark"
                         : "border-line text-muted hover:border-brand-soft"
@@ -163,7 +163,7 @@ export function ExportPanel() {
                   <button
                     type="button"
                     onClick={() => setInventoryFormat("csv")}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border py-2 text-xs font-semibold transition ${
+                    className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border text-xs font-semibold transition ${
                       inventoryFormat === "csv"
                         ? "border-brand bg-lilac/30 text-brand-dark"
                         : "border-line text-muted hover:border-brand-soft"
@@ -180,7 +180,7 @@ export function ExportPanel() {
                 <select
                   value={inventoryStockStatus}
                   onChange={(e) => setInventoryStockStatus(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand"
+                  className="mt-1 h-11 w-full rounded-lg border border-line bg-white px-3 text-sm text-ink outline-none focus:border-brand"
                 >
                   <option value="ALL">ทุกสถานะ (ทั้งหมด)</option>
                   <option value="IN_STOCK">พร้อมส่ง (IN_STOCK)</option>
@@ -201,7 +201,7 @@ export function ExportPanel() {
                 inventoryStockStatus !== "ALL" ? `stockStatus=${inventoryStockStatus}` : "",
               )
             }
-            className="btn-brand mt-6 flex w-full items-center justify-center gap-2 rounded-[var(--radius-pill)] py-2.5 text-sm font-bold text-white transition disabled:opacity-50"
+            className="btn-brand mt-6 flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-pill)] text-sm font-bold text-white transition disabled:opacity-50"
           >
             {loading === "inventory" ? (
               <Loader2 className="size-4 animate-spin" />
@@ -232,7 +232,7 @@ export function ExportPanel() {
                   <button
                     type="button"
                     onClick={() => setOrderFormat("xlsx")}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border py-2 text-xs font-semibold transition ${
+                    className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border text-xs font-semibold transition ${
                       orderFormat === "xlsx"
                         ? "border-brand bg-lilac/30 text-brand-dark"
                         : "border-line text-muted hover:border-brand-soft"
@@ -244,7 +244,7 @@ export function ExportPanel() {
                   <button
                     type="button"
                     onClick={() => setOrderFormat("csv")}
-                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg border py-2 text-xs font-semibold transition ${
+                    className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border text-xs font-semibold transition ${
                       orderFormat === "csv"
                         ? "border-brand bg-lilac/30 text-brand-dark"
                         : "border-line text-muted hover:border-brand-soft"
@@ -263,7 +263,7 @@ export function ExportPanel() {
                 <select
                   value={orderStatus}
                   onChange={(e) => setOrderStatus(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand"
+                  className="mt-1 h-11 w-full rounded-lg border border-line bg-white px-3 text-sm text-ink outline-none focus:border-brand"
                 >
                   <option value="ALL">ทุกสถานะ (ทั้งหมด)</option>
                   <option value="PENDING_PAYMENT">รอชำระเงิน</option>
@@ -288,7 +288,7 @@ export function ExportPanel() {
                 orderStatus !== "ALL" ? `status=${orderStatus}` : "",
               )
             }
-            className="btn-brand mt-6 flex w-full items-center justify-center gap-2 rounded-[var(--radius-pill)] py-2.5 text-sm font-bold text-white transition disabled:opacity-50"
+            className="btn-brand mt-6 flex min-h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-pill)] text-sm font-bold text-white transition disabled:opacity-50"
           >
             {loading === "orders" ? (
               <Loader2 className="size-4 animate-spin" />

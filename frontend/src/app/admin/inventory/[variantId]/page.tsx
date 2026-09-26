@@ -78,7 +78,7 @@ export default async function VariantInventoryPage({
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={cn(
-              "flex min-h-9 items-center rounded-[var(--radius-pill)] border px-3 text-xs font-bold",
+              "flex min-h-11 items-center rounded-[var(--radius-pill)] border px-3 text-xs font-bold",
               stockStatusTone(row.stockStatus),
             )}
           >

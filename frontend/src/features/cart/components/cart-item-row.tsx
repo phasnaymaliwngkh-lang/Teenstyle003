@@ -66,8 +66,8 @@ export function CartItemRow({ item }: { item: CartItem }) {
         disabled && "opacity-70",
       )}
     >
-      <div className="flex gap-4">
-        <label className="flex items-start pt-1">
+      <div className="flex gap-3 sm:gap-4">
+        <label className="grid size-11 shrink-0 place-items-center">
           <span className="sr-only">เลือกรายการนี้เพื่อสั่งซื้อ</span>
           <input
             type="checkbox"
@@ -80,14 +80,14 @@ export function CartItemRow({ item }: { item: CartItem }) {
 
         <Link
           href={`/product/${item.slug}`}
-          className="relative size-24 shrink-0 overflow-hidden rounded-[12px] bg-lilac-50"
+          className="relative size-20 shrink-0 overflow-hidden rounded-[12px] bg-lilac-50 sm:size-24"
         >
           {item.image ? (
             <Image
               src={item.image.url}
               alt={item.image.alt}
               fill
-              sizes="96px"
+              sizes="(min-width: 640px) 96px, 80px"
               className="object-cover"
             />
           ) : (
@@ -134,18 +134,18 @@ export function CartItemRow({ item }: { item: CartItem }) {
           )}
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-1 rounded-[var(--radius-pill)] border border-line p-1">
+            <div className="flex items-center gap-0.5 rounded-[var(--radius-pill)] border border-line p-0.5 sm:gap-1 sm:p-1">
               <button
                 type="button"
                 onClick={() => changeQuantity(item.quantity - 1)}
                 disabled={disabled || item.quantity <= 1}
                 aria-label="ลดจำนวน"
-                className="grid size-9 place-items-center rounded-full transition hover:bg-lilac-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="grid size-11 place-items-center rounded-full transition hover:bg-lilac-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Minus className="size-4" aria-hidden />
               </button>
 
-              <label>
+              <label className="flex min-h-11 min-w-11 items-center justify-center">
                 <span className="sr-only">จำนวนของ {item.name}</span>
                 <input
                   type="number"
@@ -157,7 +157,7 @@ export function CartItemRow({ item }: { item: CartItem }) {
                   disabled={disabled}
                   key={item.quantity}
                   onBlur={(event) => changeQuantity(Number(event.target.value))}
-                  className="w-12 bg-transparent text-center text-sm font-bold outline-none disabled:opacity-40"
+                  className="w-10 bg-transparent text-center text-sm font-bold outline-none disabled:opacity-40 sm:w-12"
                 />
               </label>
 
@@ -166,7 +166,7 @@ export function CartItemRow({ item }: { item: CartItem }) {
                 onClick={() => changeQuantity(item.quantity + 1)}
                 disabled={disabled || item.quantity >= maxQuantity}
                 aria-label="เพิ่มจำนวน"
-                className="grid size-9 place-items-center rounded-full transition hover:bg-lilac-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="grid size-11 place-items-center rounded-full transition hover:bg-lilac-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Plus className="size-4" aria-hidden />
               </button>

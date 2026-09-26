@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutDashboard, LogOut, Menu, User as UserIcon, X } from "lucide-react";
+import { Heart, LayoutDashboard, LogOut, Menu, User as UserIcon, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -10,6 +10,9 @@ import { MAIN_NAV } from "./nav-config";
 import { signOutAction } from "@/features/auth/actions";
 import { isStaffRole } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
+
+/** ปลายทางที่ navbar ซ่อนไอคอนไว้บนจอเล็ก (ดูเหตุผลที่ navbar.tsx) */
+const EXTRA_MOBILE_NAV = [{ label: "รายการที่ถูกใจ", href: "/wishlist", icon: Heart }] as const;
 
 export interface MobileMenuProps {
   user: {
@@ -122,6 +125,30 @@ export function MobileMenu({ user }: MobileMenuProps) {
                         STEP {item.pendingStep}
                       </span>
                     )}
+                  </Link>
+                );
+              })}
+
+              {/**
+               * รายการนี้ไม่ได้อยู่ใน MAIN_NAV แต่ต้องมีที่นี่ (STEP 31)
+               * เพราะบนจอเล็กไอคอน "ถูกใจ" ถูกซ่อนจาก navbar เพื่อไม่ให้แถบล้นที่ 360px
+               * ถ้าไม่มีทางนี้ จะเข้าหน้า /wishlist จากมือถือไม่ได้เลย
+               */}
+              {EXTRA_MOBILE_NAV.map((item) => {
+                const isActive = pathname.startsWith(item.href);
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={isActive ? "page" : undefined}
+                    className={cn(
+                      "flex min-h-12 items-center gap-3 rounded-[var(--radius-sm,12px)] px-4 text-base font-semibold transition sm:hidden",
+                      isActive ? "bg-lilac text-brand-dark" : "hover:bg-lilac-50",
+                    )}
+                  >
+                    <item.icon className="size-4 text-brand" aria-hidden />
+                    {item.label}
                   </Link>
                 );
               })}

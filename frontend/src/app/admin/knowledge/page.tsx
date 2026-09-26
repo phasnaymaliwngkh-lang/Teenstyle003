@@ -452,7 +452,7 @@ export default function AdminKnowledgePage() {
           <button
             type="button"
             onClick={() => setErrorMessage(null)}
-            className="text-xs font-bold text-danger hover:underline"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 text-xs font-bold text-danger hover:underline"
           >
             ปิด
           </button>
@@ -504,7 +504,7 @@ export default function AdminKnowledgePage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="ค้นหาชื่อบทความ, Slug, แท็ก..."
-              className="w-full rounded-full border border-line bg-lilac-50 py-2 pl-10 pr-4 text-sm text-ink placeholder:text-muted focus:border-brand focus:bg-white focus:outline-none"
+              className="h-11 w-full rounded-full border border-line bg-lilac-50 pl-10 pr-4 text-sm text-ink placeholder:text-muted focus:border-brand focus:bg-white focus:outline-none"
             />
           </div>
 
@@ -516,7 +516,7 @@ export default function AdminKnowledgePage() {
             id="kb-filter-category"
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value as KnowledgeCategory | "ALL")}
-            className="rounded-full border border-line bg-lilac-50 px-4 py-2 text-sm font-semibold text-ink focus:border-brand focus:bg-white focus:outline-none"
+            className="h-11 rounded-full border border-line bg-lilac-50 px-4 text-sm font-semibold text-ink focus:border-brand focus:bg-white focus:outline-none"
           >
             <option value="ALL">ทุกหมวดหมู่ ({articles.length})</option>
             {CATEGORIES.map((cat) => (
@@ -531,7 +531,7 @@ export default function AdminKnowledgePage() {
             <button
               type="button"
               onClick={() => setStatusFilter("ALL")}
-              className={`rounded-full px-3 py-1 transition ${
+              className={`inline-flex min-h-11 items-center rounded-full px-3.5 transition ${
                 statusFilter === "ALL" ? "bg-white shadow-xs text-ink" : "text-muted hover:text-ink"
               }`}
             >
@@ -540,7 +540,7 @@ export default function AdminKnowledgePage() {
             <button
               type="button"
               onClick={() => setStatusFilter("PUBLISHED")}
-              className={`rounded-full px-3 py-1 transition ${
+              className={`inline-flex min-h-11 items-center rounded-full px-3.5 transition ${
                 statusFilter === "PUBLISHED"
                   ? "bg-white shadow-xs text-success"
                   : "text-muted hover:text-ink"
@@ -551,7 +551,7 @@ export default function AdminKnowledgePage() {
             <button
               type="button"
               onClick={() => setStatusFilter("DRAFT")}
-              className={`rounded-full px-3 py-1 transition ${
+              className={`inline-flex min-h-11 items-center rounded-full px-3.5 transition ${
                 statusFilter === "DRAFT"
                   ? "bg-white shadow-xs text-warning"
                   : "text-muted hover:text-ink"
@@ -565,7 +565,7 @@ export default function AdminKnowledgePage() {
         <button
           type="button"
           onClick={() => void loadArticles()}
-          className="p-2 rounded-full border border-line hover:bg-lilac-50 transition text-muted"
+          className="grid size-11 shrink-0 place-items-center rounded-full border border-line hover:bg-lilac-50 transition text-muted"
           title="รีเฟรชข้อมูล"
           aria-label="รีเฟรชรายการบทความ"
         >
@@ -595,7 +595,7 @@ export default function AdminKnowledgePage() {
             <button
               type="button"
               onClick={handleOpenCreate}
-              className="btn-brand px-4 py-2 text-xs font-bold"
+              className="btn-brand inline-flex min-h-11 items-center rounded-[var(--radius-pill)] px-4 text-xs font-bold"
             >
               + สร้างบทความใหม่
             </button>

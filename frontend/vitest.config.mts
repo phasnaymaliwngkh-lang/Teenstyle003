@@ -12,13 +12,16 @@ const here = path.dirname(fileURLToPath(import.meta.url));
  * แต่ STEP 28 เพิ่ม `lib/safe-redirect.ts` ที่เป็น **ตรรกะความปลอดภัย**
  * — ของแบบนี้พังเงียบ ๆ ได้ และพังแล้วกลายเป็นช่องฟิชชิง จึงต้องมีเทสต์ล็อกไว้
  *
- * ขอบเขตตอนนี้: เฉพาะฟังก์ชันล้วนใน `src/lib` ที่ไม่ต้องมี DOM
+ * ขอบเขตตอนนี้ (ยังไม่ต้องมี DOM ทั้งคู่ — ดู include ข้างล่าง)
+ *   - ไฟล์ .test.ts ใน `src`   ฟังก์ชันล้วนใน `src/lib`
+ *   - ไฟล์ .test.ts ใน `tests` กฎระดับโปรเจกต์ที่อ่านซอร์สมาตรวจ (เพิ่มใน STEP 31 — กฎ responsive)
+ *
  * การเทสต์คอมโพเนนต์ (ต้องมี jsdom + testing-library) เป็นงานของ STEP 37
  */
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
     restoreMocks: true,
   },
   resolve: {

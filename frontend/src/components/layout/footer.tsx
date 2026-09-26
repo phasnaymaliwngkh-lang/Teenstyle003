@@ -42,7 +42,7 @@ export function Footer() {
                   target="_blank"
                   rel="noopener noreferrer"
                   role="listitem"
-                  className="rounded-[var(--radius-pill)] border border-white/15 px-4 py-2 text-xs font-semibold transition hover:border-brand-soft hover:bg-brand"
+                  className="inline-flex min-h-11 items-center rounded-[var(--radius-pill)] border border-white/15 px-4 text-xs font-semibold transition hover:border-brand-soft hover:bg-brand"
                 >
                   {social.label}
                 </a>

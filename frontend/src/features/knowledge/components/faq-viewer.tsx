@@ -374,7 +374,7 @@ export function FaqViewer() {
                   setActiveSearch(q);
                   void handleAskAI(q);
                 }}
-                className="rounded-full bg-white px-3 py-1 text-muted hover:text-brand hover:border-brand-soft border border-line transition shadow-2xs font-medium"
+                className="inline-flex min-h-11 items-center rounded-full bg-white px-3.5 text-muted hover:text-brand hover:border-brand-soft border border-line transition shadow-2xs font-medium"
               >
                 {q}
               </button>
@@ -540,7 +540,7 @@ export function FaqViewer() {
           <button
             type="button"
             onClick={() => setSelectedCategory("ALL")}
-            className={`flex items-center gap-1.5 rounded-[var(--radius-pill)] px-4 py-2 text-xs font-bold transition ${
+            className={`flex min-h-11 items-center gap-1.5 rounded-[var(--radius-pill)] px-4 text-xs font-bold transition ${
               selectedCategory === "ALL"
                 ? "bg-brand text-white shadow-[var(--shadow-brand)]"
                 : "border border-line bg-white text-muted hover:border-brand-soft hover:text-ink"
@@ -557,7 +557,7 @@ export function FaqViewer() {
                 key={cat.key}
                 type="button"
                 onClick={() => setSelectedCategory(cat.key)}
-                className={`flex items-center gap-2 rounded-[var(--radius-pill)] px-4 py-2 text-xs font-bold transition ${
+                className={`flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] px-4 text-xs font-bold transition ${
                   isSelected
                     ? "bg-brand text-white shadow-[var(--shadow-brand)]"
                     : "border border-line bg-white text-muted hover:border-brand-soft hover:text-ink"
@@ -594,7 +594,7 @@ export function FaqViewer() {
           <button
             type="button"
             onClick={() => void loadArticles()}
-            className="btn-brand px-4 py-2 text-xs font-bold"
+            className="btn-brand inline-flex min-h-11 items-center rounded-[var(--radius-pill)] px-4 text-xs font-bold"
           >
             ลองใหม่
           </button>
@@ -666,7 +666,7 @@ export function FaqViewer() {
                     <button
                       type="button"
                       onClick={() => openArticle(article)}
-                      className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] border border-line px-3.5 py-1.5 text-xs font-bold text-ink hover:border-brand hover:bg-lilac-50 hover:text-brand transition shadow-2xs"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-[var(--radius-pill)] border border-line px-3.5 text-xs font-bold text-ink hover:border-brand hover:bg-lilac-50 hover:text-brand transition shadow-2xs"
                     >
                       <FileText className="size-3.5" />
                       อ่านคู่มือฉบับเต็ม
@@ -726,7 +726,7 @@ export function FaqViewer() {
                       type="button"
                       disabled={hasVoted || votingLoading[article.id]}
                       onClick={() => void handleVote(article.id, true)}
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold border transition ${
+                      className={`inline-flex min-h-11 items-center gap-1 rounded-full px-3 font-semibold border transition ${
                         isVotedHelpful
                           ? "bg-success/5 text-success border-success/30"
                           : "bg-white border-line hover:border-success hover:text-success"
@@ -740,7 +740,7 @@ export function FaqViewer() {
                       type="button"
                       disabled={hasVoted || votingLoading[article.id]}
                       onClick={() => void handleVote(article.id, false)}
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold border transition ${
+                      className={`inline-flex min-h-11 items-center gap-1 rounded-full px-3 font-semibold border transition ${
                         isVotedNotHelpful
                           ? "bg-danger/5 text-danger border-danger/25"
                           : "bg-white border-line hover:border-danger hover:text-danger"

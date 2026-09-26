@@ -46,7 +46,7 @@ export function ImportExportTabs({ initialTab = "export" }: ImportExportTabsProp
             key={tab.key}
             type="button"
             onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-2 rounded-[var(--radius-pill)] px-5 py-2.5 text-sm font-bold transition ${
+            className={`flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] px-5 text-sm font-bold transition ${
               activeTab === tab.key
                 ? "bg-brand text-white shadow-[var(--shadow-brand)]"
                 : "border border-line bg-white text-muted hover:border-brand-soft hover:bg-lilac-50 hover:text-brand-dark"

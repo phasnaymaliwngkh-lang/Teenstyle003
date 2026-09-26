@@ -4,7 +4,40 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 30 เสร็จ — Error Handling (ตรวจทั้งระบบ ไม่ใช่แค่มี errorHandler)**
+**ล่าสุด: STEP 31 เสร็จ — Responsive (วัดของจริงทุกหน้า ไม่ใช่เปิดดูแล้วเดา)**
+เขียนเครื่องมือ [`scripts/audit-responsive.mjs`](../scripts/audit-responsive.mjs) ที่เปิด **Chrome จริง**
+ในเครื่องผ่าน CDP (ไม่มี puppeteer/playwright เป็น dependency เพราะ Node 24 มี `WebSocket` เป็น global)
+แล้วไล่เปิด **ทุกหน้าในแอป (44 หน้า)** ทีละความกว้าง โดยล็อกอินตามบทบาทที่หน้านั้นต้องการ
+และวัด 3 อย่างที่อ่านจากซอร์สไม่ได้: `documentElement.scrollWidth > clientWidth` (หน้าเลื่อนแนวนอน) ·
+กล่องที่ยื่นเกินจอแล้วถูก `overflow-x: hidden` ตัดหาย · และขนาดกล่องของ **ทุกตัวควบคุม** เทียบเกณฑ์ 44px ·
+**ของที่เจอ (ทั้งหมดเป็นของจริง ไม่ใช่ทฤษฎี):** ① `globals.css` มี `overflow-x: hidden` ที่ `body`
+เขียนกำกับว่า "ป้องกัน horizontal overflow ตาม STEP 31" ซึ่ง **ไม่ได้ป้องกันอะไร** มันแค่ตัดของที่ล้น
+ให้มองไม่เห็น และหน้าก็ยังเลื่อนซ้ายขวาได้จริง — สิ่งที่มันกลบไว้คือ navbar ของ **คนที่ล็อกอิน**
+บนจอ 360px ล้นไป 25px แล้ว **ปุ่ม hamburger ถูกตัดหายไปครึ่งปุ่ม** (กระดิ่งแจ้งเตือนของ STEP 24
+ทำให้มี 5 ไอคอน × 44px ซึ่งเกินที่ 360px รับได้ จึงพังเฉพาะคนที่ล็อกอิน = ไม่มีใครเห็นตอนพัฒนา) ·
+② แถบ `/admin` ที่ 360px **ไม่ได้ล้นเลย** แต่ flex ย่อของทุกชิ้นให้พอดี ผลคือกระดิ่งเหลือกว้าง 29px
+จาก 44 · โลโก้ตัดสองบรรทัด · ปุ่มออกจากระบบสูง 62px — **การย่อของ flex ซ่อนปัญหาไว้จนการตรวจ
+"หน้าล้นไหม" ผ่านหมด** ③ `/admin/support` วางรายการเคสกับห้องแชตข้างกันในกล่อง `overflow-hidden`
+ที่ 360px ห้องแชตถูกดันออกนอกจอแล้วถูกตัดหายทั้งคอลัมน์ (แก้เป็น master/detail สลับหน้า + ปุ่มย้อนกลับ) ·
+④ ตัวควบคุม 102 แบบที่พื้นที่กดเล็กกว่า 44px — ชิปตัวกรอง 36px · ปุ่มโหวต 42px · ปุ่มเพิ่ม/ลดจำนวน 40px ·
+ปุ่ม "ปิด" ของแถบแจ้งเตือนที่ `/admin/knowledge` **15×16px** · ช่องกรอกในแชตสูง 38px ·
+`<summary>` ในหน้า audit log สูง 16px — แก้ครบทั้งหมดแล้ว ·
+**บทเรียนที่สำคัญที่สุด: สองกฎนี้ขัดกันเอง** — ขยายปุ่ม +/− จำนวนในตะกร้าเป็น 44px แล้ว **สร้างการล้น
+ขึ้นใหม่ทันที** ที่ `/cart` (แถวสินค้าต้องการ 348px ในพื้นที่ 328px) จึงต้องลดช่องไฟและขนาดรูปบนจอเล็ก
+แล้ว **รันตรวจซ้ำหลังแก้ทุกครั้ง** ไม่ใช่แก้แล้วจบ · ตัววัดเองก็มีกับดัก 2 ข้อที่ทำให้ผลผิดจริง:
+**cookie เป็นของโปรไฟล์เบราว์เซอร์ ไม่ใช่ของแท็บ** (รอบที่สองหน้า "guest" ถูกตรวจในฐานะ admin
+เพราะ cookie ค้าง → ล้างก่อนทุกหน้า) และ **หน้าที่แสดงแผง error ไม่ได้แสดงเลย์เอาต์ของตัวเอง**
+(ยิงรัวจาก IP เดียวชน rate limit ของ API เอง 300 คำขอ/15 นาที → หลายหน้ากลายเป็น
+"โหลดข้อมูลส่วนนี้ไม่สำเร็จ" ที่สั้นและไม่ล้น = **ผ่านแบบหลอก ๆ** ตอนนี้สคริปต์ฟ้องและไม่คืน exit 0) ·
+ล็อกด้วย [responsive.test.ts](../frontend/tests/responsive.test.ts) 5 เคส: ห้ามเอา `overflow-x: hidden`
+กลับมาที่ `body`/`html` · ทุก `page.tsx` ต้องอยู่ในรายการที่สคริปต์ไล่ตรวจ · เกณฑ์ยังเป็น 44px ·
+ไม่มีตัวควบคุมที่ตั้งขนาดคงที่ต่ำกว่า 44px ในซอร์ส (ทดสอบแล้วว่าเทสต์ล้มจริงเมื่อถอยหลัง) ·
+**ผลตรวจสุดท้าย: 44 หน้า × 360/768/1280 = 132 หน้า-ความกว้าง ไม่มีปัญหาเลย** ·
+ข้อจำกัดที่บอกไว้ตรง ๆ: ที่ **320px ยังล้น 16 หน้า** (ต่ำกว่าเกณฑ์ 360px ที่โปรเจกต์กำหนด) และ
+ลิงก์ข้อความในประโยค/เบรดครัมบ์/ช่องตาราง ~600 จุดไม่ถูกบังคับ 44px ตามข้อยกเว้น inline ของ WCAG 2.5.5 ·
+test 626 เคส (backend 612 + frontend 14) ผ่านทั้งหมด
+
+**STEP 30:** Error Handling (ตรวจทั้งระบบ ไม่ใช่แค่มี errorHandler)
 โครง `errorHandler` + `{ success, message, errorCode }` มีมาตั้งแต่ STEP 1 แล้ว
 งานของ STEP นี้คือไล่ดูว่า **error จริง ๆ ที่เกิดขึ้นได้ ตอบอะไรกลับไปบ้าง** —
 แล้วเจอว่ามี **5 เส้นทางที่ตอบ 500 "เกิดข้อผิดพลาดภายในระบบ" ทั้งที่เป็นความผิดของคำขอ**:
@@ -367,25 +400,25 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 
 ## Platform / Quality
 
-| STEP | หัวข้อ                            | สถานะ | หมายเหตุ                                                                                                                                                                                                                                   |
-| ---: | --------------------------------- | :---: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-|   24 | Notifications                     |  ✅   | ฟีดในบัญชี + กระดิ่งบน navbar · IN_APP เท่านั้น (อีเมลจริง STEP 50) · ประกาศของพนักงานไม่หลุดเข้าฟีดลูกค้า                                                                                                                                 |
-|   28 | Security                          |  ✅   | ตรวจทั้งระบบแล้ว + ปิด open redirect 2 ช่องทาง · CSP แบบ nonce · HSTS · TRUST_PROXY_HOPS · จำกัดชนิดไฟล์อัปโหลด · security.test.ts 19 เคส — รายละเอียดใน [08-security.md](08-security.md)                                                  |
-|   29 | REST API                          |  ✅   | 119 เส้นทาง · เอกสารครบใน [09-api-reference.md](09-api-reference.md) ที่ถูกเทียบกับ router จริงทีละแถวด้วย api-contract.test.ts · `GET /api` นับจาก router ไม่ใช่รายการที่เขียนด้วยมือ · ตรวจลำดับ route ว่าไม่มีเส้นทางถูกบัง             |
-|   30 | Error Handling                    |  ✅   | `normalizeError()` ที่เดียว — ApiError · Zod · body-parser · multer · URIError · ตาข่าย Prisma (ต่อ DB ไม่ได้ → 503) · **แก้ 5 เส้นทางที่เคยตอบ 500 ทั้งที่เป็นความผิดของคำขอ** · frontend มี error boundary ครบทุกชั้น + หน้า 404 ภาษาไทย |
-|   31 | Responsive                        |  🚧   | จะครบเมื่อมีหน้าจริงตั้งแต่ STEP 4                                                                                                                                                                                                         |
-|   32 | Loading / Empty / Error / Retry   |  ✅   | โครงใช้ซ้ำได้ใน components/shared/section.tsx · ทดสอบ error state แล้วตอน backend ล่ม · STEP 30 เพิ่ม error boundary ทุกชั้น (`error.tsx`, `global-error.tsx`) และหน้า 404 ที่ราก                                                          |
-|   33 | SEO                               |  🚧   | STEP 6/8: metadata ต่อสินค้า/ลุค + slug ที่ไม่มีจริงคืน HTTP 404 จริง (ไม่ใช่ soft 404)                                                                                                                                                    |
-|   34 | Performance (cache, index, Redis) |  ⬜   |                                                                                                                                                                                                                                            |
-|   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                                                                                                                                                |
-|   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                                                                                                                                              |
-|   37 | Testing                           |  🚧   | vitest + supertest 621 เคส (backend 612 + frontend 9) · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                                                                                                   |
-|   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                                                                                                                                              |
-|   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                                                                                                                                            |
-|   40 | Final Audit                       |  ⬜   |                                                                                                                                                                                                                                            |
-|   50 | Backup / Recovery                 |  ⬜   |                                                                                                                                                                                                                                            |
-|   51 | Monitoring                        |  🚧   | `/health` พร้อมแล้ว                                                                                                                                                                                                                        |
-|   52 | Background Jobs (BullMQ)          |  ⬜   |                                                                                                                                                                                                                                            |
-|   53 | Privacy / Consent                 |  ⬜   |                                                                                                                                                                                                                                            |
-|   54 | Accessibility                     |  🚧   |                                                                                                                                                                                                                                            |
-|   55 | Production Readiness Audit        |  ⬜   |                                                                                                                                                                                                                                            |
+| STEP | หัวข้อ                            | สถานะ | หมายเหตุ                                                                                                                                                                                                                                                                                              |
+| ---: | --------------------------------- | :---: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|   24 | Notifications                     |  ✅   | ฟีดในบัญชี + กระดิ่งบน navbar · IN_APP เท่านั้น (อีเมลจริง STEP 50) · ประกาศของพนักงานไม่หลุดเข้าฟีดลูกค้า                                                                                                                                                                                            |
+|   28 | Security                          |  ✅   | ตรวจทั้งระบบแล้ว + ปิด open redirect 2 ช่องทาง · CSP แบบ nonce · HSTS · TRUST_PROXY_HOPS · จำกัดชนิดไฟล์อัปโหลด · security.test.ts 19 เคส — รายละเอียดใน [08-security.md](08-security.md)                                                                                                             |
+|   29 | REST API                          |  ✅   | 119 เส้นทาง · เอกสารครบใน [09-api-reference.md](09-api-reference.md) ที่ถูกเทียบกับ router จริงทีละแถวด้วย api-contract.test.ts · `GET /api` นับจาก router ไม่ใช่รายการที่เขียนด้วยมือ · ตรวจลำดับ route ว่าไม่มีเส้นทางถูกบัง                                                                        |
+|   30 | Error Handling                    |  ✅   | `normalizeError()` ที่เดียว — ApiError · Zod · body-parser · multer · URIError · ตาข่าย Prisma (ต่อ DB ไม่ได้ → 503) · **แก้ 5 เส้นทางที่เคยตอบ 500 ทั้งที่เป็นความผิดของคำขอ** · frontend มี error boundary ครบทุกชั้น + หน้า 404 ภาษาไทย                                                            |
+|   31 | Responsive                        |  ✅   | ตรวจ 44 หน้า × 360/768/1280 ด้วย Chrome จริงผ่าน [`scripts/audit-responsive.mjs`](../scripts/audit-responsive.mjs) — ไม่มีหน้าล้น ไม่มีเนื้อหาถูกตัด ไม่มีปุ่มเล็กกว่า 44px · ถอด `overflow-x: hidden` ที่ `body` ซึ่งกลบปัญหาไว้ · ล็อกด้วย responsive.test.ts · **320px ยังล้น 16 หน้า (นอกเกณฑ์)** |
+|   32 | Loading / Empty / Error / Retry   |  ✅   | โครงใช้ซ้ำได้ใน components/shared/section.tsx · ทดสอบ error state แล้วตอน backend ล่ม · STEP 30 เพิ่ม error boundary ทุกชั้น (`error.tsx`, `global-error.tsx`) และหน้า 404 ที่ราก                                                                                                                     |
+|   33 | SEO                               |  🚧   | STEP 6/8: metadata ต่อสินค้า/ลุค + slug ที่ไม่มีจริงคืน HTTP 404 จริง (ไม่ใช่ soft 404)                                                                                                                                                                                                               |
+|   34 | Performance (cache, index, Redis) |  ⬜   |                                                                                                                                                                                                                                                                                                       |
+|   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                                                                                                                                                                                                           |
+|   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                                                                                                                                                                                                         |
+|   37 | Testing                           |  🚧   | vitest + supertest 626 เคส (backend 612 + frontend 14) · STEP 17 เพิ่มตัวถอดรหัส EAN-13 เทียบกับมาตรฐาน (ป้ายสแกนได้จริง)                                                                                                                                                                             |
+|   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                                                                                                                                                                                                         |
+|   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                                                                                                                                                                                                       |
+|   40 | Final Audit                       |  ⬜   |                                                                                                                                                                                                                                                                                                       |
+|   50 | Backup / Recovery                 |  ⬜   |                                                                                                                                                                                                                                                                                                       |
+|   51 | Monitoring                        |  🚧   | `/health` พร้อมแล้ว                                                                                                                                                                                                                                                                                   |
+|   52 | Background Jobs (BullMQ)          |  ⬜   |                                                                                                                                                                                                                                                                                                       |
+|   53 | Privacy / Consent                 |  ⬜   |                                                                                                                                                                                                                                                                                                       |
+|   54 | Accessibility                     |  🚧   |                                                                                                                                                                                                                                                                                                       |
+|   55 | Production Readiness Audit        |  ⬜   |                                                                                                                                                                                                                                                                                                       |

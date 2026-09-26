@@ -36,7 +36,7 @@ export function LooksFilterBar({
 
   return (
     <div className="space-y-4">
-      <form action="/looks" method="get" className="flex gap-2">
+      <form action="/looks" method="get" className="flex flex-wrap gap-2">
         {/* คงค่า filter อื่นไว้ตอนค้นหา */}
         {[...params.entries()]
           .filter(([key]) => key !== "q" && key !== "page")
@@ -44,7 +44,7 @@ export function LooksFilterBar({
             <input key={key} type="hidden" name={key} value={value} />
           ))}
 
-        <label className="flex min-h-12 flex-1 items-center gap-2 rounded-[var(--radius-pill)] border border-line bg-white px-4">
+        <label className="flex min-h-12 min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-pill)] border border-line bg-white px-4">
           <Search className="size-4 shrink-0 text-muted" aria-hidden />
           <span className="sr-only">ค้นหาลุค</span>
           <input
@@ -112,7 +112,7 @@ export function LooksFilterBar({
           {hasActiveFilters(params) && (
             <Link
               href={withClearedFilters(params)}
-              className="flex min-h-9 items-center gap-1.5 rounded-[var(--radius-pill)] border border-danger/30 px-3 text-xs font-semibold text-danger transition hover:bg-danger/5"
+              className="flex min-h-11 items-center gap-1.5 rounded-[var(--radius-pill)] border border-danger/30 px-3 text-xs font-semibold text-danger transition hover:bg-danger/5"
             >
               <X className="size-3.5" aria-hidden />
               ล้างตัวกรอง
@@ -140,7 +140,7 @@ export function LooksFilterBar({
 
 function chipClass(active: boolean): string {
   return cn(
-    "flex min-h-9 items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 text-xs font-semibold transition",
+    "flex min-h-11 items-center gap-1.5 rounded-[var(--radius-pill)] border px-3 text-xs font-semibold transition",
     active
       ? "border-brand bg-brand text-white"
       : "border-line hover:border-brand-soft hover:bg-lilac-50",

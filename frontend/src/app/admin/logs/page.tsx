@@ -219,7 +219,7 @@ export default async function AdminLogsPage({
               {hasActiveFilters(params) && (
                 <Link
                   href={withClearedFilters(params)}
-                  className="inline-flex min-h-9 items-center text-xs font-bold text-brand underline"
+                  className="inline-flex min-h-11 items-center text-xs font-bold text-brand underline"
                 >
                   ล้างตัวกรองทั้งหมด
                 </Link>
@@ -280,7 +280,7 @@ function Chip({
   children: React.ReactNode;
 }) {
   const className = cn(
-    "flex min-h-9 items-center rounded-[var(--radius-pill)] border px-3.5 text-xs font-bold",
+    "flex min-h-11 items-center rounded-[var(--radius-pill)] border px-3.5 text-xs font-bold",
     active
       ? "border-brand bg-brand text-white"
       : "border-line text-muted transition hover:border-brand-soft hover:bg-lilac-50",

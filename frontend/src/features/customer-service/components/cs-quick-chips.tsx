@@ -46,7 +46,7 @@ export function CsQuickChips({ onSelectPrompt, disabled }: CsQuickChipsProps) {
             type="button"
             disabled={disabled}
             onClick={() => onSelectPrompt(item.prompt)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-soft shadow-xs transition hover:border-brand hover:bg-lilac-50 hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-white px-3.5 text-xs font-medium text-ink-soft shadow-xs transition hover:border-brand hover:bg-lilac-50 hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Icon className="h-3.5 w-3.5 text-brand" />
             <span>{item.label}</span>

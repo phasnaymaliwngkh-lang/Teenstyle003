@@ -122,7 +122,7 @@ export function LogEntry({ entry }: { entry: AdminLogEntry }) {
 
       {hasRaw && (
         <details className="mt-3">
-          <summary className="cursor-pointer text-xs font-bold text-brand">
+          <summary className="inline-flex min-h-11 cursor-pointer items-center text-xs font-bold text-brand">
             ดูค่าดิบที่บันทึกไว้
           </summary>
           <div className="mt-2 grid gap-3 sm:grid-cols-2">

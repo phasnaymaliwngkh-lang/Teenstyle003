@@ -251,7 +251,7 @@ export default async function AdminDashboardPage() {
                 <li key={entry.status}>
                   <Link
                     href={`/admin/orders?status=${entry.status}`}
-                    className="flex min-h-9 items-center rounded-[var(--radius-pill)] border border-line px-3 text-xs font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+                    className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-3 text-xs font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
                   >
                     {orderStatusLabel(entry.status)} ({entry.count})
                   </Link>

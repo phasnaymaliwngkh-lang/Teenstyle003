@@ -61,7 +61,7 @@ export function QuickChips({ onSelectPrompt, disabled }: QuickChipsProps) {
           type="button"
           disabled={disabled}
           onClick={() => onSelectPrompt(preset.prompt, preset.preferences)}
-          className="rounded-[var(--radius-pill)] border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink transition hover:border-brand hover:bg-lilac-50 hover:text-brand disabled:opacity-50"
+          className="inline-flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line bg-white px-3.5 text-xs font-medium text-ink transition hover:border-brand hover:bg-lilac-50 hover:text-brand disabled:opacity-50"
         >
           {preset.label}
         </button>

@@ -61,8 +61,10 @@ export default async function CartPage() {
         ) : cart === null ? null : cart.items.length === 0 ? (
           <EmptyCart />
         ) : (
-          <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
-            <ul className="space-y-4">
+          /* min-w-0 ที่ลูกของ grid สำคัญ: ไม่มีแล้ว track จะกว้างตาม min-content ของแถวสินค้า
+             แล้วดันทั้งหน้าให้เลื่อนแนวนอนที่จอ 360px (STEP 31) */
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <ul className="min-w-0 space-y-4">
               {cart.items.map((item) => (
                 <CartItemRow key={item.id} item={item} />
               ))}

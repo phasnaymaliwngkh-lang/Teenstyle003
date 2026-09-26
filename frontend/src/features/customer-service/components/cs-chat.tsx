@@ -250,7 +250,7 @@ export function CsChat() {
               type="button"
               onClick={handleEscalate}
               disabled={escalating || loading || !conversationId}
-              className="inline-flex items-center gap-1.5 rounded-full border border-warning/30 bg-warning/5 px-3 py-1.5 text-xs font-semibold text-warning transition hover:bg-warning/10 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-warning/30 bg-warning/5 px-3.5 text-xs font-semibold text-warning transition hover:bg-warning/10 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {escalating ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -267,7 +267,7 @@ export function CsChat() {
             disabled={loading}
             title="เริ่มการสนทนาใหม่"
             aria-label="เริ่มการสนทนาใหม่"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-muted transition hover:border-brand hover:text-brand"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full border border-line text-muted transition hover:border-brand hover:text-brand"
           >
             <RotateCcw className="h-4 w-4" />
           </button>
@@ -425,7 +425,7 @@ export function CsChat() {
           <button
             type="button"
             onClick={() => setError(null)}
-            className="text-danger underline font-semibold ml-2"
+            className="ml-2 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-2 font-semibold text-danger underline"
           >
             ปิด
           </button>
@@ -464,14 +464,14 @@ export function CsChat() {
                   ? "พิมพ์ข้อความถึงเจ้าหน้าที่..."
                   : "พิมพ์คำถาม เช่น เช็คพัสดุ ORD-..., ค่าส่ง, หรือคุยกับเจ้าหน้าที่..."
             }
-            className="flex-1 rounded-full border border-line bg-lilac-50 px-4 py-2.5 text-xs sm:text-sm text-ink placeholder:text-muted focus:border-brand focus:bg-white focus:outline-hidden disabled:cursor-not-allowed disabled:bg-lilac-50"
+            className="h-11 flex-1 rounded-full border border-line bg-lilac-50 px-4 text-xs sm:text-sm text-ink placeholder:text-muted focus:border-brand focus:bg-white focus:outline-hidden disabled:cursor-not-allowed disabled:bg-lilac-50"
           />
 
           <button
             type="submit"
             disabled={!inputText.trim() || loading || status === "CLOSED"}
             aria-label="ส่งข้อความ"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-white shadow-soft transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand text-white shadow-soft transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-40"
           >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />

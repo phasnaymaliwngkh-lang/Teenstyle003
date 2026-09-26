@@ -41,7 +41,8 @@ export async function AlertBell() {
           ? "แจ้งเตือนสต็อก (อ่านจำนวนไม่ได้)"
           : `แจ้งเตือนสต็อก ${count} รายการที่ยังไม่รับทราบ`
       }
-      className="relative flex size-11 items-center justify-center rounded-full border border-line transition hover:border-brand-soft hover:bg-lilac-50"
+      /* `shrink-0` สำคัญ: ไม่มีแล้ว flex ของแถบหลังบ้านย่อกระดิ่งเหลือ 29px บนจอ 360px (STEP 31) */
+      className="relative flex size-11 shrink-0 items-center justify-center rounded-full border border-line transition hover:border-brand-soft hover:bg-lilac-50"
     >
       <Bell className="size-5" aria-hidden />
 

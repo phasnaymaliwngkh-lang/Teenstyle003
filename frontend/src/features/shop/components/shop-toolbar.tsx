@@ -27,7 +27,7 @@ export function ShopToolbar({ params, total }: { params: URLSearchParams; total:
 
   return (
     <div className="space-y-4">
-      <form action="/shop" method="get" className="flex gap-2">
+      <form action="/shop" method="get" className="flex flex-wrap gap-2">
         {/* คงค่า filter อื่นไว้ตอนค้นหา */}
         {[...params.entries()]
           .filter(([key]) => key !== "q" && key !== "page")
@@ -35,7 +35,7 @@ export function ShopToolbar({ params, total }: { params: URLSearchParams; total:
             <input key={key} type="hidden" name={key} value={value} />
           ))}
 
-        <label className="flex min-h-12 flex-1 items-center gap-2 rounded-[var(--radius-pill)] border border-line bg-white px-4">
+        <label className="flex min-h-12 min-w-0 flex-1 items-center gap-2 rounded-[var(--radius-pill)] border border-line bg-white px-4">
           <Search className="size-4 shrink-0 text-muted" aria-hidden />
           <span className="sr-only">ค้นหาสินค้า</span>
           <input
@@ -74,7 +74,7 @@ export function ShopToolbar({ params, total }: { params: URLSearchParams; total:
               href={withParam(params, "sort", sort)}
               aria-current={activeSort === sort ? "true" : undefined}
               className={cn(
-                "flex min-h-9 items-center rounded-[var(--radius-pill)] border px-3 text-xs font-semibold transition",
+                "flex min-h-11 items-center rounded-[var(--radius-pill)] border px-3 text-xs font-semibold transition",
                 activeSort === sort
                   ? "border-brand bg-brand text-white"
                   : "border-line hover:border-brand-soft hover:bg-lilac-50",

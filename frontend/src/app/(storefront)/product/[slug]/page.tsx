@@ -267,7 +267,7 @@ function ProductDetailSection({
               {product.brand && (
                 <Link
                   href={`/shop?brand=${product.brand.slug}`}
-                  className="rounded-[var(--radius-pill)] bg-lilac px-3 py-1 text-[11px] font-bold tracking-wider text-brand-dark uppercase transition hover:bg-brand-soft/30"
+                  className="inline-flex min-h-11 items-center rounded-[var(--radius-pill)] bg-lilac px-3.5 text-[11px] font-bold tracking-wider text-brand-dark uppercase transition hover:bg-brand-soft/30"
                 >
                   {product.brand.name}
                 </Link>
@@ -341,7 +341,7 @@ function ProductDetailSection({
                 <Link
                   key={tag}
                   href={`/shop?q=${encodeURIComponent(tag)}`}
-                  className="rounded-[var(--radius-pill)] border border-line px-3 py-1 text-xs font-semibold text-muted transition hover:border-brand-soft hover:bg-lilac-50"
+                  className="inline-flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-3.5 text-xs font-semibold text-muted transition hover:border-brand-soft hover:bg-lilac-50"
                 >
                   #{tag}
                 </Link>

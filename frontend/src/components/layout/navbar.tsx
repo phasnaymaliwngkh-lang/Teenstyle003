@@ -14,6 +14,7 @@ import {
 
 import { getSession } from "@/lib/dal";
 import { publicEnv } from "@/lib/env";
+import { cn } from "@/lib/utils";
 
 /**
  * Navbar หลักของหน้าร้าน (STEP 4)
@@ -59,7 +60,14 @@ export async function Navbar() {
             <Search className="size-5" aria-hidden />
           </IconLink>
 
-          <IconLink href="/wishlist" label="รายการที่ถูกใจ">
+          {/**
+           * ⚠️ ไอคอนที่แสดงพร้อมกันต้องไม่เกินที่จอ 360px รับได้ (STEP 31)
+           *    ปุ่มละ 44px (ห้ามย่อ — กฎ touch target) → โลโก้ + 4 ไอคอน = เต็มพอดี
+           *    คนที่ล็อกอินแล้วจะมีกระดิ่งเพิ่มมาเป็นไอคอนที่ 5 แล้วแถบล้นออกนอกจอ
+           *    จึงซ่อน "ถูกใจ" บนจอเล็ก **และไปเพิ่มไว้ในเมนู hamburger แทน**
+           *    (ซ่อนเฉย ๆ ไม่ได้ เพราะจะไม่มีทางเข้าหน้านั้นจากมือถือเลย)
+           */}
+          <IconLink href="/wishlist" label="รายการที่ถูกใจ" className="hidden sm:grid">
             <Heart className="size-5" aria-hidden />
           </IconLink>
 
@@ -95,10 +103,12 @@ export async function Navbar() {
 function IconLink({
   href,
   label,
+  className,
   children,
 }: {
   href: string;
   label: string;
+  className?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -106,7 +116,10 @@ function IconLink({
       href={href}
       aria-label={label}
       title={label}
-      className="grid size-11 place-items-center rounded-[var(--radius-pill)] text-ink transition hover:bg-lilac hover:text-brand-dark"
+      className={cn(
+        "grid size-11 shrink-0 place-items-center rounded-[var(--radius-pill)] text-ink transition hover:bg-lilac hover:text-brand-dark",
+        className,
+      )}
     >
       {children}
     </Link>

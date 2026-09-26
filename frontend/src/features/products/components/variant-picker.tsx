@@ -248,12 +248,12 @@ export function VariantPicker({ product }: { product: ProductDetail }) {
             onClick={() => changeQuantity(quantity - 1)}
             disabled={!canBuy || quantity <= 1}
             aria-label="ลดจำนวน"
-            className="grid size-10 place-items-center rounded-full transition hover:bg-lilac-50 disabled:cursor-not-allowed disabled:opacity-40"
+            className="grid size-11 place-items-center rounded-full transition hover:bg-lilac-50 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Minus className="size-4" aria-hidden />
           </button>
 
-          <label>
+          <label className="flex min-h-11 items-center">
             <span className="sr-only">จำนวนที่ต้องการ</span>
             <input
               type="number"
@@ -273,7 +273,7 @@ export function VariantPicker({ product }: { product: ProductDetail }) {
             onClick={() => changeQuantity(quantity + 1)}
             disabled={!canBuy || quantity >= maxQuantity}
             aria-label="เพิ่มจำนวน"
-            className="grid size-10 place-items-center rounded-full transition hover:bg-lilac-50 disabled:cursor-not-allowed disabled:opacity-40"
+            className="grid size-11 place-items-center rounded-full transition hover:bg-lilac-50 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Plus className="size-4" aria-hidden />
           </button>

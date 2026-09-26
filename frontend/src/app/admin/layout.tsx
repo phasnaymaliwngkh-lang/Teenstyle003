@@ -1,3 +1,4 @@
+import { Store } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -20,30 +21,41 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <header className="sticky top-0 z-30 border-b border-line bg-white/90 backdrop-blur-xl">
-        <div className="mx-auto flex h-[64px] w-full max-w-[1200px] items-center gap-4 px-4 sm:px-6">
-          <Link href="/admin" className="text-lg font-extrabold">
-            TeenStyle
-            <span className="text-brand-gradient" aria-hidden>
-              {" "}
-              ✧
+        {/**
+         * ⚠️ แถบนี้เคยล้นที่จอ 360px แล้ว flex ย่อของทุกชิ้นให้พอดี (STEP 31)
+         *    ผลคือกระดิ่งเหลือกว้าง 29px (จาก 44) · โลโก้ตัดเป็นสองบรรทัด ·
+         *    ปุ่มออกจากระบบสูง 62px เพราะข้อความขึ้นบรรทัดใหม่
+         *    **หน้าไม่ได้เลื่อนแนวนอน จึงไม่มีอะไรฟ้อง** — การย่อของ flex ซ่อนปัญหาไว้
+         *    → ทุกชิ้นต้อง `shrink-0` และบนจอเล็กเหลือเฉพาะไอคอน
+         */}
+        <div className="mx-auto flex h-[64px] w-full max-w-[1200px] items-center gap-2 px-4 sm:gap-4 sm:px-6">
+          <Link href="/admin" className="flex shrink-0 items-center text-lg font-extrabold">
+            <span className="hidden sm:inline">
+              TeenStyle
+              <span className="text-brand-gradient" aria-hidden>
+                {" "}
+                ✧
+              </span>
             </span>
-            <span className="ml-2 rounded-[var(--radius-pill)] bg-lilac px-2.5 py-1 text-xs font-bold text-brand-dark">
+            <span className="rounded-[var(--radius-pill)] bg-lilac px-2.5 py-1 text-xs font-bold text-brand-dark sm:ml-2">
               ADMIN
             </span>
           </Link>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {/* ป้ายแจ้งเตือนยิง API เอง — ห่อ Suspense ไว้เพื่อไม่ให้ถ่วงการแสดงแถบทั้งแถบ */}
-            <Suspense fallback={<div className="size-11" aria-hidden />}>
+            <Suspense fallback={<div className="size-11 shrink-0" aria-hidden />}>
               <AlertBell />
             </Suspense>
             <Link
               href="/"
-              className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+              aria-label="ไปหน้าร้าน"
+              className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-[var(--radius-pill)] border border-line text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50 sm:px-4"
             >
-              ไปหน้าร้าน
+              <Store className="size-5 sm:hidden" aria-hidden />
+              <span className="hidden whitespace-nowrap sm:inline">ไปหน้าร้าน</span>
             </Link>
-            <SignOutButton />
+            <SignOutButton compactOnMobile />
           </div>
         </div>
       </header>

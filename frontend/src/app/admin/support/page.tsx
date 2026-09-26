@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   AlertCircle,
+  ArrowLeft,
   Bot,
   CheckCircle2,
   Headphones,
@@ -22,6 +23,7 @@ import {
   sendSupportReply,
   updateSupportTicketStatus,
 } from "@/services/admin-support.service";
+import { cn } from "@/lib/utils";
 import type { AIConversationStatus, SupportTicketDetail, SupportTicketItem } from "@/types/catalog";
 
 export default function AdminSupportPage() {
@@ -195,7 +197,7 @@ export default function AdminSupportPage() {
           type="button"
           onClick={loadTickets}
           disabled={loadingList}
-          className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-ink transition hover:border-brand hover:text-brand"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-white px-3.5 text-xs font-semibold text-ink transition hover:border-brand hover:text-brand"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loadingList ? "animate-spin" : ""}`} />
           <span>รีเฟรช</span>
@@ -215,13 +217,19 @@ export default function AdminSupportPage() {
       {/* ─── Main Content Split Pane ───────────────────────────────────────────── */}
       <div className="mt-3 flex flex-1 overflow-hidden gap-4 rounded-2xl border border-line bg-white shadow-soft">
         {/* ─── Left Column: Ticket List ────────────────────────────────────────── */}
-        <div className="flex w-full md:w-[380px] lg:w-[420px] shrink-0 flex-col border-r border-line bg-lilac-50/50">
+        <div
+          className={cn(
+            "flex w-full shrink-0 flex-col border-r border-line bg-lilac-50/50 md:w-[380px] lg:w-[420px]",
+            // จอเล็กมีที่พอแค่คอลัมน์เดียว — เปิดเคสแล้วสลับไปแสดงห้องแชตแทนรายการ
+            selectedTicketId && "hidden md:flex",
+          )}
+        >
           {/* Status Tabs */}
           <div className="flex border-b border-line p-2 gap-1 bg-white">
             <button
               type="button"
               onClick={() => handleTabChange("ESCALATED")}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-bold transition ${
+              className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition ${
                 activeTab === "ESCALATED"
                   ? "bg-warning/10 text-warning shadow-2xs"
                   : "text-muted hover:bg-lilac-50"
@@ -236,7 +244,7 @@ export default function AdminSupportPage() {
             <button
               type="button"
               onClick={() => handleTabChange("ACTIVE")}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-bold transition ${
+              className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition ${
                 activeTab === "ACTIVE"
                   ? "bg-brand/10 text-brand shadow-2xs"
                   : "text-muted hover:bg-lilac-50"
@@ -251,7 +259,7 @@ export default function AdminSupportPage() {
             <button
               type="button"
               onClick={() => handleTabChange("CLOSED")}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-bold transition ${
+              className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl text-xs font-bold transition ${
                 activeTab === "CLOSED"
                   ? "bg-lilac text-ink shadow-2xs"
                   : "text-muted hover:bg-lilac-50"
@@ -266,7 +274,7 @@ export default function AdminSupportPage() {
             <button
               type="button"
               onClick={() => handleTabChange("ALL")}
-              className={`flex items-center justify-center px-2.5 rounded-xl py-1.5 text-xs font-bold transition ${
+              className={`flex min-h-11 items-center justify-center rounded-xl px-2.5 text-xs font-bold transition ${
                 activeTab === "ALL"
                   ? "bg-ink-soft text-white shadow-2xs"
                   : "text-muted hover:bg-lilac-50"
@@ -358,7 +366,12 @@ export default function AdminSupportPage() {
         </div>
 
         {/* ─── Right Column: Chat History & Action Pane ────────────────────────── */}
-        <div className="flex flex-1 flex-col bg-white overflow-hidden">
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 flex-col overflow-hidden bg-white",
+            !selectedTicketId && "hidden md:flex",
+          )}
+        >
           {loadingDetail ? (
             <div className="flex h-full flex-col items-center justify-center text-muted">
               <Loader2 className="h-6 w-6 animate-spin text-brand mb-2" />
@@ -368,19 +381,31 @@ export default function AdminSupportPage() {
             <>
               {/* Header Details */}
               <div className="flex flex-wrap items-center justify-between border-b border-line px-5 py-3 gap-2 bg-lilac-50/40">
-                <div>
-                  <div className="flex items-center gap-2">
+                {/* จอเล็กสลับมาแสดงห้องแชตแทนรายการ จึงต้องมีทางกลับ (STEP 31) */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedTicketId(null)}
+                  aria-label="กลับไปรายการเคส"
+                  className="grid size-11 shrink-0 place-items-center rounded-full border border-line bg-white text-muted transition hover:border-brand hover:text-brand md:hidden"
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden />
+                </button>
+
+                <div className="min-w-0">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2">
                     <h2 className="text-sm font-bold text-ink">
                       {ticketDetail.user?.name || "ลูกค้าทั่วไป"}
                     </h2>
                     {ticketDetail.user?.email && (
-                      <span className="text-xs text-muted">({ticketDetail.user.email})</span>
+                      <span className="max-w-full text-xs break-all text-muted">
+                        ({ticketDetail.user.email})
+                      </span>
                     )}
                     {ticketDetail.user?.phone && (
                       <span className="text-xs text-muted">· {ticketDetail.user.phone}</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5 text-xs text-muted">
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
                     <span>
                       สถานะ:{" "}
                       <strong className={ticketDetail.status === "ESCALATED" ? "text-warning" : ""}>
@@ -405,7 +430,7 @@ export default function AdminSupportPage() {
                       type="button"
                       onClick={handleAssign}
                       disabled={actionLoading}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 text-xs font-bold text-white shadow-xs transition hover:bg-brand-dark disabled:opacity-50"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-brand px-3.5 text-xs font-bold text-white shadow-xs transition hover:bg-brand-dark disabled:opacity-50"
                     >
                       <UserCheck className="h-3.5 w-3.5" />
                       <span>รับเรื่องเคสนี้</span>
@@ -417,7 +442,7 @@ export default function AdminSupportPage() {
                       type="button"
                       onClick={() => handleStatusChange("CLOSED")}
                       disabled={actionLoading}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink-soft transition hover:bg-lilac-50 disabled:opacity-50"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-white px-3.5 text-xs font-semibold text-ink-soft transition hover:bg-lilac-50 disabled:opacity-50"
                     >
                       <Lock className="h-3.5 w-3.5" />
                       <span>ปิดเคสนี้</span>
@@ -427,7 +452,7 @@ export default function AdminSupportPage() {
                       type="button"
                       onClick={() => handleStatusChange("ACTIVE")}
                       disabled={actionLoading}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-ink transition hover:bg-lilac-50 disabled:opacity-50"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-line bg-white px-3.5 text-xs font-semibold text-ink transition hover:bg-lilac-50 disabled:opacity-50"
                     >
                       <RefreshCw className="h-3.5 w-3.5" />
                       <span>เปิดเคสใหม่</span>
@@ -535,14 +560,14 @@ export default function AdminSupportPage() {
                         ? "เคสนี้ปิดแล้ว หากต้องการพิมพ์ตอบให้เปิดเคสใหม่ก่อน"
                         : "พิมพ์ข้อความตอบกลับลูกค้าในฐานะเจ้าหน้าที่..."
                     }
-                    className="flex-1 rounded-full border border-line bg-lilac-50 px-4 py-2.5 text-xs sm:text-sm text-ink placeholder:text-muted focus:border-brand focus:bg-white focus:outline-hidden disabled:bg-lilac-50"
+                    className="h-11 flex-1 rounded-full border border-line bg-lilac-50 px-4 text-xs sm:text-sm text-ink placeholder:text-muted focus:border-brand focus:bg-white focus:outline-hidden disabled:bg-lilac-50"
                   />
 
                   <button
                     type="submit"
                     disabled={!replyText.trim() || sendingReply || ticketDetail.status === "CLOSED"}
                     aria-label="ส่งข้อความตอบกลับ"
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-dark text-white shadow-soft transition hover:bg-brand-dark disabled:opacity-40"
+                    className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-dark text-white shadow-soft transition hover:bg-brand-dark disabled:opacity-40"
                   >
                     {sendingReply ? (
                       <Loader2 className="h-4 w-4 animate-spin" />

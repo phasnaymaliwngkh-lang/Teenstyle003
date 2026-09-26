@@ -61,8 +61,17 @@
     background: var(--background);
     color: var(--foreground);
     font-family: var(--font-thai);
-    /* ป้องกัน horizontal overflow ตาม STEP 31 */
-    overflow-x: hidden;
+    /*
+     * ⚠️ เคยมี `overflow-x: hidden` อยู่ที่นี่ในนาม "ป้องกัน horizontal overflow" — ถอดออกแล้ว (STEP 31)
+     *
+     * มันไม่ได้ป้องกัน มันแค่ตัดของที่ล้นให้มองไม่เห็น และยังกันหน้าเลื่อนไม่ได้จริง
+     * (`documentElement` ยังเลื่อนได้ เพราะ viewport propagation มาจาก html ไม่ใช่ body)
+     * ของจริงที่เจอ: navbar ของคนที่ล็อกอินบนจอ 360px ล้นไป 25px แล้วปุ่ม hamburger
+     * **ถูกตัดหายไปครึ่งปุ่ม** โดยหน้ายังเลื่อนซ้ายขวาได้ — อาการถูกกลบจนไม่มีใครเห็น
+     *
+     * กฎ: ล้นแล้วต้องแก้ที่ต้นเหตุ (ดู scripts/audit-responsive.mjs ที่ชี้ตัวที่ล้นให้)
+     * ห้ามเอา overflow-x: hidden มาปิดอาการที่ระดับ body/html อีก
+     */
   }
 
   h1,
