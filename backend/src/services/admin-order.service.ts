@@ -146,6 +146,59 @@ export interface AdminOrderListResult {
   counts: { status: string; count: number }[];
 }
 
+/**
+ * ค้นหาคำสั่งซื้อจากเลขออเดอร์ หรือชื่อ/อีเมลของลูกค้า — คืน id ของหน้าที่ขอ + จำนวนรวม (STEP 34)
+ *
+ * ⚠️ ทำไมต้องเป็น raw SQL และต้องเป็น UNION
+ *    เดิมเขียนเป็น `OR` ของ Prisma สามขา (เลขออเดอร์ · อีเมล · ชื่อ) ซึ่งกลายเป็น
+ *    `WHERE o.orderNumber ILIKE … OR u.email ILIKE … OR u.name ILIKE …` **ข้ามสองตาราง**
+ *    PostgreSQL ใช้ index กับ OR แบบข้ามตารางไม่ได้เลย ต้อง join ทั้งสองตารางให้ครบก่อน
+ *    แล้วค่อยกรอง → สแกน Order 60,000 แถว + User 20,000 แถว **สองรอบ** (count + findMany)
+ *    วัดแล้ว: ค้นเลขออเดอร์ 267ms · ค้นชื่อลูกค้าไทย 411ms
+ *
+ *    แยกเป็น UNION ของสองขา ขาละตารางเดียว → ทั้งสองขาใช้ index trigram ได้
+ *    (เพิ่มใน migration 20260926171404) วัดแล้ว: 4.2ms และ 25ms
+ *
+ * ⚠️ แบ่งหน้าและนับจำนวน **ในคิวรีเดียวกัน** (`count(*) OVER ()`) ไม่ใช่ดึง id ทั้งหมด
+ *    มาแล้วตัดใน TypeScript — คำค้นกว้าง ๆ อย่าง "a" ตรงกับหลายหมื่นแถวได้
+ *    (แพตเทิร์นเดียวกับ /shop ใน shop.service.ts)
+ */
+async function searchOrderIds(
+  prisma: ReturnType<typeof getPrisma>,
+  q: string,
+  status: string | undefined,
+  page: number,
+  limit: number,
+): Promise<{ ids: string[]; total: number }> {
+  const pattern = `%${q}%`;
+  const statusCondition =
+    status === undefined ? Prisma.empty : Prisma.sql`AND o."status" = ${status}::"OrderStatus"`;
+
+  const rows = await prisma.$queryRaw<Array<{ id: string; total: bigint }>>(Prisma.sql`
+    WITH matched AS (
+      SELECT o."id"
+        FROM "Order" o
+       WHERE o."deletedAt" IS NULL AND o."orderNumber" ILIKE ${pattern} ${statusCondition}
+      UNION
+      SELECT o."id"
+        FROM "Order" o
+        JOIN "User" u ON u."id" = o."userId"
+       WHERE o."deletedAt" IS NULL ${statusCondition}
+         AND (u."email" ILIKE ${pattern} OR u."name" ILIKE ${pattern})
+    )
+    SELECT o."id", count(*) OVER () AS total
+      FROM "Order" o
+      JOIN matched ON matched."id" = o."id"
+     ORDER BY o."createdAt" DESC
+     LIMIT ${limit} OFFSET ${(page - 1) * limit}
+  `);
+
+  return {
+    ids: rows.map((row) => row.id),
+    total: rows.length > 0 ? Number(rows[0]!.total) : 0,
+  };
+}
+
 /** รายการคำสั่งซื้อทั้งร้าน (ต้องมีสิทธิ์ order:read) */
 export async function listAdminOrders(query: {
   status?: string;
@@ -154,20 +207,48 @@ export async function listAdminOrders(query: {
   limit: number;
 }): Promise<AdminOrderListResult> {
   const prisma = getPrisma();
+  const searching = query.q !== undefined && query.q !== '';
 
   const where: Prisma.OrderWhereInput = {
     deletedAt: null,
     ...(query.status !== undefined ? { status: query.status as Prisma.EnumOrderStatusFilter } : {}),
-    ...(query.q !== undefined && query.q !== ''
-      ? {
-          OR: [
-            { orderNumber: { contains: query.q, mode: 'insensitive' } },
-            { user: { email: { contains: query.q, mode: 'insensitive' } } },
-            { user: { name: { contains: query.q, mode: 'insensitive' } } },
-          ],
-        }
-      : {}),
   };
+
+  const countsPromise = prisma.order.groupBy({
+    by: ['status'],
+    where: { deletedAt: null },
+    _count: { _all: true },
+  });
+
+  if (searching) {
+    const { ids, total } = await searchOrderIds(
+      prisma,
+      query.q!,
+      query.status,
+      query.page,
+      query.limit,
+    );
+
+    const [rows, grouped] = await Promise.all([
+      ids.length === 0
+        ? Promise.resolve([])
+        : prisma.order.findMany({
+            where: { id: { in: ids } },
+            orderBy: { createdAt: 'desc' },
+            select: ORDER_SELECT,
+          }),
+      countsPromise,
+    ]);
+
+    return {
+      items: rows.map(toAdminOrder),
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.ceil(total / query.limit),
+      counts: grouped.map((row) => ({ status: String(row.status), count: row._count._all })),
+    };
+  }
 
   const [total, rows, grouped] = await Promise.all([
     prisma.order.count({ where }),
@@ -178,7 +259,7 @@ export async function listAdminOrders(query: {
       take: query.limit,
       select: ORDER_SELECT,
     }),
-    prisma.order.groupBy({ by: ['status'], where: { deletedAt: null }, _count: { _all: true } }),
+    countsPromise,
   ]);
 
   return {

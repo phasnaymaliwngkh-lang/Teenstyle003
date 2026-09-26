@@ -1,6 +1,6 @@
 import { getPrisma, Prisma } from '@teenstyle/database';
 
-import { AVAILABLE_STOCK_SQL } from '../models/availability.ts';
+import { AVAILABLE_STOCK_JOIN, AVAILABLE_STOCK_JOINED_SQL } from '../models/availability.ts';
 import { resolveProductPrice, resolveVariantPrice, toNumber } from '../models/pricing.ts';
 import { resolveStockStatus } from '../models/product.model.ts';
 import { writeAdminLog } from '../models/admin-log.model.ts';
@@ -205,8 +205,9 @@ async function findLowStockProductIds(prisma: ReturnType<typeof getPrisma>): Pro
   const rows = await prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
     SELECT p."id"
     FROM "Product" p
+    ${AVAILABLE_STOCK_JOIN}
     WHERE p."deletedAt" IS NULL
-      AND ${AVAILABLE_STOCK_SQL} <= p."minimumStock"
+      AND ${AVAILABLE_STOCK_JOINED_SQL} <= p."minimumStock"
   `);
 
   return rows.map((row) => row.id);

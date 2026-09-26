@@ -30,6 +30,22 @@ const server: Server = app.listen(listenPort, () => {
       'DATABASE_URL ยังไม่ได้ตั้งค่า — endpoint ที่ใช้ database จะยังทำงานไม่ได้ (STEP 2)',
     );
   }
+
+  /**
+   * เตือนตอน production ว่า rate limit ยังนับแยกต่อ process (STEP 34)
+   *
+   * เตือนตรงนี้เพราะเป็นจุดเดียวที่คนดูแลระบบเห็นแน่ ๆ ตอน deploy
+   * ถ้าไม่เตือน ระบบจะดู "มี rate limit แล้ว" ทั้งที่ค่าจริงถูกคูณด้วยจำนวน instance
+   * (รายละเอียดและทางแก้อยู่ใน middlewares/rate-limit.ts)
+   */
+  if (env.NODE_ENV === 'production' && !env.REDIS_URL) {
+    logger.warn(
+      { rateLimitMax: env.RATE_LIMIT_MAX },
+      'ยังไม่มี REDIS_URL — rate limit นับแยกในแต่ละ process ' +
+        'ถ้ารันหลาย instance limit จริงจะเท่ากับ RATE_LIMIT_MAX × จำนวน instance ' +
+        '(ตั้ง limit ที่ proxy/ingress หรือใส่ Redis ก่อน scale)',
+    );
+  }
 });
 
 /** ปิด server ให้เรียบร้อย: หยุดรับ connection ใหม่ → ปิด connection ที่ค้าง → ตัด database */

@@ -316,6 +316,12 @@ export async function scanAlertsAfterStockChange(variantIds: string[]): Promise<
 
 export interface StockAlertListResult {
   items: StockAlertDto[];
+  /**
+   * จำนวนรายการที่เข้าเงื่อนไขทั้งหมด (หลังกรอง severity) — อาจมากกว่า `items.length`
+   * เพราะ `items` ถูกจำกัดด้วย `limit` · UI **ต้องบอกผู้ใช้ว่ากำลังเห็นไม่ครบ**
+   * ไม่งั้นแอดมินเข้าใจว่าเตือนแค่เท่านี้ แล้วของที่เหลือถูกมองข้าม
+   */
+  totalMatched: number;
   summary: {
     outOfStock: number;
     lowStock: number;
@@ -329,7 +335,7 @@ export interface StockAlertListResult {
 }
 
 export async function listStockAlerts(
-  query: { severity?: AlertSeverity } = {},
+  query: { severity?: AlertSeverity; limit?: number } = {},
 ): Promise<StockAlertListResult> {
   const [rows, openNotifications] = await Promise.all([findAlertRows(), findOpenNotifications()]);
 
@@ -364,11 +370,13 @@ export async function listStockAlerts(
     };
   });
 
-  const items =
+  const matched =
     query.severity === undefined ? all : all.filter((item) => item.severity === query.severity);
 
   return {
-    items,
+    /* เรียงมาแล้วจาก SQL (ของที่ขาดหนักสุดอยู่บน) จึงตัดท้ายได้ตรง ๆ */
+    items: matched.slice(0, query.limit ?? matched.length),
+    totalMatched: matched.length,
     summary: {
       outOfStock: all.filter((item) => item.severity === 'OUT_OF_STOCK').length,
       lowStock: all.filter((item) => item.severity === 'LOW_STOCK').length,

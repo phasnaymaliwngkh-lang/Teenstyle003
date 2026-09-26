@@ -398,4 +398,79 @@ describe('GET /api/admin/orders', () => {
 
     expect(res.status).toBe(422);
   });
+
+  /**
+   * STEP 34 เปลี่ยนการค้นหาจาก `OR` ของ Prisma (ข้ามสองตาราง — index ใช้ไม่ได้เลย)
+   * เป็น UNION ของสองขา ขาละตารางเดียว เพื่อให้ใช้ index trigram ได้
+   * เทสต์ชุดนี้กันความผิดพลาดที่มาพร้อมการเขียนแบบนั้น: **ลืมใส่เงื่อนไขในขาใดขาหนึ่ง**
+   * ซึ่งจะไม่ error แต่คืนผลผิด (เช่น กรองสถานะแล้วยังมีสถานะอื่นหลุดมา)
+   */
+  describe('ค้นหาด้วย UNION (STEP 34)', () => {
+    it('ค้นด้วยอีเมลลูกค้าเจอออเดอร์ของคนนั้น (ขาที่ต้อง join ตาราง User)', async () => {
+      const orderNumber = await makeOrder();
+      const email = `test-admin-cust-${suffix}@teenstyle.test`;
+
+      const res = await request(app)
+        .get(`/api/admin/orders?q=${encodeURIComponent(email)}&limit=50`)
+        .set(asStaff());
+
+      expect(res.status).toBe(200);
+      const numbers = (res.body.data.items as { orderNumber: string }[]).map(
+        (order) => order.orderNumber,
+      );
+      expect(numbers).toContain(orderNumber);
+      expect(res.body.data.total).toBeGreaterThanOrEqual(numbers.length);
+    });
+
+    it('ค้นหาพร้อมกรองสถานะ: เงื่อนไขต้องมีผลกับ **ทั้งสองขา** ของ UNION', async () => {
+      const pending = await makeOrder();
+      const email = `test-admin-cust-${suffix}@teenstyle.test`;
+
+      /* ค้นด้วยอีเมล (ขาที่สอง) + กรองสถานะที่ออเดอร์นี้ไม่ได้อยู่ → ต้องไม่เจอ */
+      const mismatch = await request(app)
+        .get(`/api/admin/orders?q=${encodeURIComponent(email)}&status=DELIVERED&limit=50`)
+        .set(asStaff());
+
+      expect(mismatch.status).toBe(200);
+      const mismatchNumbers = (mismatch.body.data.items as { orderNumber: string }[]).map(
+        (order) => order.orderNumber,
+      );
+      expect(mismatchNumbers).not.toContain(pending);
+      for (const order of mismatch.body.data.items as { status: string }[]) {
+        expect(order.status).toBe('DELIVERED');
+      }
+
+      /* ค้นด้วยเลขออเดอร์ (ขาแรก) + สถานะที่ตรง → ต้องเจอ */
+      const match = await request(app)
+        .get(`/api/admin/orders?q=${pending}&status=PENDING_PAYMENT`)
+        .set(asStaff());
+
+      expect((match.body.data.items as { orderNumber: string }[])[0]?.orderNumber).toBe(pending);
+    });
+
+    it('คำค้นที่ไม่ตรงกับอะไรเลย → รายการว่างและ total = 0 (ไม่ใช่ error)', async () => {
+      const res = await request(app)
+        .get(`/api/admin/orders?q=ไม่มีออเดอร์ชื่อนี้-${randomUUID()}`)
+        .set(asStaff());
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.items).toEqual([]);
+      expect(res.body.data.total).toBe(0);
+      expect(res.body.data.totalPages).toBe(0);
+    });
+
+    it('จำนวนรวมมาจากผลค้นหาทั้งชุด ไม่ใช่จำนวนแถวในหน้านั้น', async () => {
+      await makeOrder();
+      await makeOrder();
+      const email = `test-admin-cust-${suffix}@teenstyle.test`;
+
+      const firstPage = await request(app)
+        .get(`/api/admin/orders?q=${encodeURIComponent(email)}&limit=1&page=1`)
+        .set(asStaff());
+
+      expect(firstPage.body.data.items).toHaveLength(1);
+      expect(firstPage.body.data.total).toBeGreaterThan(1);
+      expect(firstPage.body.data.totalPages).toBe(firstPage.body.data.total);
+    });
+  });
 });

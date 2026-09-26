@@ -45,3 +45,4 @@
 | [07-payment-setup.md](07-payment-setup.md)           | ตั้งค่า Stripe และบัตรทดสอบ                 |
 | [08-security.md](08-security.md)                     | ด่านความปลอดภัยและความเสี่ยงที่ยอมรับไว้    |
 | [09-api-reference.md](09-api-reference.md)           | REST API ทุกเส้นทาง สิทธิ์ และข้อตกลงร่วม   |
+| [10-performance.md](10-performance.md)               | ผลวัดกับข้อมูลปริมาณจริง index และงบเวลา    |

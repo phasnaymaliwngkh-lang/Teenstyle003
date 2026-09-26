@@ -1,6 +1,10 @@
 import { getPrisma, Prisma } from '@teenstyle/database';
 
-import { AVAILABLE_STOCK_SQL } from '../models/availability.ts';
+import {
+  AVAILABLE_STOCK_JOIN,
+  AVAILABLE_STOCK_JOINED_SQL,
+  HAS_AVAILABLE_STOCK_SQL,
+} from '../models/availability.ts';
 import { toNumber } from '../models/pricing.ts';
 
 /**
@@ -113,17 +117,20 @@ export async function getOverview(): Promise<AdminOverviewDto> {
      * ไม่ใช่ cache `totalStock` ที่ยังไม่หักของที่จองไว้ ไม่งั้นหน้า dashboard
      * จะบอกว่ามีของขายทั้งที่ของถูกจองไปหมดแล้ว
      */
+    /* "ของหมด" = ไม่มีตัวเลือกไหนเหลือของให้ขายเลย → ถามด้วย NOT EXISTS (108ms → 26ms) */
     prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
       SELECT count(*)::bigint AS count
       FROM "Product" p
       WHERE p."deletedAt" IS NULL AND p."status" = 'ACTIVE'
-        AND ${AVAILABLE_STOCK_SQL} = 0
+        AND NOT ${HAS_AVAILABLE_STOCK_SQL}
     `),
+    /* "สต็อกต่ำ" ต้องใช้ตัวเลขมาเทียบกับจุดเตือนของสินค้าชิ้นนั้น → รวมยอดรอบเดียวด้วย JOIN */
     prisma.$queryRaw<Array<{ count: bigint }>>(Prisma.sql`
       SELECT count(*)::bigint AS count
       FROM "Product" p
+      ${AVAILABLE_STOCK_JOIN}
       WHERE p."deletedAt" IS NULL AND p."status" = 'ACTIVE'
-        AND ${AVAILABLE_STOCK_SQL} <= p."minimumStock"
+        AND ${AVAILABLE_STOCK_JOINED_SQL} <= p."minimumStock"
     `),
     prisma.inventory.aggregate({ _sum: { quantity: true, reservedQuantity: true } }),
     /**

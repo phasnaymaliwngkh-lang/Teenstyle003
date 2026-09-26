@@ -264,6 +264,60 @@ describe('รายการเตือนคำนวณสดจากฐา�
 
     expect(res.status).toBe(422);
   });
+
+  /**
+   * STEP 34: endpoint นี้เคยส่ง **ทุกแถว** ที่ตกเกณฑ์ ซึ่งวัดที่แคตตาล็อก 5,000 สินค้าได้
+   * 1.1 MB ต่อคำขอ (3,659 รายการ) — ตอนนี้จำกัดจำนวน **แต่ตัวเลขสรุปยังนับจากทั้งชุด**
+   * ถ้าวันหนึ่งมีคนย้ายการจำกัดไปทำที่ SQL แล้วนับสรุปจากแถวที่เหลือ ตัวเลขจะผิดเงียบ ๆ
+   */
+  describe('จำกัดจำนวนรายการที่ส่งกลับ (STEP 34)', () => {
+    it('limit เล็กกว่าจำนวนจริง → items ถูกตัด แต่ totalMatched และตัวเลขสรุปยังนับทั้งชุด', async () => {
+      /*
+       * ต้องมีของตกเกณฑ์ **มากกว่าหนึ่งรายการ** ไม่งั้นเทสต์ผ่านทั้งที่ limit ไม่ทำงาน
+       * (ฐานข้อมูล dev ตอนนี้ไม่มีของตกเกณฑ์เลย → ถ้าจัดฉากแค่ตัวเดียวก็เทียบอะไรไม่ได้)
+       */
+      const second = await createTestProduct();
+      try {
+        await setStock(0);
+        await prisma.inventory.update({
+          where: { variantId: second.variantId },
+          data: { quantity: 0, reservedQuantity: 0 },
+        });
+
+        const full = await listAlerts();
+        expect(
+          (full.body.data.items as unknown[]).length,
+          'ต้องมีของตกเกณฑ์อย่างน้อย 2 รายการ ไม่งั้นการตัดรายการพิสูจน์ไม่ได้',
+        ).toBeGreaterThan(1);
+
+        const limited = await listAlerts('?limit=1');
+
+        expect(limited.status).toBe(200);
+        expect(limited.body.data.items).toHaveLength(1);
+        expect(limited.body.data.totalMatched).toBe((full.body.data.items as unknown[]).length);
+        expect(limited.body.data.summary).toEqual(full.body.data.summary);
+      } finally {
+        await prisma.inventoryMovement.deleteMany({
+          where: { variant: { productId: second.productId } },
+        });
+        await prisma.product.deleteMany({ where: { id: second.productId } });
+      }
+    });
+
+    it('ไม่ส่ง limit มา → totalMatched เท่ากับจำนวนรายการที่ส่งไป (ยังไม่ถึงเพดาน)', async () => {
+      await setStock(0);
+
+      const res = await listAlerts();
+
+      expect(res.body.data.totalMatched).toBe(res.body.data.items.length);
+    });
+
+    it('limit นอกช่วงที่ยอมรับ → 422 (ไม่เงียบ ๆ ใช้ค่าอื่นแทน)', async () => {
+      expect((await listAlerts('?limit=0')).status).toBe(422);
+      expect((await listAlerts('?limit=501')).status).toBe(422);
+      expect((await listAlerts('?limit=abc')).status).toBe(422);
+    });
+  });
 });
 
 describe('การแจ้งเตือน (ไม่ซ้ำ · แย่ลงเตือนใหม่ · ดีขึ้นปิดเอง)', () => {

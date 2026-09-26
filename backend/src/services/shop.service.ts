@@ -1,6 +1,6 @@
 import { getPrisma, Prisma } from '@teenstyle/database';
 
-import { AVAILABLE_STOCK_SQL } from '../models/availability.ts';
+import { HAS_AVAILABLE_STOCK_SQL } from '../models/availability.ts';
 import { resolveVariantPrice } from '../models/pricing.ts';
 import { toProductDetail, type ProductDetailDto } from '../models/product-detail.model.ts';
 import { type ProductCardDto } from '../models/product.model.ts';
@@ -35,35 +35,77 @@ export interface ShopResult {
 /** นิพจน์ราคาที่ลูกค้าจ่ายจริง */
 const EFFECTIVE_PRICE = Prisma.sql`COALESCE(p."salePrice", p."price")`;
 
-/** ORDER BY ตาม sort ที่ผ่าน validation มาแล้ว (whitelist — ไม่รับค่าอื่น) */
-function orderByFragment(sort: ShopQuery['sort']): Prisma.Sql {
+/** ไม่มี JOIN เพิ่ม — ใช้กับ sort ที่อ่านค่าจากตาราง Product ตรง ๆ */
+const NO_JOIN = Prisma.empty;
+
+/**
+ * ยอดขายรวมต่อสินค้า (นับเฉพาะออเดอร์ที่ได้เงินจริง) — **รวมเป็นตารางเดียวรอบเดียว**
+ *
+ * ⚠️ เดิมเป็น subquery ที่อ้าง `p.id` ในตัวเอง (correlated) ซึ่ง PostgreSQL ต้องรัน
+ *    **ทีละแถวของ Product** ตอนเรียง → 5,000 สินค้า = 5,000 subquery
+ *    วัดที่ข้อมูลจริง 60,000 ออเดอร์: `/shop?sort=bestselling` ใช้เวลา **505ms**
+ *    ซึ่งเป็นหน้าสาธารณะที่ผู้เข้าเว็บกดเองได้ (ไม่ใช่รายงานหลังบ้าน)
+ *    แบบ LEFT JOIN นี้รวมยอดรอบเดียวแล้วต่อกับ Product → **79ms** (ผลลัพธ์เท่ากันเป๊ะ)
+ */
+const SALES_JOIN = Prisma.sql`
+  LEFT JOIN (
+    SELECT oi."productId" AS product_id, sum(oi."quantity") AS sold
+      FROM "OrderItem" oi
+      JOIN "Order" o ON o.id = oi."orderId"
+     WHERE o."deletedAt" IS NULL
+       AND o."paymentStatus" = 'PAID'
+       AND o."status" NOT IN ('CANCELLED', 'REFUNDED')
+     GROUP BY oi."productId"
+  ) sales ON sales.product_id = p.id`;
+
+/** จำนวนคนที่กดถูกใจต่อสินค้า — เหตุผลเดียวกับ SALES_JOIN (วัดแล้ว 34ms → 9.8ms) */
+const SAVES_JOIN = Prisma.sql`
+  LEFT JOIN (
+    SELECT w."productId" AS product_id, count(*) AS saves
+      FROM "Wishlist" w
+     GROUP BY w."productId"
+  ) saves ON saves.product_id = p.id`;
+
+/**
+ * JOIN + ORDER BY ตาม sort ที่ผ่าน validation มาแล้ว (whitelist — ไม่รับค่าอื่น)
+ *
+ * คืนทั้งสองส่วนคู่กันเพราะการเรียงบางแบบต้องใช้ยอดรวมจากตารางอื่น
+ * ซึ่งต้องรวมมาเป็น JOIN ไม่ใช่ subquery ต่อแถว (ดูคอมเมนต์ของ SALES_JOIN)
+ */
+function sortFragments(sort: ShopQuery['sort']): { join: Prisma.Sql; orderBy: Prisma.Sql } {
   switch (sort) {
     case 'price-asc':
-      return Prisma.sql`${EFFECTIVE_PRICE} ASC, p."createdAt" DESC`;
+      return { join: NO_JOIN, orderBy: Prisma.sql`${EFFECTIVE_PRICE} ASC, p."createdAt" DESC` };
     case 'price-desc':
-      return Prisma.sql`${EFFECTIVE_PRICE} DESC, p."createdAt" DESC`;
+      return { join: NO_JOIN, orderBy: Prisma.sql`${EFFECTIVE_PRICE} DESC, p."createdAt" DESC` };
     case 'discount':
-      return Prisma.sql`
-        CASE WHEN p."salePrice" IS NULL OR p."price" = 0 THEN 0
-             ELSE (p."price" - p."salePrice") / p."price" END DESC,
-        p."createdAt" DESC`;
+      return {
+        join: NO_JOIN,
+        orderBy: Prisma.sql`
+          CASE WHEN p."salePrice" IS NULL OR p."price" = 0 THEN 0
+               ELSE (p."price" - p."salePrice") / p."price" END DESC,
+          p."createdAt" DESC`,
+      };
     case 'popular':
-      return Prisma.sql`
-        (SELECT count(*) FROM "Wishlist" w WHERE w."productId" = p.id) DESC,
-        p."viewCount" DESC,
-        p."publishedAt" DESC NULLS LAST`;
+      return {
+        join: SAVES_JOIN,
+        orderBy: Prisma.sql`
+          COALESCE(saves.saves, 0) DESC,
+          p."viewCount" DESC,
+          p."publishedAt" DESC NULLS LAST`,
+      };
     case 'bestselling':
-      return Prisma.sql`
-        (SELECT COALESCE(sum(oi."quantity"), 0)
-           FROM "OrderItem" oi
-           JOIN "Order" o ON o.id = oi."orderId"
-          WHERE oi."productId" = p.id
-            AND o."deletedAt" IS NULL
-            AND o."paymentStatus" = 'PAID'
-            AND o."status" NOT IN ('CANCELLED', 'REFUNDED')) DESC,
-        p."publishedAt" DESC NULLS LAST`;
+      return {
+        join: SALES_JOIN,
+        orderBy: Prisma.sql`
+          COALESCE(sales.sold, 0) DESC,
+          p."publishedAt" DESC NULLS LAST`,
+      };
     case 'newest':
-      return Prisma.sql`p."publishedAt" DESC NULLS LAST, p."createdAt" DESC`;
+      return {
+        join: NO_JOIN,
+        orderBy: Prisma.sql`p."publishedAt" DESC NULLS LAST, p."createdAt" DESC`,
+      };
   }
 }
 
@@ -112,7 +154,7 @@ export async function searchProducts(query: ShopQuery): Promise<ShopResult> {
      * เดิมใช้ `p."totalStock" > 0` ซึ่งไม่หักของที่ถูกจองไว้ในออเดอร์ที่ยังไม่จบ
      * → สินค้าที่ของถูกจองไปหมดแล้วยังโผล่ในตัวกรองนี้ (แก้ใน STEP 15)
      */
-    conditions.push(Prisma.sql`${AVAILABLE_STOCK_SQL} > 0`);
+    conditions.push(HAS_AVAILABLE_STOCK_SQL);
   }
   if (query.onSale) {
     conditions.push(Prisma.sql`p."salePrice" IS NOT NULL`);
@@ -138,12 +180,15 @@ export async function searchProducts(query: ShopQuery): Promise<ShopResult> {
 
   const offset = (query.page - 1) * query.limit;
 
+  const { join, orderBy } = sortFragments(query.sort);
+
   // count(*) OVER () ให้จำนวนรวมมาพร้อมผลลัพธ์ ไม่ต้อง query ซ้ำ
   const rows = await prisma.$queryRaw<Array<{ id: string; total: bigint }>>(Prisma.sql`
     SELECT p.id, count(*) OVER () AS total
     FROM "Product" p
+    ${join}
     WHERE ${Prisma.join(conditions, ' AND ')}
-    ORDER BY ${orderByFragment(query.sort)}
+    ORDER BY ${orderBy}
     LIMIT ${query.limit} OFFSET ${offset}
   `);
 
@@ -200,13 +245,25 @@ export async function getShopFilters(): Promise<ShopFiltersDto> {
      * เพื่อให้ตัวเลขในแผงกรองตรงกับจำนวนที่ได้จริงเมื่อกดกรอง
      * ถ้านับแค่หมวดตัวเอง จะขึ้น "เสื้อ 1 ชิ้น" แต่กดแล้วได้ 3 ชิ้น ซึ่งทำให้ผู้ใช้สับสน
      */
+    /*
+     * ⚠️ นับด้วย GROUP BY รอบเดียวแล้วค่อยบวกหมวดย่อยเข้าหมวดแม่ (STEP 34)
+     *    เดิมเป็น subquery ที่อ้าง `c.id` ในตัวเอง → PostgreSQL สแกนตาราง Product
+     *    **ใหม่ทุกหมวด** (30 หมวด = 30 รอบ) ทั้งที่คำตอบทั้งหมดอยู่ในรอบเดียว
+     *    วัดที่ 5,000 สินค้า: 52ms ตอน cache เย็น / 5.8ms ตอนอุ่น → 1.1ms
+     *    ผลลัพธ์ต้องเท่าเดิมทุกหมวด (มี test เทียบเลขข้างตัวกรองกับผลค้นหาจริงอยู่แล้ว)
+     */
     prisma.$queryRaw<Array<{ name: string; slug: string; product_count: bigint }>>(Prisma.sql`
+      WITH direct AS (
+        SELECT p."categoryId" AS category_id, count(*) AS n
+        FROM "Product" p
+        WHERE p."deletedAt" IS NULL AND p."status" = 'ACTIVE'
+        GROUP BY p."categoryId"
+      )
       SELECT c."name", c."slug",
-             (SELECT count(*) FROM "Product" p
-               WHERE p."deletedAt" IS NULL AND p."status" = 'ACTIVE'
-                 AND (p."categoryId" = c.id
-                      OR p."categoryId" IN (SELECT id FROM "Category" WHERE "parentId" = c.id))
-             ) AS product_count
+             COALESCE((SELECT n FROM direct WHERE direct.category_id = c.id), 0)
+             + COALESCE((SELECT sum(d.n) FROM direct d
+                          JOIN "Category" child ON child.id = d.category_id
+                         WHERE child."parentId" = c.id), 0) AS product_count
       FROM "Category" c
       WHERE c."deletedAt" IS NULL AND c."isActive"
       ORDER BY c."sortOrder" ASC

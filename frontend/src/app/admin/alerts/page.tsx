@@ -176,11 +176,26 @@ export default async function StockAlertsPage({
                 </p>
               </div>
             ) : (
-              <ul className="space-y-3">
-                {data.items.map((alert) => (
-                  <AlertCard key={alert.variantId} alert={alert} />
-                ))}
-              </ul>
+              <>
+                <ul className="space-y-3">
+                  {data.items.map((alert) => (
+                    <AlertCard key={alert.variantId} alert={alert} />
+                  ))}
+                </ul>
+
+                {/**
+                 * backend จำกัดจำนวนรายการที่ส่งมา (STEP 34 — เดิมส่งทุกแถวจนได้ 1.1 MB)
+                 * ถ้าไม่บอกว่ากำลังเห็นไม่ครบ แอดมินจะเข้าใจว่าเตือนแค่เท่านี้
+                 * แล้วของที่เหลือถูกมองข้ามเงียบ ๆ (กฎเดียวกับป้ายกระดิ่งของ STEP 16 ข้อ 8)
+                 */}
+                {data.totalMatched > data.items.length && (
+                  <p className="mt-4 rounded-[var(--radius-card)] border border-warning/30 bg-warning/5 px-4 py-3 text-sm">
+                    แสดง {data.items.length.toLocaleString("th-TH")} รายการแรกจาก{" "}
+                    <strong>{data.totalMatched.toLocaleString("th-TH")} รายการ</strong> ที่ตกเกณฑ์
+                    (เรียงจากที่ขาดหนักสุด) — กรองตามความรุนแรงเพื่อดูให้แคบลง
+                  </p>
+                )}
+              </>
             )}
           </div>
 

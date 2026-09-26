@@ -319,15 +319,15 @@ backend อ่าน token ได้ 2 ทาง:
 
 ### คลังสินค้าและการแจ้งเตือนสต็อก
 
-| Method | Path                                          | ต้องมี             | รายละเอียด                                                                                                  |
-| ------ | --------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------- |
-| GET    | `/api/admin/inventory`                        | `inventory:read`   | สต็อกต่อตัวเลือก + สรุปทั้งคลัง (ของในคลัง / จองไว้ / ขายได้จริง แยกกันเสมอ)                                |
-| GET    | `/api/admin/inventory/movements`              | `inventory:read`   | ประวัติการเคลื่อนไหวทั้งร้าน — **append-only แก้ย้อนหลังไม่ได้**                                            |
-| GET    | `/api/admin/inventory/:variantId`             | `inventory:read`   | สต็อกและประวัติของตัวเลือกเดียว                                                                             |
-| POST   | `/api/admin/inventory/:variantId/adjust`      | `inventory:adjust` | รับเข้า / ตัดออก / นับได้เท่าไร — ต้องมี `reason` และ `idempotencyKey` · ห้ามลดต่ำกว่าของที่ลูกค้าจอง (409) |
-| GET    | `/api/admin/stock-alerts`                     | `inventory:read`   | รายการที่ต้องเติมสต็อก — **คำนวณสด** จากจำนวนที่ขายได้จริง                                                  |
-| POST   | `/api/admin/stock-alerts/scan`                | `inventory:adjust` | ตรวจทั้งร้านแล้วสร้าง/ปิดการแจ้งเตือนตามความเป็นจริง                                                        |
-| PATCH  | `/api/admin/stock-alerts/:notificationId/ack` | `inventory:adjust` | รับทราบ — **ไม่ได้แก้ปัญหาสต็อก** ของยังเหลือน้อยจึงยังอยู่ในรายการสด                                       |
+| Method | Path                                          | ต้องมี             | รายละเอียด                                                                                                    |
+| ------ | --------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/admin/inventory`                        | `inventory:read`   | สต็อกต่อตัวเลือก + สรุปทั้งคลัง (ของในคลัง / จองไว้ / ขายได้จริง แยกกันเสมอ)                                  |
+| GET    | `/api/admin/inventory/movements`              | `inventory:read`   | ประวัติการเคลื่อนไหวทั้งร้าน — **append-only แก้ย้อนหลังไม่ได้**                                              |
+| GET    | `/api/admin/inventory/:variantId`             | `inventory:read`   | สต็อกและประวัติของตัวเลือกเดียว                                                                               |
+| POST   | `/api/admin/inventory/:variantId/adjust`      | `inventory:adjust` | รับเข้า / ตัดออก / นับได้เท่าไร — ต้องมี `reason` และ `idempotencyKey` · ห้ามลดต่ำกว่าของที่ลูกค้าจอง (409)   |
+| GET    | `/api/admin/stock-alerts`                     | `inventory:read`   | รายการที่ต้องเติมสต็อก — **คำนวณสด** จากจำนวนที่ขายได้จริง · `severity`, `limit` (ค่าเริ่มต้น 200 สูงสุด 500) |
+| POST   | `/api/admin/stock-alerts/scan`                | `inventory:adjust` | ตรวจทั้งร้านแล้วสร้าง/ปิดการแจ้งเตือนตามความเป็นจริง                                                          |
+| PATCH  | `/api/admin/stock-alerts/:notificationId/ack` | `inventory:adjust` | รับทราบ — **ไม่ได้แก้ปัญหาสต็อก** ของยังเหลือน้อยจึงยังอยู่ในรายการสด                                         |
 
 ### บาร์โค้ด / QR
 

@@ -17,19 +17,57 @@ import { Prisma, type getPrisma } from '@teenstyle/database';
  *   ทั้งสองทางต้องให้คำตอบเดียวกันเสมอ — มี test เทียบตรง ๆ
  */
 
-/**
- * นิพจน์ SQL ของจำนวนที่ขายได้จริงต่อสินค้าหนึ่งแถว
- *
- * ⚠️ ใช้ได้กับคิวรีที่ตั้ง alias ของตาราง `Product` ไว้เป็น `p` เท่านั้น
+/*
+ * ⚠️ นิพจน์ SQL ทุกตัวในไฟล์นี้ใช้ได้กับคิวรีที่ตั้ง alias ของตาราง `Product` ไว้เป็น `p` เท่านั้น
  *    (จงใจ hardcode ไม่รับ alias เป็นพารามิเตอร์ เพราะชื่อ identifier ส่งผ่าน
  *    parameter ของ Prisma ไม่ได้ ต้องต่อสตริง ซึ่งเสี่ยงเปิดช่อง SQL injection)
  */
-export const AVAILABLE_STOCK_SQL = Prisma.sql`COALESCE((
-  SELECT sum(GREATEST(i."quantity" - i."reservedQuantity", 0))
+
+/**
+ * "สินค้านี้ยังขายได้ไหม" — ใช้ตอบคำถามแบบมี/ไม่มี (STEP 34)
+ *
+ * ⚠️ เดิมที่นี่มีนิพจน์เดียวคือ `sum(GREATEST(q - r, 0))` แบบ subquery ที่อ้าง `p."id"`
+ *    แล้วทุกที่นำไปเทียบ `> 0` / `= 0` / `<= minimumStock` เอา
+ *    ปัญหาคือ subquery แบบนั้น PostgreSQL ต้องรัน **ซ้ำทีละแถวของ Product**
+ *    → ที่ 5,000 สินค้าคือ 5,000 รอบ (วัดแล้ว: 83,168 buffer hits ต่อคิวรีเดียว)
+ *    ตอนนี้จึงแยกเป็นสองรูปแบบตามคำถามที่ถามจริง และไม่มีนิพจน์แบบเดิมให้ใช้อีก
+ *
+ * `sum(...)` ต้องอ่าน **ทุก** ตัวเลือกให้ครบก่อนจะรู้ผลรวม แต่คำถาม "ขายได้ไหม"
+ * ตอบได้ทันทีที่เจอตัวเลือกแรกที่มีของ → `EXISTS` หยุดตรงนั้นเลย
+ * ทั้งสองให้คำตอบเดียวกันเพราะ `GREATEST(q - r, 0)` ไม่เคยติดลบ ผลรวมจึงมากกว่า 0
+ * เมื่อ **มีอย่างน้อยหนึ่งตัวเลือก** ที่ q > r เท่านั้น
+ * (วัดที่ 5,000 สินค้า / 20,000 ตัวเลือก: ตัวกรอง "พร้อมส่ง" ของ /shop 92ms → 18ms)
+ */
+export const HAS_AVAILABLE_STOCK_SQL = Prisma.sql`EXISTS (
+  SELECT 1
   FROM "ProductVariant" v
   JOIN "Inventory" i ON i."variantId" = v."id"
   WHERE v."productId" = p."id" AND v."deletedAt" IS NULL
-), 0)`;
+    AND i."quantity" > i."reservedQuantity"
+)`;
+
+/**
+ * ตารางสรุป "ขายได้จริงเท่าไร" ต่อสินค้า สำหรับคิวรีที่ต้องใช้ **ตัวเลข** ไม่ใช่แค่มี/ไม่มี
+ * (เช่น เทียบกับจุดเตือน `p."minimumStock"` ซึ่งเป็นค่าของสินค้าแต่ละชิ้น)
+ *
+ * ใช้เป็น JOIN คู่กับ `AVAILABLE_STOCK_JOINED_SQL` แทนการเขียน subquery ที่อ้าง `p."id"`
+ * ในตัวเอง เพราะ subquery แบบนั้น PostgreSQL รันซ้ำทีละแถวของ Product
+ * (วัดที่ข้อมูลจริง: รายการ "สต็อกต่ำ" ของหลังบ้าน 105ms → 21ms)
+ *
+ * ⚠️ ต้องวางไว้หลัง `FROM "Product" p` และใช้ alias `stock` — ห้ามตั้ง alias ซ้ำในคิวรีเดียวกัน
+ */
+export const AVAILABLE_STOCK_JOIN = Prisma.sql`
+  LEFT JOIN (
+    SELECT v."productId" AS product_id,
+           sum(GREATEST(i."quantity" - i."reservedQuantity", 0)) AS available
+    FROM "ProductVariant" v
+    JOIN "Inventory" i ON i."variantId" = v."id"
+    WHERE v."deletedAt" IS NULL
+    GROUP BY v."productId"
+  ) stock ON stock.product_id = p."id"`;
+
+/** จำนวนที่ขายได้จริงของแถวนั้น เมื่อคิวรีมี `AVAILABLE_STOCK_JOIN` อยู่แล้ว */
+export const AVAILABLE_STOCK_JOINED_SQL = Prisma.sql`COALESCE(stock.available, 0)`;
 
 /**
  * จำนวนที่ขายได้จริงของสินค้าหลายตัวในคิวรีเดียว

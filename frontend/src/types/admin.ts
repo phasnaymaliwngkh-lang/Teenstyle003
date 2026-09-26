@@ -312,6 +312,8 @@ export interface NotificationChannelInfo {
 
 export interface StockAlertListResult {
   items: StockAlert[];
+  /** จำนวนที่เข้าเงื่อนไขทั้งหมด — มากกว่า `items.length` ได้เมื่อ backend ตัดรายการให้ (STEP 34) */
+  totalMatched: number;
   summary: { outOfStock: number; lowStock: number; unacknowledged: number };
   channels: NotificationChannelInfo[];
   emailConfigured: boolean;

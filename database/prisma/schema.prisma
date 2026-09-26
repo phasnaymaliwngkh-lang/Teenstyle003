@@ -272,6 +272,14 @@ model User {
   @@index([status])
   @@index([createdAt])
   @@index([deletedAt])
+  /// ค้นหาลูกค้าด้วยอีเมล/ชื่อ/เบอร์ที่หน้า /admin/customers และ /admin/orders (STEP 34)
+  ///
+  /// ทั้งสองหน้าใช้ `contains` (= `ILIKE '%คำค้น%'`) ซึ่ง btree ช่วยไม่ได้เลย
+  /// และเพราะเป็นเงื่อนไข OR **ทุกขาต้องมี index** ไม่งั้น planner เลือก seq scan ทั้งคิวรี
+  /// (วัดแล้ว: ค้นหาลูกค้า 68.5ms → 2.3ms เมื่อขา phone มี index ครบเป็นขาสุดท้าย)
+  @@index([email(ops: raw("gin_trgm_ops"))], type: Gin, map: "User_email_trgm_idx")
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "User_name_trgm_idx")
+  @@index([phone(ops: raw("gin_trgm_ops"))], type: Gin, map: "User_phone_trgm_idx")
 }
 
 /// ─────────────────────────────────────────────────────────────────────────────
@@ -776,6 +784,13 @@ model Order {
   @@index([paymentStatus])
   @@index([createdAt])
   @@index([couponId])
+  /// รายงานยอดขายทุกแบบตัดรอบด้วย `paidAt` ไม่ใช่ `createdAt` (กฎ STEP 26 ข้อ 1)
+  /// แต่เดิมไม่มี index ของ `paidAt` เลย → ทุกรายงานสแกนตาราง Order ทั้งตาราง
+  /// (วัดที่ 60,000 ออเดอร์: ยอดขายรายวัน 30 วัน 42.0ms → 5.8ms · ยอดสินค้า 107.5ms → 37.6ms)
+  @@index([paymentStatus, paidAt])
+  /// ค้นหาด้วยเลขออเดอร์ที่หน้า /admin/orders — `contains` ใช้ unique btree ไม่ได้
+  /// (วัดแล้ว 64.7ms → 4.2ms)
+  @@index([orderNumber(ops: raw("gin_trgm_ops"))], type: Gin, map: "Order_orderNumber_trgm_idx")
 }
 
 model OrderItem {
