@@ -1834,8 +1834,19 @@ STEP 4 จดไว้ว่า "navbar อ่าน session ทำให้ท�
   `NEXT_PUBLIC_API_PROXY_PATH=/backend` กลายเป็น `C:/Program Files/Git/backend`
   แล้ว `next build` ล้มด้วย `Invalid rewrite found` → ใส่ `MSYS_NO_PATHCONV=1` เสมอ
 - **คำสั่งฆ่า process ที่กรองด้วย `*web003*` มองไม่เห็น backend ตอน production**
-  เพราะ command line เป็น `node dist/server.js` (ไม่มีคำว่า web003) → เพิ่มเงื่อนไข
-  `-or $_.CommandLine -like "*dist\server.js*"` ด้วย ไม่งั้นคิดว่าปิดแล้วแต่ยังฟังพอร์ตอยู่
+  เพราะ command line เป็น `node dist/server.js` ซึ่งไม่มีคำว่า web003 เลย
+  → ผลคือ backend ตัว production ยังฟังพอร์ต 4000 อยู่ แล้ว dev ที่เปิดใหม่ bind ไม่ได้
+  **โดยที่ `curl /health` ยังตอบ 200** จึงดูเหมือนทุกอย่างปกติ (เจอจริง 2 ครั้ง — ครั้งที่สอง
+  รู้เพราะ `/health` รายงาน `environment: production` และ uptime 70 นาที)
+  ใช้เงื่อนไขนี้เสมอ — **ต้องมีทั้ง slash และ backslash** เพราะที่พิมพ์ใน command line จริงคือ slash:
+
+  ```powershell
+  Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+    Where-Object { $_.CommandLine -like "*web003*" -or $_.CommandLine -like "*dist/server.js*" -or $_.CommandLine -like "*dist\server.js*" } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+  ```
+
+  **วิธียืนยันว่าปิดจริง: อ่าน `environment` กับ `uptimeSeconds` จาก `/health`** ไม่ใช่ดูแค่ status code
 
 ## Testing (STEP 37 — เทสต์คอมโพเนนต์จริงแล้ว และวัด coverage แล้ว)
 

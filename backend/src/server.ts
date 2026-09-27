@@ -4,6 +4,7 @@ import { disconnectDatabase } from '@teenstyle/database';
 
 import { createApp } from './app.ts';
 import { API_VERSION, env, listenPort } from './config/index.ts';
+import { RATE_LIMIT_STORE_IS_PER_PROCESS } from './middlewares/rate-limit.ts';
 import { logger } from './utils/logger.ts';
 
 const app = createApp();
@@ -22,7 +23,12 @@ const server: Server = app.listen(listenPort, () => {
       version: API_VERSION,
       corsOrigin: env.CORS_ORIGIN,
     },
-    `🚀 TEENSTYLE AI API พร้อมใช้งานที่ ${env.BACKEND_URL}`,
+    /**
+     * บอกทั้ง **พอร์ตที่ฟังจริง** และ URL ที่เผยแพร่ — ห้ามบอกแค่ `BACKEND_URL`
+     * เพราะโฮสต์ที่ฉีด `PORT` มาให้จะทำให้สองค่านี้ไม่ตรงกัน แล้วบรรทัดนี้จะบอกพอร์ตผิด
+     * ซึ่งเป็นบรรทัดแรกที่คนอ่านตอนไล่หาสาเหตุ health check ล้ม (กับดักที่ docs/06 เตือนไว้)
+     */
+    `🚀 TEENSTYLE AI API ฟังอยู่ที่พอร์ต ${listenPort} · เผยแพร่ที่ ${env.BACKEND_URL}`,
   );
 
   if (!env.DATABASE_URL) {
@@ -36,14 +42,20 @@ const server: Server = app.listen(listenPort, () => {
    *
    * เตือนตรงนี้เพราะเป็นจุดเดียวที่คนดูแลระบบเห็นแน่ ๆ ตอน deploy
    * ถ้าไม่เตือน ระบบจะดู "มี rate limit แล้ว" ทั้งที่ค่าจริงถูกคูณด้วยจำนวน instance
-   * (รายละเอียดและทางแก้อยู่ใน middlewares/rate-limit.ts)
+   *
+   * ⚠️ เงื่อนไขต้องเป็น **สถานะจริงของ store** ไม่ใช่ `!env.REDIS_URL`
+   *    เดิมเช็ค `REDIS_URL` ซึ่งตรวจผิดเรื่อง: ใส่ค่าลง env (แม้ชี้ไป Redis ที่ไม่มีอยู่จริง —
+   *    ซึ่ง `.env` ของเครื่องพัฒนาเป็นแบบนั้นอยู่) คำเตือนก็เงียบ ทั้งที่ยังไม่มี adapter
+   *    และพฤติกรรมยังนับแยกต่อ process เหมือนเดิมทุกอย่าง
+   *    (รายละเอียดและทางแก้อยู่ใน middlewares/rate-limit.ts)
    */
-  if (env.NODE_ENV === 'production' && !env.REDIS_URL) {
+  if (env.NODE_ENV === 'production' && RATE_LIMIT_STORE_IS_PER_PROCESS) {
     logger.warn(
-      { rateLimitMax: env.RATE_LIMIT_MAX },
-      'ยังไม่มี REDIS_URL — rate limit นับแยกในแต่ละ process ' +
+      { rateLimitMax: env.RATE_LIMIT_MAX, redisUrlConfigured: Boolean(env.REDIS_URL) },
+      'rate limit นับแยกในแต่ละ process เพราะยังไม่มี store ที่แชร์กัน ' +
         'ถ้ารันหลาย instance limit จริงจะเท่ากับ RATE_LIMIT_MAX × จำนวน instance ' +
-        '(ตั้ง limit ที่ proxy/ingress หรือใส่ Redis ก่อน scale)',
+        '(การตั้ง REDIS_URL อย่างเดียวยังไม่เปลี่ยนพฤติกรรมนี้ — ต้องใส่ store ให้ limiter ด้วย) ' +
+        'ระหว่างนี้ให้ตั้ง limit ที่ proxy/ingress ก่อน scale',
     );
   }
 });

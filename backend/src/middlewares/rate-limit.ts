@@ -30,6 +30,19 @@ const tooManyRequestsBody: ApiErrorBody = {
  *    (nginx, Cloudflare) หรือใส่ Redis แล้วเปลี่ยน `store` ที่นี่ **ที่เดียว**
  *    · `/health` รายงานสถานะ Redis ตามความจริงอยู่แล้ว (`not-configured`)
  */
+/**
+ * `true` = ตัวนับอยู่ในหน่วยความจำของ process นี้เท่านั้น (ยังไม่มี store ที่แชร์กันระหว่าง instance)
+ *
+ * ⚠️ **ตั้งเป็น `false` ได้เฉพาะตอนที่ใส่ `store:` ให้ limiter ทั้งสองตัวจริง ๆ แล้ว**
+ *    ห้ามเปลี่ยนเพราะ "ตั้ง `REDIS_URL` แล้ว" — การมี env ไม่ได้ทำให้ตัวนับแชร์กัน
+ *
+ * ทำไมต้อง export: `server.ts` ใช้ค่านี้ตัดสินว่าจะเตือนตอนบูต production ไหม
+ * เดิมเงื่อนไขคือ `!env.REDIS_URL` ซึ่ง **ตรวจผิดเรื่อง** — ใครใส่ `REDIS_URL` ลง env
+ * (แม้ชี้ไป Redis ที่ไม่มีอยู่จริง) คำเตือนก็เงียบ ทั้งที่พฤติกรรมยังเป็นแบบนับแยกต่อ process เหมือนเดิม
+ * คำเตือนที่เงียบได้ด้วยการตั้งค่าที่ไม่เกี่ยวข้องกัน คือคำเตือนที่เชื่อไม่ได้
+ */
+export const RATE_LIMIT_STORE_IS_PER_PROCESS = true;
+
 export const globalRateLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
   limit: env.RATE_LIMIT_MAX,
