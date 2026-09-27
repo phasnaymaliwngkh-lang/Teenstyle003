@@ -21,17 +21,23 @@ export function LookCard({
   look,
   detailHref,
   showItems = false,
+  priority = false,
 }: {
   look: LookCardData;
   detailHref?: string;
   showItems?: boolean;
+  /**
+   * รูปนี้เป็นภาพใหญ่สุดที่เห็นตอนเปิดหน้า (LCP) หรือไม่ — ใส่ให้ **การ์ดแรกเท่านั้น**
+   * (Next เตือนใน console เมื่อรูป LCP ไม่ได้โหลดแบบ eager — เจอตอน STEP 39 ที่ /looks)
+   */
+  priority?: boolean;
 }) {
   const missingCount = look.itemCount - look.availableItemCount;
   const outOfStockCount = look.items.filter((item) => item.stockStatus === "OUT_OF_STOCK").length;
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-line bg-white shadow-[var(--shadow-soft)] transition hover:-translate-y-1 hover:shadow-[var(--shadow-lift)]">
-      <CardImage look={look} detailHref={detailHref} />
+      <CardImage look={look} detailHref={detailHref} priority={priority} />
 
       <div className="flex flex-1 flex-col gap-2 p-4">
         <h3 className="font-extrabold">
@@ -84,7 +90,15 @@ export function LookCard({
   );
 }
 
-function CardImage({ look, detailHref }: { look: LookCardData; detailHref?: string }) {
+function CardImage({
+  look,
+  detailHref,
+  priority,
+}: {
+  look: LookCardData;
+  detailHref?: string;
+  priority?: boolean;
+}) {
   const badges = (
     <>
       <span className="absolute top-3 left-3 rounded-[var(--radius-pill)] bg-white/90 px-2.5 py-1 text-xs font-bold text-brand-dark">
@@ -105,6 +119,7 @@ function CardImage({ look, detailHref }: { look: LookCardData; detailHref?: stri
       alt={look.imageAlt ?? look.name}
       fill
       sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+      priority={priority}
       className="object-cover transition duration-500 group-hover:scale-105"
     />
   ) : (

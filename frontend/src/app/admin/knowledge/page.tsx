@@ -28,6 +28,7 @@ import {
   resetAdminKnowledgeDefaults,
   updateAdminKnowledgeArticle,
 } from "@/services/knowledge.service";
+import { describeApiError } from "@/lib/api-error-text";
 import type { KnowledgeArticle, KnowledgeCategory } from "@/types/catalog";
 
 const CATEGORIES: Array<{ key: KnowledgeCategory; label: string }> = [
@@ -64,8 +65,20 @@ const EMPTY_FORM: ArticleFormData = {
   isPublished: true,
 };
 
+/**
+ * จำนวนบทความที่ขอต่อครั้ง — **ต้องไม่เกินเพดานของ API** (`max(50)` ใน
+ * `knowledgeSearchQuerySchema` ของ backend) ไม่งั้นได้ 422 แล้วหน้านี้โหลดบทความไม่ได้เลย
+ *
+ * ⚠️ เคยตั้งไว้ 100 ซึ่งเกินเพดาน → ทุกครั้งที่เปิดหน้านี้ได้ 422 และเห็นแค่ข้อความรวม
+ *    "ไม่สามารถโหลดข้อมูลบทความคลังความรู้ได้" จึงไม่มีใครรู้ว่าสาเหตุคืออะไร
+ *    เจอตอน STEP 39 ด้วยการเปิดหน้านี้ใน Chrome จริงแล้วอ่าน console กับคำขอที่ล้ม
+ */
+const ARTICLE_PAGE_SIZE = 50;
+
 export default function AdminKnowledgePage() {
   const [articles, setArticles] = useState<KnowledgeArticle[]>([]);
+  /** ยอดจริงที่ตรงเงื่อนไข — ใช้บอกเมื่อรายการถูกตัด (กฎ STEP 34 ข้อ 6) */
+  const [totalArticles, setTotalArticles] = useState(0);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<KnowledgeCategory | "ALL">("ALL");
@@ -122,12 +135,13 @@ export default function AdminKnowledgePage() {
       const res = await fetchAdminKnowledgeArticles({
         category: selectedCategory === "ALL" ? undefined : selectedCategory,
         q: searchQuery.trim() || undefined,
-        limit: 100,
+        limit: ARTICLE_PAGE_SIZE,
       });
       setArticles(res.items);
+      setTotalArticles(res.total);
     } catch (err) {
       console.error("Failed to load admin articles:", err);
-      setErrorMessage("ไม่สามารถโหลดข้อมูลบทความคลังความรู้ได้");
+      setErrorMessage(describeApiError(err, "ไม่สามารถโหลดข้อมูลบทความคลังความรู้ได้"));
     } finally {
       setLoading(false);
     }
@@ -142,16 +156,17 @@ export default function AdminKnowledgePage() {
         const res = await fetchAdminKnowledgeArticles({
           category: selectedCategory === "ALL" ? undefined : selectedCategory,
           q: searchQuery.trim() || undefined,
-          limit: 100,
+          limit: ARTICLE_PAGE_SIZE,
         });
         if (!cancelled) {
           setArticles(res.items);
+          setTotalArticles(res.total);
           setLoading(false);
         }
       } catch (err) {
         if (!cancelled) {
           console.error("Failed to load admin articles:", err);
-          setErrorMessage("ไม่สามารถโหลดข้อมูลบทความคลังความรู้ได้");
+          setErrorMessage(describeApiError(err, "ไม่สามารถโหลดข้อมูลบทความคลังความรู้ได้"));
           setLoading(false);
         }
       }
@@ -459,6 +474,17 @@ export default function AdminKnowledgePage() {
         </div>
       )}
 
+      {/**
+       * รายการถูกตัดต้องบอกยอดจริงเสมอ (กฎ STEP 34 ข้อ 6)
+       * ไม่งั้นแอดมินเข้าใจว่าคลังความรู้มีแค่เท่าที่เห็น แล้วแก้บทความที่มองไม่เห็นไม่ได้
+       */}
+      {totalArticles > articles.length && (
+        <p className="rounded-[var(--radius-card)] border border-warning/30 bg-warning/5 px-4 py-3 text-sm font-semibold text-warning">
+          แสดง {articles.length} บทความแรกจาก {totalArticles} บทความที่ตรงเงื่อนไข —
+          ใช้ช่องค้นหาหรือ ตัวกรองหมวดหมู่เพื่อเข้าถึงบทความที่เหลือ
+        </p>
+      )}
+
       {/* Stats Cards */}
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)]">
@@ -662,7 +688,7 @@ export default function AdminKnowledgePage() {
                       <button
                         type="button"
                         onClick={() => void handleTogglePublish(article)}
-                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition ${
+                        className={`inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold transition ${
                           article.isPublished
                             ? "bg-success/5 text-success border border-success/30 hover:bg-success/10"
                             : "bg-warning/5 text-warning border border-warning/30 hover:bg-warning/10"
@@ -684,7 +710,7 @@ export default function AdminKnowledgePage() {
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(article)}
-                          className="p-2 rounded-full hover:bg-lilac hover:text-brand transition text-muted"
+                          className="grid size-11 place-items-center rounded-full text-muted transition hover:bg-lilac hover:text-brand"
                           title="แก้ไขบทความ"
                           aria-label={`แก้ไขบทความ ${article.title}`}
                         >
@@ -693,7 +719,7 @@ export default function AdminKnowledgePage() {
                         <button
                           type="button"
                           onClick={() => setDeletingArticle(article)}
-                          className="p-2 rounded-full hover:bg-danger/5 hover:text-danger transition text-muted"
+                          className="grid size-11 place-items-center rounded-full text-muted transition hover:bg-danger/5 hover:text-danger"
                           title="ลบบทความ"
                           aria-label={`ลบบทความ ${article.title}`}
                         >

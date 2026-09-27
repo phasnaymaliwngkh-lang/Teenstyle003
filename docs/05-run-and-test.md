@@ -169,6 +169,21 @@ node scripts/audit-performance.mjs --reuse    # ใช้ DB ที่ --keep �
 · ตัวเลขก่อน/หลัง เหตุผลของ index แต่ละตัว และจุดที่ยังหนักอยู่ ทั้งหมดอยู่ใน
 [10-performance.md](10-performance.md)
 
+## ตรวจในเบราว์เซอร์จริง (STEP 39)
+
+```powershell
+npm run dev                          # ต้องเปิดไว้ก่อน
+node scripts/audit-chrome.mjs        # console · CSP · คำขอที่ล้ม · status · กดจริง · API ล่ม
+node scripts/audit-chrome.mjs --only=/admin --width=360
+```
+
+ปิดช่องว่าง **"หน้าเปิดได้ แต่ใช้งานไม่ได้"** ที่ `curl` และเทสต์ jsdom มองไม่เห็น
+· `exit 0` = ไม่พบปัญหา · `1` = พบ · `2` = รันไม่สำเร็จ (รวมกรณีตรวจ 0 หน้า)
+⚠️ ส่ง argument ที่ขึ้นต้นด้วย `/` ใน Git Bash ต้องใส่ `MSYS_NO_PATHCONV=1` นำหน้า
+· รันตัวตรวจติด ๆ กันจะชน rate limit ของ API เอง — ตั้ง `RATE_LIMIT_MAX` สูงขึ้นใน `.env`
+**แล้วรีสตาร์ต backend** (แก้ `.env` เฉย ๆ ไม่มีผล)
+· รายละเอียดและข้อจำกัดอยู่ที่ [12-browser-testing.md](12-browser-testing.md)
+
 ## ตรวจของที่ใช้ deploy (STEP 38)
 
 ```powershell

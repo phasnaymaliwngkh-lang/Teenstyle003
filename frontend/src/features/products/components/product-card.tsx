@@ -19,7 +19,20 @@ const STOCK_STYLE = {
  *
  * ลิงก์ไป /product/[slug] ซึ่งจะสร้างใน STEP 6
  */
-export function ProductCard({ product }: { product: ProductCardData }) {
+export function ProductCard({
+  product,
+  priority = false,
+}: {
+  product: ProductCardData;
+  /**
+   * รูปนี้เป็นภาพใหญ่สุดที่เห็นตอนเปิดหน้า (LCP) หรือไม่ — ใส่ให้ **การ์ดแรกเท่านั้น**
+   *
+   * Next เตือนใน console ว่า "detected as the Largest Contentful Paint (LCP)" เมื่อ
+   * รูปที่เป็น LCP ไม่ได้โหลดแบบ eager (เจอตอน STEP 39 ที่ /shop และ /looks)
+   * ⚠️ ใส่หลายใบพร้อมกันจะแย่งแบนด์วิดท์กันเองแล้ว LCP แย่ลง จึงใส่ใบเดียว
+   */
+  priority?: boolean;
+}) {
   const isOutOfStock = product.stockStatus === "OUT_OF_STOCK";
 
   return (
@@ -34,6 +47,7 @@ export function ProductCard({ product }: { product: ProductCardData }) {
             alt={product.image.alt}
             fill
             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            priority={priority}
             className="object-cover transition duration-500 group-hover:scale-105"
           />
         ) : (

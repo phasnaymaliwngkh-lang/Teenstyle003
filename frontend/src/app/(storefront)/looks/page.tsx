@@ -143,8 +143,14 @@ async function ResultsSection({ params }: { params: URLSearchParams }) {
       </p>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {result.items.map((look) => (
-          <LookCard key={look.id} look={look} detailHref={`/looks/${look.slug}`} showItems />
+        {result.items.map((look, index) => (
+          <LookCard
+            key={look.id}
+            look={look}
+            detailHref={`/looks/${look.slug}`}
+            showItems
+            priority={index === 0}
+          />
         ))}
       </div>
 

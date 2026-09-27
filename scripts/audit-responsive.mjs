@@ -17,11 +17,12 @@
  * โค้ดออก: 0 = ไม่พบปัญหา · 1 = พบปัญหา · 2 = รันไม่สำเร็จ (เปิดเซิร์ฟเวอร์ไม่ได้ ฯลฯ)
  */
 
-import { spawn } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+
+import { prepareRoutes } from './lib/app-routes.mjs';
+import { launchChrome, log, sleep, waitForHttp } from './lib/chrome.mjs';
 
 // ต้องโหลด .env ก่อน import @teenstyle/database เพราะ getPrisma() อ่าน DATABASE_URL ตอนสร้าง client
 try {
@@ -50,150 +51,6 @@ const DEBUG_PORT = Number(args.get('port') ?? 9411);
 
 /** เกณฑ์ขนาดปุ่มขั้นต่ำ — กฎข้อ 11 ของ CLAUDE.md */
 const MIN_TOUCH = 44;
-
-const CHROME_CANDIDATES = [
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
-  `${process.env.LOCALAPPDATA ?? ''}/Google/Chrome/Application/chrome.exe`,
-  '/usr/bin/google-chrome',
-  '/usr/bin/chromium',
-];
-
-/**
- * เส้นทางทั้งหมดที่ต้องตรวจ
- *
- * `as` = ล็อกอินเป็นใคร (guest / customer / admin) · `{...}` ถูกแทนด้วยค่าจริงจากฐานข้อมูล
- * เพิ่มหน้าใหม่แล้วต้องมาเพิ่มที่นี่ ไม่งั้นหน้านั้นไม่เคยถูกตรวจ
- */
-const ROUTES = [
-  { path: '/', as: 'guest' },
-  { path: '/shop', as: 'guest' },
-  { path: '/shop?category={categorySlug}&sort=price-asc&page=1', as: 'guest' },
-  { path: '/product/{productSlug}', as: 'guest' },
-  { path: '/looks', as: 'guest' },
-  { path: '/looks/{lookSlug}', as: 'guest' },
-  { path: '/faq', as: 'guest' },
-  { path: '/customer-service', as: 'guest' },
-  { path: '/ai-stylist', as: 'guest' },
-  { path: '/about', as: 'guest' },
-  { path: '/search', as: 'guest' },
-  { path: '/signin', as: 'guest' },
-  { path: '/unauthorized', as: 'guest' },
-  { path: '/forbidden', as: 'guest' },
-  { path: '/ไม่มีหน้านี้จริง', as: 'guest', note: 'หน้า 404 ที่ราก' },
-
-  { path: '/account', as: 'customer' },
-  { path: '/account/profile', as: 'customer' },
-  { path: '/account/addresses', as: 'customer' },
-  { path: '/account/orders', as: 'customer' },
-  { path: '/account/orders/{orderNumber}', as: 'customer' },
-  { path: '/account/reviews', as: 'customer' },
-  { path: '/account/notifications', as: 'customer' },
-  { path: '/wishlist', as: 'customer' },
-  { path: '/cart', as: 'customer', note: 'ตะกร้าที่มีของจริง — แถวสินค้าคือจุดที่แน่นที่สุด' },
-  { path: '/checkout', as: 'customer' },
-  { path: '/checkout/success?order={ownOrderNumber}', as: 'customer' },
-
-  { path: '/admin', as: 'admin' },
-  { path: '/admin/orders', as: 'admin' },
-  { path: '/admin/orders/{orderNumber}', as: 'admin' },
-  { path: '/admin/products', as: 'admin' },
-  { path: '/admin/products/new', as: 'admin' },
-  { path: '/admin/products/{productId}', as: 'admin' },
-  { path: '/admin/inventory', as: 'admin' },
-  { path: '/admin/inventory/movements', as: 'admin' },
-  { path: '/admin/inventory/{variantId}', as: 'admin' },
-  { path: '/admin/alerts', as: 'admin' },
-  { path: '/admin/barcodes', as: 'admin' },
-  { path: '/admin/barcodes?code={sku}', as: 'admin' },
-  { path: '/admin/barcodes/labels?variantId={variantId}', as: 'admin' },
-  { path: '/admin/import-export', as: 'admin' },
-  { path: '/admin/reviews', as: 'admin' },
-  { path: '/admin/customers', as: 'admin' },
-  { path: '/admin/customers/{customerId}', as: 'admin' },
-  { path: '/admin/analytics', as: 'admin' },
-  { path: '/admin/logs', as: 'admin' },
-  { path: '/admin/knowledge', as: 'admin' },
-  { path: '/admin/support', as: 'admin' },
-];
-
-// ───────────────────────────── ตัวช่วยเล็ก ๆ ─────────────────────────────
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function log(...parts) {
-  process.stdout.write(`${parts.join(' ')}\n`);
-}
-
-async function waitForHttp(url, label, timeoutMs = 60_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    try {
-      const res = await fetch(url);
-      if (res.status < 500) return;
-    } catch {
-      /* ยังไม่ขึ้น */
-    }
-    await sleep(500);
-  }
-  throw new Error(`รอ ${label} ที่ ${url} ไม่ขึ้นภายใน ${timeoutMs / 1000}s`);
-}
-
-// ───────────────────────────── ลูกค้า CDP ─────────────────────────────
-
-class Cdp {
-  constructor(ws) {
-    this.ws = ws;
-    this.nextId = 1;
-    this.pending = new Map();
-    this.waiters = [];
-
-    ws.addEventListener('message', (event) => {
-      const msg = JSON.parse(event.data);
-
-      if (msg.id && this.pending.has(msg.id)) {
-        const { resolve, reject } = this.pending.get(msg.id);
-        this.pending.delete(msg.id);
-        if (msg.error)
-          reject(new Error(`${msg.error.message} (${JSON.stringify(msg.error.data ?? null)})`));
-        else resolve(msg.result);
-        return;
-      }
-
-      for (const waiter of [...this.waiters]) {
-        if (
-          waiter.method === msg.method &&
-          (!waiter.sessionId || waiter.sessionId === msg.sessionId)
-        ) {
-          this.waiters.splice(this.waiters.indexOf(waiter), 1);
-          waiter.resolve(msg.params);
-        }
-      }
-    });
-  }
-
-  send(method, params = {}, sessionId) {
-    const id = this.nextId++;
-    const payload = { id, method, params };
-    if (sessionId) payload.sessionId = sessionId;
-    this.ws.send(JSON.stringify(payload));
-    return new Promise((resolve, reject) => this.pending.set(id, { resolve, reject }));
-  }
-
-  once(method, sessionId, timeoutMs = 30_000) {
-    return new Promise((resolve, reject) => {
-      const waiter = { method, sessionId, resolve };
-      this.waiters.push(waiter);
-      setTimeout(() => {
-        const index = this.waiters.indexOf(waiter);
-        if (index >= 0) {
-          this.waiters.splice(index, 1);
-          reject(new Error(`ไม่ได้รับ event ${method} ภายใน ${timeoutMs / 1000}s`));
-        }
-      }, timeoutMs);
-    });
-  }
-}
 
 // ───────────────── สคริปต์ที่รันในหน้าเว็บเพื่อวัดของจริง ─────────────────
 
@@ -365,89 +222,6 @@ const AUDIT_EXPRESSION = String.raw`
 })()
 `;
 
-// ───────────────────────────── เตรียมข้อมูลจริง ─────────────────────────────
-
-/** สร้าง session ชั่วคราวให้ผู้ใช้ที่มีบทบาทตามต้องการ แล้วคืน token */
-async function createSession(prisma, where, label, createdSessions) {
-  const user = await prisma.user.findFirst({
-    where,
-    select: { id: true, email: true, role: { select: { name: true } } },
-    orderBy: { createdAt: 'asc' },
-  });
-
-  if (!user) throw new Error(`ไม่พบผู้ใช้สำหรับ ${label} ในฐานข้อมูล (ลอง npm run db:seed)`);
-
-  const sessionToken = `audit-responsive-${randomBytes(24).toString('hex')}`;
-  /*
-   * จดไว้ "ก่อน" สร้าง เพื่อให้บล็อก finally ลบได้แม้ขั้นถัดไปจะโยน error
-   * (เจอจริง: การหาลูกค้าไม่สำเร็จทำให้ session ของ admin ที่สร้างไปแล้วค้างอยู่ในฐานข้อมูล)
-   */
-  createdSessions.push(sessionToken);
-  await prisma.session.create({
-    data: { sessionToken, userId: user.id, expires: new Date(Date.now() + 2 * 60 * 60 * 1000) },
-  });
-
-  log(`  ${label}: ${user.email} (${user.role.name})`);
-  return { sessionToken, userId: user.id, email: user.email };
-}
-
-/** ดึงค่าจริงมาแทน {placeholder} ในรายการเส้นทาง */
-async function resolvePlaceholders(prisma, adminToken) {
-  const asAdmin = async (pathname) => {
-    const res = await fetch(`${API_BASE}${pathname}`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
-    });
-    if (!res.ok) throw new Error(`เรียก ${pathname} ไม่สำเร็จ (${res.status})`);
-    const body = await res.json();
-    return body.data;
-  };
-
-  const [product] = (await asAdmin('/api/admin/products?limit=1')).products ?? [];
-  const [inventory] = (await asAdmin('/api/admin/inventory?limit=1')).items ?? [];
-  const [order] = (await asAdmin('/api/admin/orders?limit=1')).orders ?? [];
-  const [customer] = (await asAdmin('/api/admin/customers?limit=1&role=CUSTOMER')).customers ?? [];
-
-  const publicProduct = await prisma.product.findFirst({
-    where: { status: 'ACTIVE', deletedAt: null },
-    select: { slug: true, category: { select: { slug: true } } },
-  });
-  const look = await prisma.look.findFirst({ where: { isActive: true }, select: { slug: true } });
-
-  return {
-    productSlug: publicProduct?.slug ?? '',
-    categorySlug: publicProduct?.category?.slug ?? '',
-    lookSlug: look?.slug ?? '',
-    productId: product?.id ?? '',
-    variantId: inventory?.variantId ?? '',
-    sku: inventory?.sku ?? '',
-    orderNumber: order?.orderNumber ?? '',
-    customerId: customer?.id ?? '',
-  };
-}
-
-/** คำสั่งซื้อของลูกค้าที่ใช้ทดสอบ — /account/orders/[orderNumber] ต้องเป็นของเขาเอง */
-async function customerOrderNumber(prisma, userId) {
-  const order = await prisma.order.findFirst({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-    select: { orderNumber: true },
-  });
-  return order?.orderNumber ?? '';
-}
-
-// ───────────────────────────── ตัวตรวจ ─────────────────────────────
-
-function findChrome() {
-  for (const candidate of CHROME_CANDIDATES) {
-    try {
-      if (candidate && existsSync(candidate)) return candidate;
-    } catch {
-      /* ข้าม */
-    }
-  }
-  throw new Error('ไม่พบ Chrome ในเครื่อง — ระบุด้วย --chrome=<path>');
-}
-
 async function main() {
   const prisma = getPrisma();
   const userDataDir = mkdtempSync(path.join(tmpdir(), 'teenstyle-audit-'));
@@ -460,82 +234,28 @@ async function main() {
     await waitForHttp(`${API_BASE}/health`, 'backend');
     await waitForHttp(WEB_BASE, 'frontend');
 
-    log('สร้าง session ชั่วคราว…');
-    const admin = await createSession(
+    const {
+      routes,
+      createdSessions: sessions,
+      tokens,
+    } = await prepareRoutes({
       prisma,
-      { role: { name: { in: ['SUPER_ADMIN', 'ADMIN'] } }, status: 'ACTIVE' },
-      'admin',
-      createdSessions,
-    );
-    // เลือกลูกค้าที่ "มีคำสั่งซื้อจริง" ก่อน เพราะหน้าที่ว่างเปล่าตรวจ layout ได้น้อยกว่าหน้าที่มีข้อมูล
-    const customer =
-      (await createSession(
-        prisma,
-        { role: { name: 'CUSTOMER' }, status: 'ACTIVE', orders: { some: {} } },
-        'customer',
-        createdSessions,
-      ).catch(() => null)) ??
-      (await createSession(
-        prisma,
-        { role: { name: 'CUSTOMER' }, status: 'ACTIVE' },
-        'customer',
-        createdSessions,
-      ));
-
-    const placeholders = await resolvePlaceholders(prisma, admin.sessionToken);
-    const tokens = { guest: null, customer: customer.sessionToken, admin: admin.sessionToken };
-
-    // /account/orders/[orderNumber] ต้องเป็นออเดอร์ของลูกค้าคนนั้นเอง ไม่ใช่ใบแรกของร้าน
-    const ownOrder = await customerOrderNumber(prisma, customer.userId);
-
-    const resolved = ROUTES.map((route) => {
-      const values = { ...placeholders, ownOrderNumber: ownOrder };
-      // หน้าในบัญชีต้องใช้ออเดอร์ของลูกค้าคนนั้นเอง ไม่ใช่ใบแรกของร้าน (ของคนอื่นได้ 404 ตามกฎ STEP 10)
-      if (route.as === 'customer' && ownOrder) values.orderNumber = ownOrder;
-      // ค่าที่หาไม่ได้ให้คง {…} ไว้ เพื่อให้ตัวกรองข้างล่างตัดเส้นทางนั้นออกอย่างเห็นได้ชัด
-      return {
-        ...route,
-        url: route.path.replace(/\{(\w+)\}/g, (match, key) => values[key] || match),
-      };
+      apiBase: API_BASE,
+      only: ONLY,
+      tokenPrefix: 'audit-responsive',
     });
 
-    // เส้นทางที่ข้ามต้อง "เห็น" ไม่ใช่หายเงียบ ๆ ไม่งั้นฐานข้อมูลว่างจะทำให้ขอบเขตการตรวจแคบลงโดยไม่มีใครรู้
-    const skipped = resolved.filter((route) => route.url.includes('{'));
-    if (skipped.length) {
-      log('\n⚠️ ข้ามเพราะไม่มีข้อมูลในฐานข้อมูล (หน้าเหล่านี้ยังไม่ถูกตรวจ):');
-      for (const route of skipped) log(`  - ${route.path}`);
-    }
+    createdSessions.push(...sessions);
 
-    const routes = resolved.filter(
-      (route) => !route.url.includes('{') && (!ONLY || route.url.startsWith(ONLY)),
-    );
-
-    const chromePath = args.get('chrome') ?? findChrome();
-    chrome = spawn(
-      chromePath,
-      [
-        '--headless=new',
-        '--disable-gpu',
-        '--no-first-run',
-        '--no-default-browser-check',
-        '--disable-extensions',
-        `--user-data-dir=${userDataDir}`,
-        `--remote-debugging-port=${DEBUG_PORT}`,
-        'about:blank',
-      ],
-      { stdio: 'ignore' },
-    );
-
-    await waitForHttp(`http://127.0.0.1:${DEBUG_PORT}/json/version`, 'chrome', 30_000);
-    const version = await (await fetch(`http://127.0.0.1:${DEBUG_PORT}/json/version`)).json();
-    log(`ใช้ ${version.Browser}`);
-
-    const ws = new WebSocket(version.webSocketDebuggerUrl);
-    await new Promise((resolve, reject) => {
-      ws.addEventListener('open', resolve, { once: true });
-      ws.addEventListener('error', reject, { once: true });
+    const launched = await launchChrome({
+      chromePath: args.get('chrome'),
+      debugPort: DEBUG_PORT,
+      userDataDir,
     });
-    cdp = new Cdp(ws);
+
+    chrome = launched.chrome;
+    cdp = launched.cdp;
+    log(`ใช้ ${launched.browser}`);
 
     const results = [];
 

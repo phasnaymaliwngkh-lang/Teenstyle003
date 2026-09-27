@@ -4,7 +4,36 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 38 เสร็จ — Deployment (ทำให้ของที่ deploy ตรวจได้ด้วยเครื่อง แล้วแก้ที่มันเจอ)**
+**ล่าสุด: STEP 39 เสร็จ — Google Chrome Testing (ตรวจว่าเว็บทำงานจริงในเบราว์เซอร์ ไม่ใช่แค่ตอบ 200)**
+ช่องว่างที่เหลือหลัง STEP 31/33/37 คือ **"หน้าเปิดได้ แต่ใช้งานไม่ได้"** — ปุ่มยังเห็น เลย์เอาต์ยังสวย
+status ยัง 200 แต่กดแล้วไม่มีอะไรเกิดขึ้น · เทสต์คอมโพเนนต์ของ STEP 37 รันใน jsdom ซึ่ง
+**ไม่มี CSP ไม่มี hydration จริง และไม่โหลด chunk ของ Next เลย** ·
+เขียน [`scripts/audit-chrome.mjs`](../scripts/audit-chrome.mjs) เปิดทุกหน้าใน Chrome จริงผ่าน CDP
+แล้วฟังสิ่งที่เบราว์เซอร์รายงาน: exception · `console.error/warn` (รวม hydration mismatch ของ React) ·
+**CSP บล็อกอะไรไปจริงไหม** (ถามเบราว์เซอร์ตรง ๆ แทนการนับ nonce ในซอร์สแบบ STEP 28) ·
+คำขอที่ล้มหรือได้ 4xx/5xx · **status ของเอกสารตรงกับที่คาดไหม** (หน้า 404 ต้องตอบ 404 ไม่ใช่ soft 404) ·
+**กดปุ่มจริงแล้ว DOM ต้องเปลี่ยน** · และ **ปิดทาง backend แล้วหน้าต้องมี `role="alert"`** (กฎ 4 สถานะของ STEP 5) ·
+**ของที่เจอ (แก้ครบ):** ① **`/admin/knowledge` โหลดบทความไม่ได้เลย** — หน้าขอ `limit=100`
+แต่ schema ของ backend จำกัด 50 → ได้ **422 ทุกครั้งที่เปิดหน้า** แล้วแสดงข้อความรวม
+"ไม่สามารถโหลดข้อมูลบทความคลังความรู้ได้" จึงไม่มีใครรู้สาเหตุ (เป็นหน้าที่ coverage 24% และ
+ไม่มีเทสต์ไหนเปิดเลย) → แก้ limit ให้อยู่ในเพดาน + ใช้ `describeApiError()` + บอกยอดจริงเมื่อรายการถูกตัด
+② **ปุ่มในตารางหน้านั้นเล็กกว่า 44px ซึ่งซ่อนอยู่หลังบั๊กข้อ ①** — พอตารางเรนเดอร์จริงเป็นครั้งแรก
+`audit-responsive.mjs` (ที่ผ่านมาตลอด) ก็เห็นปุ่มแก้ไข/ลบ **32×32** และปุ่มสลับสถานะสูง **26px** ทันที
+③ Next เตือนว่ารูป LCP ของ `/shop` และ `/looks` ไม่ได้โหลดแบบ eager → เพิ่ม prop `priority`
+ให้การ์ดแรกใบเดียว (ใส่หลายใบจะแย่งแบนด์วิดท์กันเองแล้ว LCP แย่ลง) ·
+**แยกโค้ดที่ใช้ร่วมกันออกเป็น `scripts/lib/chrome.mjs` + `scripts/lib/app-routes.mjs`**
+เพราะถ้าก๊อป `ROUTES` ไปไว้สองที่ `responsive.test.ts` จะเฝ้าแค่ก๊อปเดียวแล้วอีกตัวเพี้ยนเงียบ ๆ
+· และทำให้ตัวตรวจ **ข้ามหน้าของบทบาทที่ไม่มีบัญชีแบบเห็นชัด** แทนการล้มทั้งสคริปต์
+(ฐานข้อมูล dev เหลือผู้ใช้คนเดียว ตัวตรวจเดิมตายก่อนถึงหน้า guest ด้วย) ·
+**กับดักของตัววัดเองที่แก้ไปด้วย 3 ข้อ:** ตรวจ 0 หน้าแล้วบอกว่าไม่พบปัญหา (จาก `--only` ที่ Git Bash
+แปลงเป็น path ของ Windows) → ตอนนี้ exit 2 · รายงาน "backend ไม่ตอบ" ทั้งที่ตอบ 429 อยู่
+(ชน rate limit ของ API เอง) → ตอนนี้ตอบอะไรก็ถือว่าขึ้นแล้วและเตือน 429 แยก ·
+เขียนไฟล์ผลไม่สำเร็จแล้ว exit 2 ทั้งที่ตรวจผ่านหมด → ตอนนี้เตือนแล้วไปต่อ ·
+**ผลล่าสุด: audit-chrome 33 หน้า 0 ปัญหา · audit-responsive 99 หน้า-ความกว้าง 0 ปัญหา** ·
+พิสูจน์ว่าตัวตรวจไม่ว่างเปล่าด้วยการแทรก `<script>` ที่ไม่มี nonce (จับ CSP ได้) และสลับ
+`expectStatus` ของหน้า 404 (จับ status ไม่ตรงได้) · รายละเอียดใน [12-browser-testing.md](12-browser-testing.md)
+
+**STEP 38 — Deployment (ทำให้ของที่ deploy ตรวจได้ด้วยเครื่อง แล้วแก้ที่มันเจอ)**
 Dockerfile กับ `docker-compose.yml` เป็น **โค้ดที่ไม่มีใครรันบนเครื่องนี้** (Windows Home ไม่มี WSL2
 → Docker daemon ใช้ไม่ได้) ความผิดพลาดในนั้นจึงไม่มีอะไรฟ้องจนกว่าจะขึ้น production แล้วพัง ·
 เขียน [`scripts/audit-deploy.mjs`](../scripts/audit-deploy.mjs) ที่ตรวจ **ข้อเท็จจริงที่อ่านจาก repo ได้**
@@ -524,7 +553,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 |   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                                                                                                                                                                                                                                                                                                                              |
 |   37 | Testing                           |  ✅   | **761 เคส** (backend 634 + frontend 127) · เพิ่มเทสต์คอมโพเนนต์ด้วย jsdom + testing-library (7 คอมโพเนนต์ที่แตะเงิน/สต็อก อยู่ที่ 86–98%) · วัด coverage ได้แล้ว (`npm run test:coverage`) แล้วเจอ `admin-support.service.ts` ที่ **0%** → เขียนเทสต์ 15 เคส · **เจอบั๊กจริง 5 ข้อจากการเขียนเทสต์ แก้ครบ** — [11-testing.md](11-testing.md)                                                                               |
 |   38 | Deployment                        |  ✅   | เขียน [`scripts/audit-deploy.mjs`](../scripts/audit-deploy.mjs) ตรวจ Dockerfile/compose/env/railway.json ให้ตรงกับ repo (ไม่ต้องมี Docker daemon) · ตรวจครั้งแรก **เจอ 6 ข้อที่ทำให้ deploy ไม่สำเร็จ** แก้ครบ · ยืนยัน production build + proxy path ที่ทำให้ cookie เป็น first-party ด้วยของจริง · **`docker build` ยังไม่เคยรัน** (เครื่องนี้ไม่มี daemon) — [06-deployment.md](06-deployment.md)                       |
-|   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                                                                                                                                                                                                                                                                                                                            |
+|   39 | Google Chrome Testing             |  ✅   | [`scripts/audit-chrome.mjs`](../scripts/audit-chrome.mjs) เปิดทุกหน้าใน Chrome จริงผ่าน CDP แล้วตรวจ console/CSP/คำขอที่ล้ม/status/การกดจริง/หน้าตอน API ล่ม · เจอ `/admin/knowledge` ที่ได้ 422 ทุกครั้ง (โหลดบทความไม่ได้เลย) และปุ่ม 32×32 ที่ซ่อนอยู่หลังบั๊กนั้น · **33 หน้า 0 ปัญหา** — [12-browser-testing.md](12-browser-testing.md)                                                                               |
 |   40 | Final Audit                       |  ⬜   |                                                                                                                                                                                                                                                                                                                                                                                                                            |
 |   50 | Backup / Recovery                 |  ⬜   |                                                                                                                                                                                                                                                                                                                                                                                                                            |
 |   51 | Monitoring                        |  🚧   | `/health` พร้อมแล้ว                                                                                                                                                                                                                                                                                                                                                                                                        |

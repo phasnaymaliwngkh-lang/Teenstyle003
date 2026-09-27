@@ -21,6 +21,12 @@ const frontendRoot = path.resolve(import.meta.dirname, "..");
 const repoRoot = path.resolve(frontendRoot, "..");
 const appDir = path.join(frontendRoot, "src", "app");
 const auditScript = readFileSync(path.join(repoRoot, "scripts", "audit-responsive.mjs"), "utf8");
+/**
+ * `ROUTES` ย้ายไปอยู่ที่ `scripts/lib/app-routes.mjs` ตอน STEP 39
+ * เพราะ `audit-chrome.mjs` ต้องใช้รายการเดียวกัน — ถ้าก๊อปไว้สองที่
+ * เทสต์นี้จะเฝ้าแค่ก๊อปเดียว แล้วอีกตัวเพี้ยนเงียบ ๆ
+ */
+const routesModule = readFileSync(path.join(repoRoot, "scripts", "lib", "app-routes.mjs"), "utf8");
 
 /* ───────────────────────── ตัวช่วยเดินไฟล์ ───────────────────────── */
 
@@ -58,7 +64,7 @@ function routeShapeOfAudited(routePath: string): string {
 // รับทั้ง ' และ " เพราะ prettier ของโปรเจกต์นี้ใช้ single quote กับไฟล์ .mjs
 // (เทสต์ที่ผูกกับรูปแบบการจัดฟอร์แมตจะพังเองตอนมีคนรัน prettier — เคยเกิดจริงตอนเขียนไฟล์นี้)
 const auditedShapes = new Set(
-  [...auditScript.matchAll(/path:\s*['"]([^'"]+)['"]/g)].map((match) =>
+  [...routesModule.matchAll(/path:\s*['"]([^'"]+)['"]/g)].map((match) =>
     routeShapeOfAudited(match[1] ?? ""),
   ),
 );

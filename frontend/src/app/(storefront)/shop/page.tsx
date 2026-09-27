@@ -172,8 +172,8 @@ async function ResultsSection({ params }: { params: URLSearchParams }) {
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
-            {result.items.map((product) => (
-              <ProductCard key={product.id} product={product} />
+            {result.items.map((product, index) => (
+              <ProductCard key={product.id} product={product} priority={index === 0} />
             ))}
           </div>
 
