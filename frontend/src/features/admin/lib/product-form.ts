@@ -24,15 +24,27 @@ export const PRODUCT_STATUSES: { value: ProductStatus; label: string; hint: stri
   { value: "ARCHIVED", label: "เก็บเข้าคลัง", hint: "ซ่อนจากหน้าร้านแต่เก็บข้อมูลไว้" },
 ];
 
-const MONEY_PATTERN = /^\d{1,7}(\.\d{1,2})?$/;
-const INTEGER_PATTERN = /^\d{1,6}$/;
+/**
+ * รูปแบบที่นับว่าเป็น "ตัวเลข" ในช่องกรอกของหลังบ้าน
+ *
+ * ⚠️ **ทุกช่องตัวเลขต้องผ่านสองตัวนี้ก่อนเรียก `Number()`**
+ *    เพราะ `Number("abc")` = `NaN` แล้ว `JSON.stringify` แปลง `NaN` เป็น **`null`**
+ *    ซึ่ง API อ่านว่า "ล้างค่าฟิลด์นี้" → พิมพ์ผิดหนึ่งตัวอักษรกลายเป็นการล้างราคา
+ *    โดยหน้าจอตอบว่าบันทึกสำเร็จ (เป็นบั๊กจริงของ `variant-manager` ที่เจอตอน STEP 37)
+ */
+export const MONEY_PATTERN = /^\d{1,7}(\.\d{1,2})?$/;
+export const INTEGER_PATTERN = /^\d{1,6}$/;
 
-const moneyText = z.string().trim().regex(MONEY_PATTERN, "กรอกเป็นตัวเลข เช่น 590 หรือ 590.50");
+/** ข้อความเดียวกับที่ฟอร์มสินค้าใช้ — ผู้ใช้จึงเห็นคำอธิบายแบบเดียวกันทุกที่ */
+export const MONEY_FORMAT_MESSAGE = "กรอกเป็นตัวเลข เช่น 590 หรือ 590.50";
+export const INTEGER_FORMAT_MESSAGE = "กรอกเป็นจำนวนเต็ม";
+
+const moneyText = z.string().trim().regex(MONEY_PATTERN, MONEY_FORMAT_MESSAGE);
 
 const optionalMoneyText = z.union([z.literal(""), moneyText]);
 const optionalIntegerText = z.union([
   z.literal(""),
-  z.string().trim().regex(INTEGER_PATTERN, "กรอกเป็นจำนวนเต็ม"),
+  z.string().trim().regex(INTEGER_PATTERN, INTEGER_FORMAT_MESSAGE),
 ]);
 
 export interface ProductImageFormValue {

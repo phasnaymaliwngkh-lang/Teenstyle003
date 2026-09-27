@@ -4,7 +4,7 @@
 > Full Stack Fashion E-Commerce สำหรับวัยรุ่น — Next.js + Express + PostgreSQL + Prisma + OpenAI
 
 โปรเจกต์นี้เดินตาม **Master Prompt STEP 1–55** ทำทีละ STEP แล้วหยุดรอคำสั่งถัดไป
-สถานะปัจจุบัน: **STEP 1–34 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
+สถานะปัจจุบัน: **STEP 1–37 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
 หน้าร้าน → ตะกร้า → checkout → ชำระเงิน (COD จริง · Stripe รอใส่ key) → ติดตามคำสั่งซื้อ → รีวิวสินค้า → แจ้งเตือนในบัญชี
 → **บัญชีของฉัน: ข้อมูลส่วนตัว + สมุดที่อยู่**
 → **หลังบ้าน: ภาพรวมร้าน + รายงานยอดขาย + จัดการคำสั่งซื้อ + จัดการสินค้า + คลังสินค้า + แจ้งเตือนสต็อก + บาร์โค้ด/QR + นำเข้า/ส่งออก (CSV, Excel) + ตรวจรีวิว + จัดการลูกค้า + ประวัติการแก้ไข (Audit)**
@@ -42,7 +42,8 @@ npm run dev              # db:sync + backend :4000 + frontend :3000
 npm run build            # db:sync → tsc backend → next build
 npm run typecheck        # tsc ทั้ง 3 workspace — ต้องผ่านก่อน commit
 npm run lint             # eslint backend + frontend
-npm test                 # vitest ของ backend + frontend
+npm test                 # vitest ของ backend + frontend (761 เคส)
+npm run test:coverage    # วัดว่าโค้ดส่วนไหนยังไม่มีเทสต์แตะเลย (ไม่ใช่เป้าให้ไล่ถึง 100%)
 
 npm run db:sync          # prisma generate + build database (รันหลังแก้ schema ทุกครั้ง)
 npm run db:migrate       # prisma migrate dev (ต้องมี Postgres รันอยู่)
@@ -1366,10 +1367,8 @@ grep -c '<script[^>]*nonce=' p.html
 6. **`verifyOrigin` ทุกคำขอที่เปลี่ยนข้อมูล** · การ mutate จาก Server Component
    ต้องส่ง header `Origin` มาเอง (มีที่เดียวคือ `/api/cart/merge`)
 
-⚠️ **frontend มีตัวรันเทสต์แล้วตั้งแต่ STEP 28** ([vitest.config.mts](frontend/vitest.config.mts))
-ขอบเขตตอนนี้: ฟังก์ชันล้วนใน `src/**/*.test.ts` (ไม่ต้องมี DOM) + กฎระดับโปรเจกต์ใน `tests/**/*.test.ts`
-(เพิ่มตอน STEP 31 — เทียบซอร์สกับกฎ responsive) · `npm test` รันทั้ง backend และ frontend
-การเทสต์คอมโพเนนต์ (ต้องมี jsdom + testing-library) ยังเป็นงานของ STEP 37
+⚠️ **frontend มีตัวรันเทสต์แล้วตั้งแต่ STEP 28** และ **เทสต์คอมโพเนนต์ตั้งแต่ STEP 37**
+→ ดูหัวข้อ **Testing (STEP 37)** ด้านล่าง
 
 ## REST API (STEP 29 — รวมเป็นสัญญาที่ตรวจได้แล้ว)
 
@@ -1791,6 +1790,66 @@ STEP 4 จดไว้ว่า "navbar อ่าน session ทำให้ท�
 `revalidateTag()` ทั้งโปรเจกต์** → cache หมดอายุด้วยเวลาเท่านั้น
 **ห้ามยืด `REVALIDATE_SECONDS` ให้นานกว่า 60 วินาทีก่อนที่การล้าง cache แบบเจาะจงจะใช้ได้จริง**
 ไม่งั้นราคาที่แก้ในหลังบ้านจะค้างนานขึ้นโดยไม่มีทางล้าง
+
+## Testing (STEP 37 — เทสต์คอมโพเนนต์จริงแล้ว และวัด coverage แล้ว)
+
+**รายละเอียดทั้งหมดอยู่ที่ [docs/11-testing.md](docs/11-testing.md)** · `npm test` = **761 เคส**
+(backend 634 + frontend 127) · `npm run test:coverage` วัดว่าส่วนไหนยังไม่มีเทสต์แตะเลย
+
+frontend แยกเป็น 2 project ใน [vitest.config.mts](frontend/vitest.config.mts) เพราะสภาพแวดล้อมต่างกันจริง
+
+| project | environment | ไฟล์                                      | ใช้ทำอะไร                                  |
+| ------- | ----------- | ----------------------------------------- | ------------------------------------------ |
+| `pure`  | node        | `src/**/*.test.ts` · `tests/**/*.test.ts` | ฟังก์ชันล้วน + กฎระดับโปรเจกต์ที่อ่านซอร์ส |
+| `dom`   | jsdom       | `src/**/*.test.tsx`                       | คอมโพเนนต์จริง + user-event                |
+
+### กฎที่ห้ามละเมิด
+
+1. **เทสต์ใหม่ทุกตัวต้องพิสูจน์ว่าไม่ว่างเปล่า** — ทำโค้ดให้พังตรงจุดที่เทสต์อ้างว่าตรวจ
+   แล้วดูว่ามันล้มจริง จากนั้นคืนโค้ด · เทสต์ที่ผ่านทั้งตอนโค้ดถูกและตอนโค้ดผิดคือเทสต์ที่โกหก
+   แย่กว่าไม่มีเทสต์ เพราะทำให้เชื่อว่าตรวจแล้ว
+2. **coverage ใช้หา "ที่ที่ยังไม่มีเทสต์แตะเลย" ไม่ใช่เป้าที่ต้องไล่ให้ถึง 100%**
+   เทสต์ที่เขียนเพื่อดันเลขคือเทสต์ที่ผ่านแบบหลอก ๆ · ตัวเลขตอนปิด STEP 37:
+   backend 83.4% statements · frontend 9.8% (หน้าเพจกับ services ยังไม่มีเทสต์ — บอกไว้ตรง ๆ)
+3. **ห้าม mock ตรรกะของเราเอง** — [setup-dom.tsx](frontend/tests/setup-dom.tsx) ปลอมได้แค่
+   **เปลือกของ Next** (`next/navigation` `next/link` `next/image`) · `*.service.ts` ที่ยิง HTTP
+   ให้ mock **ในไฟล์เทสต์แต่ละไฟล์** ไม่ใช่ใน setup กลาง (mock ที่ซ่อนอยู่ = อ่านเทสต์แล้วไม่รู้ว่าสมมติอะไร)
+4. **เลือกองค์ประกอบด้วย role + ชื่อที่ผู้ใช้อ่านได้** (`getByRole('button', { name: 'เพิ่มจำนวน' })`)
+   ห้ามใช้ class หรือ test id — การผูกกับชื่อที่ screen reader อ่านได้ทำให้เทสต์กันกฎข้อ 12 ไปด้วย
+5. **เทสต์คอมโพเนนต์ตรวจพฤติกรรม ไม่ใช่ตรวจว่าเรนเดอร์ผ่าน** — ต้องกดแล้วดูว่า
+   **ส่งอะไรขึ้น API** และ **ผู้ใช้เห็นอะไร** · `render()` แล้วไม่ error ไม่ได้บอกอะไรเลย
+6. **หน้าต่างใหม่ทุกอันถูกบังคับด้วย [tests/dialog.test.ts](frontend/tests/dialog.test.ts)**
+   ซึ่งอ่านซอร์สทุกไฟล์ที่มี `role="dialog"` แล้วตรวจกฎ 5 ข้อของหน้าต่าง
+   (คู่กับ [mobile-menu.test.tsx](frontend/src/components/layout/mobile-menu.test.tsx)
+   ที่เรนเดอร์จริง — อ่านซอร์สบอกได้แค่ว่า "เขียนไว้" ไม่ได้บอกว่า "ทำงาน")
+
+### ⚠️ `Number(ค่าที่ผู้ใช้พิมพ์)` ที่ส่งขึ้น API ต้องตรวจรูปแบบก่อนทุกครั้ง
+
+```js
+JSON.stringify({ price: Number("abc") }); // → {"price":null}
+```
+
+`NaN` กลายเป็น **`null`** ตอน serialize ซึ่ง API อ่านว่า **"ล้างค่าฟิลด์นี้"**
+เจอเป็นบั๊กจริงที่ [variant-manager.tsx](frontend/src/features/admin/components/variant-manager.tsx):
+พิมพ์ราคาผิดหนึ่งตัวอักษร → ราคาของตัวเลือกถูกล้าง กลับไปใช้ราคาสินค้าแม่
+**โดยหน้าจอตอบว่า "บันทึกแล้ว"** = ราคาที่เก็บเงินจริงเปลี่ยนไปเงียบ ๆ
+→ ใช้ `MONEY_PATTERN` / `INTEGER_PATTERN` จาก
+[features/admin/lib/product-form.ts](frontend/src/features/admin/lib/product-form.ts) **ที่เดียว**
+ห้ามเขียนกฎ "อะไรนับเป็นตัวเลข" ใหม่ซ้ำ
+
+### ⚠️ ช่องกรอกแบบ uncontrolled ต้องเขียนค่าที่ใช้จริงกลับลงช่องเอง
+
+ช่องที่ใช้ `defaultValue` + `key` (เพื่อไม่ยิง API ทุกตัวอักษร) จะไม่ re-render เมื่อค่าที่ปัดแล้ว
+เท่ากับค่าเดิม → **ช่องค้างเลขที่ผู้ใช้พิมพ์** ขณะที่ระบบใช้เลขจริงอีกตัว
+เจอที่ตะกร้า: ของเหลือ 3 พิมพ์ 9 แล้วช่องค้าง 9 แต่ยอดรวมเป็นของ 3 ชิ้น
+→ ตั้ง `event.target.value` เองใน `onBlur` เสมอ
+
+### ⚠️ ทุกฟอร์มที่ส่งข้อมูลขึ้น backend ต้องใช้ `describeApiError()`
+
+[lib/api-error-text.ts](frontend/src/lib/api-error-text.ts) ต่อ `details` (`{ field, message }[]`)
+เข้ากับข้อความ **ห้ามอ่าน `error.message` ตรง ๆ** ไม่งั้นผู้ใช้เห็นแค่ "ข้อมูลที่ส่งมาไม่ถูกต้อง"
+ซึ่งทำตามไม่ได้ (กฎ STEP 26 ข้อ 10) · เดิมไฟล์นี้อยู่ใน `features/admin/lib/` จึงมีแต่หลังบ้านที่ใช้
+ย้ายมาเป็นของกลางตอน STEP 37 · **การอ่าน error ของการโหลดหน้ายังใช้ `.message` ได้** (GET ไม่มี `details`)
 
 ## Accessibility — จุดที่พลาดบ่อย (สรุปจากการเก็บงาน STEP 20/21)
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { orderStatusLabel } from "@/features/orders/lib/labels";
-import { ApiClientError } from "@/lib/api";
+import { describeApiError } from "@/lib/api-error-text";
 import { cn } from "@/lib/utils";
 import { updateOrderStatus } from "@/services/admin.service";
 import type { AdminOrder, UpdateOrderStatusInput } from "@/types/admin";
@@ -32,6 +32,14 @@ export function OrderStatusForm({ order }: { order: AdminOrder }) {
 
   const disabled = busy || isPending;
   const needsTracking = status === "SHIPPING";
+  /**
+   * กฎ STEP 13 ข้อ 2: เปลี่ยนเป็น SHIPPING ต้องมีขนส่ง + เลขพัสดุจริง
+   *
+   * ⚠️ เดิมปุ่มกดได้ทั้งที่ทั้งสองช่องยังว่าง (เจอตอน STEP 37) แล้วแอดมินได้ 422
+   *    กลับมาโดยไม่รู้ว่าช่องไหนขาด ทั้งที่ช่องมีดอกจันกำกับว่าบังคับอยู่แล้ว
+   *    ด่านจริงยังอยู่ที่ server เหมือนเดิม — อันนี้คือการไม่ยิงคำขอที่รู้อยู่แล้วว่าจะถูกปฏิเสธ
+   */
+  const trackingReady = !needsTracking || (carrier.trim() !== "" && trackingNumber.trim() !== "");
 
   if (order.allowedNextStatuses.length === 0) {
     return (
@@ -70,7 +78,7 @@ export function OrderStatusForm({ order }: { order: AdminOrder }) {
       setTrackingUrl("");
       startTransition(() => router.refresh());
     } catch (caught) {
-      setError(caught instanceof ApiClientError ? caught.message : "อัปเดตสถานะไม่สำเร็จ");
+      setError(describeApiError(caught, "อัปเดตสถานะไม่สำเร็จ"));
     } finally {
       setBusy(false);
     }
@@ -154,7 +162,7 @@ export function OrderStatusForm({ order }: { order: AdminOrder }) {
       <button
         type="button"
         onClick={() => void submit()}
-        disabled={disabled || status === ""}
+        disabled={disabled || status === "" || !trackingReady}
         className="btn-brand mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-[var(--radius-pill)] text-sm font-bold transition disabled:opacity-60"
       >
         {disabled ? (

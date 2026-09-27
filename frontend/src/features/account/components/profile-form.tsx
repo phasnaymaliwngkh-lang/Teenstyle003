@@ -4,7 +4,7 @@ import { Loader2, Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { ApiClientError } from "@/lib/api";
+import { describeApiError } from "@/lib/api-error-text";
 import { updateMyProfile } from "@/services/customer.service";
 import type { MyProfile } from "@/types/customer";
 
@@ -60,7 +60,7 @@ export function ProfileForm({ profile }: { profile: MyProfile }) {
       setSaved(true);
       router.refresh();
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : "บันทึกข้อมูลไม่สำเร็จ");
+      setError(describeApiError(err, "บันทึกข้อมูลไม่สำเร็จ"));
     } finally {
       setPending(false);
     }

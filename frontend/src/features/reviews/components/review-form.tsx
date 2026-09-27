@@ -4,7 +4,7 @@ import { Loader2, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { ApiClientError } from "@/lib/api";
+import { describeApiError } from "@/lib/api-error-text";
 import { cn } from "@/lib/utils";
 import { createReview, updateReview } from "@/services/review.service";
 import type { Review } from "@/types/catalog";
@@ -92,7 +92,7 @@ export function ReviewForm({
       router.refresh();
       onDone?.();
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : "ส่งรีวิวไม่สำเร็จ กรุณาลองใหม่");
+      setError(describeApiError(err, "ส่งรีวิวไม่สำเร็จ กรุณาลองใหม่"));
     } finally {
       setPending(false);
     }

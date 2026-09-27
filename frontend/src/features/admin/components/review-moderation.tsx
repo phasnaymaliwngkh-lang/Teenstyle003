@@ -4,7 +4,7 @@ import { Check, EyeOff, Loader2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { ApiClientError } from "@/lib/api";
+import { describeApiError } from "@/lib/api-error-text";
 import { cn } from "@/lib/utils";
 import { moderateReview } from "@/services/review.service";
 import type { ReviewStatus } from "@/types/catalog";
@@ -77,7 +77,7 @@ export function ReviewModeration({
       setNote("");
       router.refresh();
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : "บันทึกไม่สำเร็จ กรุณาลองใหม่");
+      setError(describeApiError(err, "บันทึกไม่สำเร็จ กรุณาลองใหม่"));
     } finally {
       setPending(false);
     }

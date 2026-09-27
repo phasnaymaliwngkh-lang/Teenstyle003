@@ -4,7 +4,7 @@ import { AlertTriangle, Check, Loader2, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { describeApiError } from "../lib/api-error-text";
+import { describeApiError } from "@/lib/api-error-text";
 
 import { acknowledgeStockAlert, scanStockAlerts } from "@/services/admin.service";
 

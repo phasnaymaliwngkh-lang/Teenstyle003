@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 
-import { describeApiError } from "../lib/api-error-text";
+import { describeApiError } from "@/lib/api-error-text";
 import {
   createProductFormSchema,
   emptyFormValues,

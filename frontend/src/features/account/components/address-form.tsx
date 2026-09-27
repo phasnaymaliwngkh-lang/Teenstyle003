@@ -3,7 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { useId, useState } from "react";
 
-import { ApiClientError } from "@/lib/api";
+import { describeApiError } from "@/lib/api-error-text";
 import type { Address, AddressInput } from "@/types/customer";
 
 /**
@@ -90,7 +90,7 @@ export function AddressForm({
         ...(makeDefault ? { isDefault: true } : {}),
       });
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : "บันทึกที่อยู่ไม่สำเร็จ");
+      setError(describeApiError(err, "บันทึกที่อยู่ไม่สำเร็จ"));
     } finally {
       setPending(false);
     }

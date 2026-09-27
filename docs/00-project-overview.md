@@ -34,15 +34,16 @@
 
 ## เอกสารอื่น
 
-| ไฟล์                                                 | เนื้อหา                                     |
-| ---------------------------------------------------- | ------------------------------------------- |
-| [01-architecture.md](01-architecture.md)             | สถาปัตยกรรม, tech stack, การไหลของข้อมูล    |
-| [02-step-progress.md](02-step-progress.md)           | สถานะ STEP 1–55                             |
-| [03-environment.md](03-environment.md)               | environment variable ทุกตัวและวิธีขอค่า     |
-| [04-google-oauth-setup.md](04-google-oauth-setup.md) | ตั้งค่า Google OAuth (ต้องทำเองก่อน STEP 3) |
-| [05-run-and-test.md](05-run-and-test.md)             | วิธีรันและทดสอบ                             |
-| [06-deployment.md](06-deployment.md)                 | นำขึ้น production                           |
-| [07-payment-setup.md](07-payment-setup.md)           | ตั้งค่า Stripe และบัตรทดสอบ                 |
-| [08-security.md](08-security.md)                     | ด่านความปลอดภัยและความเสี่ยงที่ยอมรับไว้    |
-| [09-api-reference.md](09-api-reference.md)           | REST API ทุกเส้นทาง สิทธิ์ และข้อตกลงร่วม   |
-| [10-performance.md](10-performance.md)               | ผลวัดกับข้อมูลปริมาณจริง index และงบเวลา    |
+| ไฟล์                                                 | เนื้อหา                                            |
+| ---------------------------------------------------- | -------------------------------------------------- |
+| [01-architecture.md](01-architecture.md)             | สถาปัตยกรรม, tech stack, การไหลของข้อมูล           |
+| [02-step-progress.md](02-step-progress.md)           | สถานะ STEP 1–55                                    |
+| [03-environment.md](03-environment.md)               | environment variable ทุกตัวและวิธีขอค่า            |
+| [04-google-oauth-setup.md](04-google-oauth-setup.md) | ตั้งค่า Google OAuth (ต้องทำเองก่อน STEP 3)        |
+| [05-run-and-test.md](05-run-and-test.md)             | วิธีรันและทดสอบ                                    |
+| [06-deployment.md](06-deployment.md)                 | นำขึ้น production                                  |
+| [07-payment-setup.md](07-payment-setup.md)           | ตั้งค่า Stripe และบัตรทดสอบ                        |
+| [08-security.md](08-security.md)                     | ด่านความปลอดภัยและความเสี่ยงที่ยอมรับไว้           |
+| [09-api-reference.md](09-api-reference.md)           | REST API ทุกเส้นทาง สิทธิ์ และข้อตกลงร่วม          |
+| [10-performance.md](10-performance.md)               | ผลวัดกับข้อมูลปริมาณจริง index และงบเวลา           |
+| [11-testing.md](11-testing.md)                       | วิธีเทสต์ · coverage ที่วัดได้ · บั๊กที่เทสต์ไปเจอ |

@@ -51,8 +51,13 @@ export function CartItemRow({ item }: { item: CartItem }) {
     }
   }
 
+  /** 1..จำนวนที่ซื้อได้จริง — ค่าว่าง/ติดลบ/ทศนิยม กลายเป็นค่าที่ใช้ได้เสมอ */
+  function clampQuantity(next: number): number {
+    return Math.min(Math.max(1, Math.trunc(next) || 1), maxQuantity);
+  }
+
   function changeQuantity(next: number) {
-    const clamped = Math.min(Math.max(1, Math.trunc(next) || 1), maxQuantity);
+    const clamped = clampQuantity(next);
     if (clamped === item.quantity) return;
 
     void run(() => updateCartItem(item.id, clamped));
@@ -156,7 +161,22 @@ export function CartItemRow({ item }: { item: CartItem }) {
                   defaultValue={item.quantity}
                   disabled={disabled}
                   key={item.quantity}
-                  onBlur={(event) => changeQuantity(Number(event.target.value))}
+                  onBlur={(event) => {
+                    /**
+                     * ช่องนี้เป็น uncontrolled (`defaultValue` + `key`) โดยเจตนา —
+                     * เพื่อให้พิมพ์ได้ต่อเนื่องโดยไม่ยิง API ทุกตัวอักษร
+                     *
+                     * ⚠️ ผลข้างเคียงที่เคยเป็นบั๊กจริง (เจอตอน STEP 37): ถ้าเลขที่ปัดแล้ว
+                     * เท่ากับจำนวนเดิม จะไม่มีการยิง API และไม่มี re-render มาล้าง
+                     * เลขที่พิมพ์ทิ้ง → ช่องค้างเลข 9 ไว้ทั้งที่ตะกร้ามี 3 ชิ้น
+                     * และยอดรวมข้างล่างก็เป็นของ 3 ชิ้น = สองตัวเลขขัดกันบนหน้าเดียว
+                     * จึงต้องเขียนค่าที่ใช้จริงกลับลงช่องเองทุกครั้ง
+                     */
+                    const clamped = clampQuantity(Number(event.target.value));
+
+                    event.target.value = String(clamped);
+                    changeQuantity(clamped);
+                  }}
                   className="w-10 bg-transparent text-center text-sm font-bold outline-none disabled:opacity-40 sm:w-12"
                 />
               </label>

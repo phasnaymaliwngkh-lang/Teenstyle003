@@ -4,7 +4,7 @@ import { AlertTriangle, Loader2, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { describeApiError } from "../lib/api-error-text";
+import { describeApiError } from "@/lib/api-error-text";
 
 import { deleteProduct } from "@/services/admin.service";
 import type { AdminProduct } from "@/types/admin";

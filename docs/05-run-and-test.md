@@ -84,11 +84,30 @@ npm run docker:down
 ## ตรวจคุณภาพโค้ด
 
 ```powershell
-npm run typecheck    # tsc ทั้ง 3 workspace
-npm run lint         # eslint backend + frontend
-npm test             # vitest ของ backend + frontend
-npm run format       # prettier (ไม่แตะ prototype เก่าที่ root)
+npm run typecheck        # tsc ทั้ง 3 workspace
+npm run lint             # eslint backend + frontend
+npm test                 # vitest ของ backend + frontend (761 เคส)
+npm run test:coverage    # วัดว่าโค้ดส่วนไหนยังไม่มีเทสต์แตะเลย
+npm run format           # prettier (ไม่แตะ prototype เก่าที่ root)
 ```
+
+## เทสต์ (STEP 37)
+
+`npm test` รัน 3 ชุด — **ไม่ต้องเปิด dev server** แต่ backend ต้องต่อ PostgreSQL ได้
+เพราะเทสต์ integration ยิงผ่าน HTTP ไปที่ฐานข้อมูลจริง (สร้างข้อมูลของตัวเองแล้วลบทิ้งใน `afterAll`)
+
+| ชุด                          | จำนวน | ตรวจอะไร                                  |
+| ---------------------------- | ----: | ----------------------------------------- |
+| `backend/tests/**`           |   634 | API + service + ด่านความปลอดภัย (DB จริง) |
+| `frontend/src/**/*.test.ts`  |       | ฟังก์ชันล้วน (`safe-redirect` · `seo`)    |
+| `frontend/src/**/*.test.tsx` |   127 | คอมโพเนนต์จริงใน jsdom + กฎระดับโปรเจกต์  |
+
+```powershell
+npm test --workspace frontend -- --project dom    # เฉพาะเทสต์คอมโพเนนต์
+npm test --workspace backend -- tests/cart.test.ts
+```
+
+**วิธีเขียนเทสต์ใหม่ กฎที่ห้ามละเมิด และบั๊กที่เทสต์ชุดนี้ไปเจอ อยู่ที่ [11-testing.md](11-testing.md)**
 
 ## ตรวจ responsive ทุกหน้า (STEP 31)
 

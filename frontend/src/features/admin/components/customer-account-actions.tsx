@@ -4,7 +4,7 @@ import { Ban, CheckCircle2, Loader2, PauseCircle, ShieldCheck } from "lucide-rea
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { ApiClientError } from "@/lib/api";
+import { describeApiError } from "@/lib/api-error-text";
 import { cn } from "@/lib/utils";
 import { updateCustomerRole, updateCustomerStatus } from "@/services/customer.service";
 import { ROLE_NAMES, type CustomerRoleName, type UserStatus } from "@/types/customer";
@@ -101,7 +101,7 @@ export function CustomerAccountActions({
       setNotice("บันทึกสถานะบัญชีแล้ว");
       router.refresh();
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : "บันทึกสถานะไม่สำเร็จ");
+      setError(describeApiError(err, "บันทึกสถานะไม่สำเร็จ"));
     } finally {
       setPending(null);
     }
@@ -118,7 +118,7 @@ export function CustomerAccountActions({
       setNotice("บันทึกบทบาทของบัญชีแล้ว");
       router.refresh();
     } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : "บันทึกบทบาทไม่สำเร็จ");
+      setError(describeApiError(err, "บันทึกบทบาทไม่สำเร็จ"));
     } finally {
       setPending(null);
     }

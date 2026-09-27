@@ -5,9 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { describeApiError } from "../lib/api-error-text";
+import { describeApiError } from "@/lib/api-error-text";
 
 import { AssignBarcodeButton } from "./assign-barcode-button";
+import {
+  INTEGER_FORMAT_MESSAGE,
+  INTEGER_PATTERN,
+  MONEY_FORMAT_MESSAGE,
+  MONEY_PATTERN,
+} from "../lib/product-form";
 
 import { cn } from "@/lib/utils";
 import { addProductVariant, updateProductVariant } from "@/services/admin.service";
@@ -125,6 +131,10 @@ export function VariantManager({
               disabled={busy}
               busy={busyId === variant.id}
               onSave={run}
+              onInvalid={(message) => {
+                setNotice(null);
+                setError(message);
+              }}
             />
           ))}
         </ul>
@@ -139,12 +149,15 @@ function VariantRow({
   disabled,
   busy,
   onSave,
+  onInvalid,
 }: {
   product: AdminProduct;
   variant: AdminProductVariant;
   disabled: boolean;
   busy: boolean;
   onSave: (id: string, action: () => Promise<AdminProduct>, successText: string) => Promise<void>;
+  /** ค่าที่กรอกมาผิดรูป — แสดงในแผง error เดียวกับ error จาก server */
+  onInvalid: (message: string) => void;
 }) {
   /**
    * ช่องราคาจะว่างเมื่อตัวเลือกนี้ไม่ได้กำหนดราคาของตัวเอง (ใช้ราคาสินค้าแม่)
@@ -256,7 +269,24 @@ function VariantRow({
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
-          onClick={() =>
+          onClick={() => {
+            /**
+             * ⚠️ ต้องตรวจรูปแบบก่อนเรียก `Number()` (เจอเป็นบั๊กจริงตอน STEP 37)
+             *    `Number("abc")` = `NaN` → `JSON.stringify` ส่งเป็น `null` → API
+             *    อ่านว่า "ล้างราคาของตัวเลือกนี้" แล้วตัวเลือกก็กลับไปใช้ราคาสินค้าแม่
+             *    **โดยหน้าจอตอบว่าบันทึกสำเร็จ** = ราคาที่เก็บเงินจริงเปลี่ยนไปเงียบ ๆ
+             *    ใช้กฎเดียวกับฟอร์มสินค้า (`MONEY_PATTERN`) ไม่เขียนกฎใหม่ซ้ำ
+             */
+            const invalid = [
+              { value: price, label: "ราคาเฉพาะตัวเลือกนี้" },
+              { value: salePrice, label: "ราคาลดของตัวเลือกนี้" },
+            ].find(({ value }) => value.trim() !== "" && !MONEY_PATTERN.test(value.trim()));
+
+            if (invalid !== undefined) {
+              onInvalid(`${invalid.label}: ${MONEY_FORMAT_MESSAGE}`);
+              return;
+            }
+
             void onSave(
               variant.id,
               () =>
@@ -266,8 +296,8 @@ function VariantRow({
                   barcode: barcode.trim() === "" ? null : barcode.trim(),
                 }),
               "บันทึกราคาและบาร์โค้ดของตัวเลือกแล้ว",
-            )
-          }
+            );
+          }}
           disabled={disabled}
           className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-brand bg-brand px-4 text-sm font-bold text-white transition disabled:opacity-50"
         >
@@ -328,6 +358,12 @@ function AddVariantForm({
   const [busy, setBusy] = useState(false);
 
   async function submit() {
+    // จำนวนตั้งต้นผิดรูปแล้ว `Number()` คืน NaN ซึ่งกลายเป็น null ตอนส่ง (ดูเหตุผลที่ปุ่มบันทึกราคา)
+    if (initialStock.trim() !== "" && !INTEGER_PATTERN.test(initialStock.trim())) {
+      onError(`จำนวนตั้งต้นในคลัง: ${INTEGER_FORMAT_MESSAGE}`);
+      return;
+    }
+
     setBusy(true);
 
     try {

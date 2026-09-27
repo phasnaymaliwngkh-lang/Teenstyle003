@@ -11,7 +11,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { describeApiError } from "../lib/api-error-text";
+import { describeApiError } from "@/lib/api-error-text";
 
 import { cn } from "@/lib/utils";
 import { adjustStock } from "@/services/admin.service";
@@ -75,7 +75,16 @@ export function StockAdjustForm({ row }: { row: InventoryRow }) {
           ? row.quantity - parsed
           : parsed;
 
-  const belowReserved = nextQuantity !== null && nextQuantity < row.reserved;
+  /**
+   * ตัดออกมากกว่าของที่มีในคลัง — คนละเรื่องกับ `belowReserved` และต้องแยกข้อความ
+   *
+   * เจอตอน STEP 37: ยอดติดลบเข้าเงื่อนไข `belowReserved` ด้วยเสมอ (เพราะ reserved ≥ 0)
+   * ทำให้ตัดของออกเกินจำนวนที่มี ทั้งที่ไม่มีใครจองไว้เลย ได้ข้อความว่า
+   * "ต่ำกว่าของที่ลูกค้าจองไว้ (0 ชิ้น) — ต้องจัดการคำสั่งซื้อเหล่านั้นก่อน"
+   * แล้วแอดมินไปไล่หาคำสั่งซื้อที่ไม่มีอยู่จริง
+   */
+  const overCutting = nextQuantity !== null && nextQuantity < 0;
+  const belowReserved = nextQuantity !== null && !overCutting && nextQuantity < row.reserved;
   const noChange = mode === "ADJUSTMENT" && parsed === row.quantity;
 
   async function submit() {
@@ -187,13 +196,17 @@ export function StockAdjustForm({ row }: { row: InventoryRow }) {
         <p
           className={cn(
             "mt-3 rounded-[12px] border p-3 text-sm",
-            belowReserved || noChange
+            overCutting || belowReserved || noChange
               ? "border-danger/25 bg-danger/5 font-semibold text-danger"
               : "border-line bg-white",
           )}
         >
           {noChange ? (
             <>ยอดที่นับได้ตรงกับระบบอยู่แล้ว ({row.quantity} ชิ้น) จึงไม่มีอะไรต้องปรับ</>
+          ) : overCutting ? (
+            <>
+              ทำไม่ได้: ตัดออก {parsed} ชิ้น แต่มีอยู่ในคลังแค่ {row.quantity} ชิ้น
+            </>
           ) : belowReserved ? (
             <>
               ทำไม่ได้: ยอดหลังปรับ ({nextQuantity} ชิ้น) ต่ำกว่าของที่ลูกค้าจองไว้ ({row.reserved}{" "}
@@ -229,7 +242,14 @@ export function StockAdjustForm({ row }: { row: InventoryRow }) {
       <button
         type="button"
         onClick={() => void submit()}
-        disabled={disabled || !validAmount || reason.trim().length < 3 || belowReserved || noChange}
+        disabled={
+          disabled ||
+          !validAmount ||
+          reason.trim().length < 3 ||
+          overCutting ||
+          belowReserved ||
+          noChange
+        }
         className="btn-brand mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-[var(--radius-pill)] text-sm font-bold transition disabled:opacity-60"
       >
         {disabled ? (
