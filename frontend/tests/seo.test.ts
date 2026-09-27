@@ -5,7 +5,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { JsonLd } from "../src/components/shared/json-ld";
+import { JsonLdScripts } from "../src/components/shared/json-ld";
 
 /**
  * กฎ SEO ที่ต้องไม่ถอยหลัง (STEP 33)
@@ -42,7 +42,7 @@ describe("JSON-LD — ความปลอดภัยของการฝั�
       description: 'เครื่องหมาย " & < > ต้องอยู่ครบ',
     };
 
-    const html = renderToStaticMarkup(createElement(JsonLd, { data: hostile }));
+    const html = renderToStaticMarkup(createElement(JsonLdScripts, { data: hostile }));
 
     // ปิด element ก่อนเวลาไม่ได้ → แทรกแท็กใหม่ไม่ได้
     expect(html).not.toContain("</script><img");
@@ -57,7 +57,7 @@ describe("JSON-LD — ความปลอดภัยของการฝั�
 
   it("ส่งหลายก้อนได้และแต่ละก้อนเป็น script ของตัวเอง", () => {
     const html = renderToStaticMarkup(
-      createElement(JsonLd, {
+      createElement(JsonLdScripts, {
         data: [
           { "@context": "https://schema.org", "@type": "WebSite" },
           { "@context": "https://schema.org", "@type": "Organization" },

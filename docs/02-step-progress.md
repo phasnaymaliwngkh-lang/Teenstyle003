@@ -4,7 +4,35 @@
 
 > อัปเดตไฟล์นี้ทุกครั้งที่ทำ STEP เสร็จ
 
-**ล่าสุด: STEP 37 เสร็จ — Testing (เทสต์คอมโพเนนต์จริง และวัด coverage แทนการเดา)**
+**ล่าสุด: STEP 38 เสร็จ — Deployment (ทำให้ของที่ deploy ตรวจได้ด้วยเครื่อง แล้วแก้ที่มันเจอ)**
+Dockerfile กับ `docker-compose.yml` เป็น **โค้ดที่ไม่มีใครรันบนเครื่องนี้** (Windows Home ไม่มี WSL2
+→ Docker daemon ใช้ไม่ได้) ความผิดพลาดในนั้นจึงไม่มีอะไรฟ้องจนกว่าจะขึ้น production แล้วพัง ·
+เขียน [`scripts/audit-deploy.mjs`](../scripts/audit-deploy.mjs) ที่ตรวจ **ข้อเท็จจริงที่อ่านจาก repo ได้**
+7 กลุ่ม: ทุก path ที่ `COPY` ต้องมีจริง · workspace ที่พึ่งพากันต้องอยู่ใน image และถูก generate+build ก่อน ·
+compose ต้องส่ง env/ARG ที่โค้ดต้องใช้และห้ามชี้ localhost สำหรับค่าที่ใช้ภายใน network ·
+`.env.example` ต้องมีชื่อ env ทุกตัวที่โค้ดอ่านและไม่มีค่าจริง · ค่าในไฟล์ env ของ production ·
+migration (รวม `pg_trgm` ที่ต้องสร้างก่อน index ที่ใช้มัน) · `railway.json` ·
+**ตรวจครั้งแรกเจอ 6 ข้อที่ทำให้ deploy ไม่สำเร็จ และ 3 ข้อแรกเอกสารเขียนถูกอยู่แล้ว —
+ไฟล์ที่ใช้จริงแค่ไม่ได้ทำตาม:** ① `frontend.Dockerfile` ไม่ได้คัดลอกและ build workspace `database`
+ทั้งที่ frontend พึ่ง `@teenstyle/database` (Auth.js เก็บ session ในฐานข้อมูล) → build ล้มด้วย
+"Cannot find module" ② compose service `frontend` ไม่มี `DATABASE_URL` → เปิดเว็บได้แต่ล็อกอินไม่ได้เลย
+③ compose ไม่ส่ง `NEXT_PUBLIC_API_PROXY_PATH` → cookie ถูกบล็อกแบบ third-party แล้วตะกร้า/สั่งซื้อ/หลังบ้านพังหมด
+④ ทั้งสอง Dockerfile สั่ง `COPY --from=deps /app/database/node_modules` ซึ่งไม่มีอยู่จริงเพราะ npm
+hoist node_modules ขึ้น root → `docker build` ล้มที่บรรทัดนั้น ⑤ `NEXT_PUBLIC_API_URL` ชี้ localhost
+ซึ่งใน container ของ frontend คือตัวมันเอง → Server Component ยิงไป backend ไม่ถึง
+⑥ `.env.example` ไม่มีชื่อ `PAYMENT_WINDOW_MINUTES` ที่ backend อ่านจาก schema ·
+**ยืนยันกับของจริงบนเครื่องนี้:** build production แล้วรัน `npm start` ทั้งสองฝั่ง แล้วยิง
+`POST /backend/api/cart/items` ผ่านโดเมนของ frontend ได้ **201 พร้อม `Set-Cookie` บนโดเมนเดียวกัน**
+(first-party จริง — นี่คือกลไกที่เอกสารเตือนไว้ทั้งหัวข้อแต่ไม่เคยมีใครทดสอบ) · `/api/auth/*` ยังเป็นของ Next
+ไม่ถูก proxy ทับ · HSTS มาเฉพาะ production · CSP ไม่มี `unsafe-eval` ·
+**เจอเพิ่มตอนตรวจ CSP: 25 จาก 27 `<script>` มี nonce** — สองตัวที่ขาดคือ JSON-LD ของ STEP 33
+ซึ่งเป็น data block ที่ไม่ถูกบล็อกก็จริง **แต่ทำให้วิธีตรวจของ STEP 28 เตือนผิดทุกครั้ง**
+แล้วคนจะเลิกเชื่อผลตรวจ → ใส่ nonce ให้ JSON-LD แล้วตรวจซ้ำ 4 หน้า ตรงครบทุกหน้า ·
+**ไม่เคลมสิ่งที่ยังไม่ได้ทำ: `docker build` และ `docker compose up` ยังไม่เคยรัน** เพราะไม่มี daemon
+เอกสารระบุไว้ตรง ๆ เป็นตาราง "ยืนยันแล้ว / ยังไม่ยืนยัน" · ทุกกลุ่มของตัวตรวจพิสูจน์แล้วว่าไม่ว่างเปล่า
+ด้วยการก่อวินาศกรรมแล้วดูว่ามันจับได้
+
+**STEP 37 — Testing (เทสต์คอมโพเนนต์จริง และวัด coverage แทนการเดา)**
 ก่อน STEP นี้ frontend มี **0 เทสต์จาก 52 client component** ทั้งที่ตรรกะที่แตะเงินและสต็อก
 (การปัดจำนวนไม่ให้เกินสต็อก · การกัน `idempotencyKey` ซ้ำ · การแปลง error ของ server เป็นข้อความไทย)
 อยู่ในคอมโพเนนต์ทั้งหมด · ตั้ง vitest แยกเป็น 2 project (`pure` = node สำหรับฟังก์ชันล้วน ·
@@ -495,7 +523,7 @@ session เก็บในฐานข้อมูล อายุ 30 วัน 
 |   35 | Docker                            |  ✅   | compose + 2 Dockerfile (multi-stage, non-root, healthcheck)                                                                                                                                                                                                                                                                                                                                                                |
 |   36 | Environment Variables             |  ✅   | `.env.example` ครบทุก service                                                                                                                                                                                                                                                                                                                                                                                              |
 |   37 | Testing                           |  ✅   | **761 เคส** (backend 634 + frontend 127) · เพิ่มเทสต์คอมโพเนนต์ด้วย jsdom + testing-library (7 คอมโพเนนต์ที่แตะเงิน/สต็อก อยู่ที่ 86–98%) · วัด coverage ได้แล้ว (`npm run test:coverage`) แล้วเจอ `admin-support.service.ts` ที่ **0%** → เขียนเทสต์ 15 เคส · **เจอบั๊กจริง 5 ข้อจากการเขียนเทสต์ แก้ครบ** — [11-testing.md](11-testing.md)                                                                               |
-|   38 | Deployment                        |  🚧   | คู่มือใน [06-deployment.md](06-deployment.md)                                                                                                                                                                                                                                                                                                                                                                              |
+|   38 | Deployment                        |  ✅   | เขียน [`scripts/audit-deploy.mjs`](../scripts/audit-deploy.mjs) ตรวจ Dockerfile/compose/env/railway.json ให้ตรงกับ repo (ไม่ต้องมี Docker daemon) · ตรวจครั้งแรก **เจอ 6 ข้อที่ทำให้ deploy ไม่สำเร็จ** แก้ครบ · ยืนยัน production build + proxy path ที่ทำให้ cookie เป็น first-party ด้วยของจริง · **`docker build` ยังไม่เคยรัน** (เครื่องนี้ไม่มี daemon) — [06-deployment.md](06-deployment.md)                       |
 |   39 | Google Chrome Testing             |  🚧   | STEP 1 ตรวจระดับ HTTP/HTML แล้ว                                                                                                                                                                                                                                                                                                                                                                                            |
 |   40 | Final Audit                       |  ⬜   |                                                                                                                                                                                                                                                                                                                                                                                                                            |
 |   50 | Backup / Recovery                 |  ⬜   |                                                                                                                                                                                                                                                                                                                                                                                                                            |

@@ -2,30 +2,29 @@
 # TEENSTYLE AI — Backend (Express 5 + Prisma 7)
 # build context = root ของ repo (เพราะเป็น npm workspaces)
 #   docker build -f docker/backend.Dockerfile .
+#
+# ⚠️ ตรวจไฟล์นี้ให้ตรงกับ repo ด้วย `node scripts/audit-deploy.mjs` ก่อน push
 # =============================================================================
 
-# ─── Stage 1: ติดตั้ง dependencies ───────────────────────────────────────────
-FROM node:22-alpine AS deps
+# ─── Stage 1: build ──────────────────────────────────────────────────────────
+# ติดตั้งและ build ใน stage เดียวกันโดยเจตนา — npm hoist node_modules ของทุก
+# workspace ขึ้น root ทำให้ `database/node_modules` ไม่ถูกสร้างขึ้นเลย
+# การ `COPY --from=deps /app/database/node_modules` จึงล้มทันที (เจอจริงตอน STEP 38)
+# layer cache ยังทำงาน เพราะ `npm ci` อยู่ก่อนการคัดลอกซอร์ส
+FROM node:22-alpine AS builder
 WORKDIR /app
 
-# คัดลอกเฉพาะ manifest ก่อน เพื่อให้ layer cache ทำงานเมื่อโค้ดเปลี่ยนแต่ deps ไม่เปลี่ยน
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json tsconfig.base.json ./
 COPY backend/package.json ./backend/
 COPY database/package.json ./database/
 COPY frontend/package.json ./frontend/
 
-# ติดตั้งทั้ง workspace (backend ต้องใช้ @teenstyle/database)
-RUN npm ci --ignore-scripts
+# `--include=dev` เพราะ tsc อยู่ใน devDependencies และโฮสต์บางที่ตั้ง
+# NODE_ENV=production ไว้ ซึ่งทำให้ npm ข้าม devDependencies แล้ว build ล้มด้วย
+# TS7016 (บทเรียนจาก docs/06-deployment.md §2.1)
+# ไม่ใส่ --ignore-scripts เพราะ postinstall ของ prisma เตรียม engine ให้ linux-musl
+RUN npm ci --include=dev
 
-# ─── Stage 2: build ──────────────────────────────────────────────────────────
-FROM node:22-alpine AS builder
-WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/backend/node_modules ./backend/node_modules
-COPY --from=deps /app/database/node_modules ./database/node_modules
-
-COPY package.json package-lock.json tsconfig.base.json ./
 COPY database ./database
 COPY backend ./backend
 
@@ -36,7 +35,7 @@ RUN npm run generate --workspace database \
   && npm run build --workspace database \
   && npm run build --workspace backend
 
-# ─── Stage 3: production runtime ─────────────────────────────────────────────
+# ─── Stage 2: production runtime ─────────────────────────────────────────────
 FROM node:22-alpine AS runner
 WORKDIR /app
 

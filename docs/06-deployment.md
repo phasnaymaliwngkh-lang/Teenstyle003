@@ -1,7 +1,53 @@
 # 06 — Deployment
 
-> รายละเอียดเต็มจะถูกทำจริงใน **STEP 38** ไฟล์นี้คือแผนและ checklist ที่ยึดไว้ตั้งแต่ STEP 1
-> เพื่อไม่ให้เขียนโค้ดที่ deploy ไม่ได้
+> แผน · ขั้นตอน · และ checklist ก่อนขึ้น production
+> **ตรวจของที่ใช้ deploy ด้วยเครื่องได้แล้วตั้งแต่ STEP 38:** `node scripts/audit-deploy.mjs`
+
+## ⚠️ อ่านก่อน: อะไรถูกยืนยันแล้ว อะไรยังไม่ถูกยืนยัน (STEP 38)
+
+เครื่องที่พัฒนาโปรเจกต์นี้ **ไม่มี Docker daemon** (Windows Home → ไม่มี WSL2)
+จึงต้องแยกให้ชัดว่าอะไรพิสูจน์แล้วและอะไรยังเป็นแค่ "เขียนไว้ถูก"
+
+| สิ่งที่ตรวจ                                                         | สถานะ                                                                                   |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| production build + `npm start` ทั้งสองฝั่ง                          | ✅ รันจริงบนเครื่องนี้                                                                  |
+| **`NEXT_PUBLIC_API_PROXY_PATH` ทำให้ cookie เป็น first-party**      | ✅ ยิงจริงผ่าน `/backend/api/cart/items` แล้วได้ 201 + `Set-Cookie` บนโดเมนของ frontend |
+| `/api/auth/*` ของ Auth.js ไม่ถูก proxy ทับ                          | ✅ ยังตอบ 200 จาก Next                                                                  |
+| security header ของ production (HSTS ฯลฯ) + CSP ไม่มี `unsafe-eval` | ✅ ตรวจกับ response จริง                                                                |
+| `<script>` ทุกตัวมี nonce ที่ตรงกับ header                          | ✅ 4 หน้า ตรงครบ (แก้ JSON-LD ตอน STEP 38 — ดูด้านล่าง)                                 |
+| Dockerfile / compose ตรงกับ repo (path, workspace, env, ARG)        | ✅ ตรวจด้วย `scripts/audit-deploy.mjs`                                                  |
+| **`docker build` ผ่านจริง**                                         | ❌ **ยังไม่เคยรัน** — ต้องมี Docker daemon                                              |
+| **`docker compose up` ทั้ง stack ทำงานจริง**                        | ❌ **ยังไม่เคยรัน**                                                                     |
+| deploy ขึ้นโฮสต์จริง (Vercel / Railway)                             | ❌ ยังไม่ได้ทำ                                                                          |
+
+> **ห้ามเขียนในเอกสารว่า image ใช้งานได้** จนกว่าจะมีคนรัน `docker build` สำเร็จจริง
+> สิ่งที่ตัวตรวจรับประกันคือ "ไม่มีข้อผิดพลาดที่อ่านจาก repo ได้แล้ว" ซึ่งไม่เท่ากับ "build ผ่าน"
+
+### สิ่งที่ตัวตรวจไปเจอตอนเขียนมันครั้งแรก (ทั้งหมดเป็นของจริง แก้แล้ว)
+
+Dockerfile กับ compose เป็น **โค้ดที่ไม่มีใครรันบนเครื่องนี้** ความผิดพลาดจึงสะสมเงียบ ๆ
+ทั้ง 6 ข้อนี้ทำให้ deploy ไม่สำเร็จ และ **เอกสารฉบับนี้เขียนถูกอยู่แล้วทั้ง 3 ข้อแรก** —
+ไฟล์ที่ใช้จริงแค่ไม่ได้ทำตาม
+
+1. `docker/frontend.Dockerfile` **ไม่ได้คัดลอกและ build workspace `database`** ทั้งที่
+   `frontend` พึ่ง `@teenstyle/database` (Auth.js เก็บ session ในฐานข้อมูล) →
+   build ล้มด้วย "Cannot find module" · หัวข้อ 3 ของเอกสารนี้บอกไว้แล้วว่าต้องรัน `db:sync` ก่อน
+2. compose service `frontend` **ไม่มี `DATABASE_URL`** → เปิดเว็บได้แต่ล็อกอินไม่ได้เลย
+   (หัวข้อ 3 เขียนว่า "ห้ามลืม" ไว้แล้ว)
+3. compose **ไม่ส่ง `NEXT_PUBLIC_API_PROXY_PATH`** → cookie ถูกบล็อกแบบ third-party
+   (หัวข้อ 3.1 อธิบายไว้ทั้งหัวข้อ)
+4. ทั้งสอง Dockerfile สั่ง `COPY --from=deps /app/database/node_modules` ซึ่ง **ไม่มีอยู่จริง**
+   เพราะ npm workspaces hoist node_modules ขึ้น root → `docker build` ล้มที่บรรทัดนั้น
+5. compose ตั้ง `NEXT_PUBLIC_API_URL=http://localhost:4000` ซึ่งใน container ของ frontend
+   คือตัวมันเอง → Server Component ยิงไป backend ไม่ถึงเลย (ต้องเป็น `http://backend:4000`)
+6. `.env.example` ไม่มีชื่อ `PAYMENT_WINDOW_MINUTES` ที่ backend อ่านจาก schema
+
+### JSON-LD ต้องมี nonce ด้วย (แก้ตอน STEP 38)
+
+ตรวจ production build จริงแล้วพบว่า **25 จาก 27 `<script>` มี nonce** — สองตัวที่ขาดคือ
+`<script type="application/ld+json">` ของ STEP 33 · ตัว data block ไม่ถูกรันจึงไม่ถูก CSP บล็อก
+**แต่ทำให้วิธีตรวจที่ STEP 28 กำหนดไว้ ("จำนวน script = จำนวน nonce") เตือนผิดทุกครั้ง**
+ซึ่งจะทำให้คนเลิกเชื่อผลตรวจ → ใส่ nonce ให้ JSON-LD แล้ว (อ่านจาก header `x-nonce` ที่ proxy.ts ออกให้)
 
 ## สถาปัตยกรรมตอน production
 
@@ -177,6 +223,26 @@ backend ต้องมี `CORS_ORIGIN` เป็น domain ของ frontend 
 | Backend              | `CORS_ORIGIN` = domain ของ frontend เท่านั้น (ห้าม `*`)                 |
 | DNS / Host           | เปิด HTTPS · บังคับ redirect http → https                               |
 
+## ตรวจของที่ใช้ deploy ด้วยเครื่อง (STEP 38)
+
+```bash
+node scripts/audit-deploy.mjs                      # ตรวจ repo — ไม่ต้องมี Docker daemon
+node scripts/audit-deploy.mjs --env .env.prod       # ตรวจค่าในไฟล์ env ของ production ด้วย
+```
+
+| กลุ่ม | ตรวจอะไร                                                                                          |
+| ----- | ------------------------------------------------------------------------------------------------- |
+| A     | ทุก path ที่ `COPY` ต้องมีอยู่จริง (จาก build context และจาก stage ก่อนหน้า)                      |
+| B     | workspace ที่พึ่งพากันต้องอยู่ใน image และถูก `generate` + `build` ก่อนใช้                        |
+| C     | compose ส่ง env/ARG ที่โค้ดต้องใช้ · ค่าที่ใช้ภายใน network ห้ามเป็น localhost · proxy path       |
+| D     | `.env.example` มีชื่อ env ทุกตัวที่โค้ดอ่าน · ไม่มีค่าที่ดูเหมือน secret จริง · `.env` ถูก ignore |
+| E     | ค่าในไฟล์ env ของ production (ต้องใส่ `--env`) — โดเมนจริง, `AUTH_SECRET`, `TRUST_PROXY_HOPS`     |
+| F     | migration อ่านได้ครบ และ `pg_trgm` ถูกสร้างก่อน index ที่ใช้มัน                                   |
+| G     | `railway.json` — build รัน `db:sync`, `--include=dev`, migrate ก่อน start, healthcheck `/health`  |
+
+**ต้องใช้ `docker` CLI สำหรับกลุ่ม C** (แต่ **ไม่ต้องมี daemon** — `docker compose config` ทำงานได้เลย)
+ถ้าไม่มี CLI สคริปต์จะบอกว่าข้ามกลุ่มนั้น ไม่ใช่เงียบแล้วผ่าน
+
 ## Checklist ก่อนขึ้น production
 
 ### Security
@@ -201,8 +267,11 @@ backend ต้องมี `CORS_ORIGIN` เป็น domain ของ frontend 
 
 ### Quality
 
+- [ ] **`node scripts/audit-deploy.mjs --env <ไฟล์ env ของ production>` ไม่มีข้อผิดพลาด**
 - [ ] `npm run typecheck` · `npm run lint` · `npm test` ผ่านทั้งหมด
 - [ ] `npm run build` ผ่าน
+- [ ] **`docker build -f docker/backend.Dockerfile .` และของ frontend ผ่าน** (ยังไม่เคยรันบนเครื่องที่พัฒนา)
+- [ ] `<script>` ทุกตัวมี nonce ที่ตรงกับ header (ดูวิธีนับที่ CLAUDE.md หัวข้อ Security)
 - [ ] ทดสอบใน Chrome ตาม [05-run-and-test.md](05-run-and-test.md) (STEP 39)
 - [ ] ไม่มี horizontal overflow ที่ 360px
 - [ ] `/health` คืน 200 บน production

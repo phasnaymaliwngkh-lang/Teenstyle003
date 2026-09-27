@@ -4,7 +4,7 @@
 > Full Stack Fashion E-Commerce สำหรับวัยรุ่น — Next.js + Express + PostgreSQL + Prisma + OpenAI
 
 โปรเจกต์นี้เดินตาม **Master Prompt STEP 1–55** ทำทีละ STEP แล้วหยุดรอคำสั่งถัดไป
-สถานะปัจจุบัน: **STEP 1–37 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
+สถานะปัจจุบัน: **STEP 1–38 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
 หน้าร้าน → ตะกร้า → checkout → ชำระเงิน (COD จริง · Stripe รอใส่ key) → ติดตามคำสั่งซื้อ → รีวิวสินค้า → แจ้งเตือนในบัญชี
 → **บัญชีของฉัน: ข้อมูลส่วนตัว + สมุดที่อยู่**
 → **หลังบ้าน: ภาพรวมร้าน + รายงานยอดขาย + จัดการคำสั่งซื้อ + จัดการสินค้า + คลังสินค้า + แจ้งเตือนสต็อก + บาร์โค้ด/QR + นำเข้า/ส่งออก (CSV, Excel) + ตรวจรีวิว + จัดการลูกค้า + ประวัติการแก้ไข (Audit)**
@@ -53,6 +53,7 @@ npm run db:studio
 node scripts/audit-responsive.mjs   # ตรวจ responsive ทุกหน้าด้วย Chrome จริง (ต้องเปิด dev ไว้ก่อน)
 node scripts/audit-seo.mjs          # ตรวจ title/canonical/robots/sitemap/JSON-LD ทุกหน้า
 node scripts/audit-performance.mjs  # วัดทุก endpoint กับข้อมูลปริมาณจริง (สร้าง DB ชั่วคราวเอง แล้วลบทิ้ง)
+node scripts/audit-deploy.mjs       # ตรวจ Dockerfile/compose/env ให้ตรงกับ repo (ไม่ต้องมี Docker daemon)
 
 npm run docker:up:infra  # เปิดแค่ Postgres + Redis (แนะนำตอน dev)
 npm run docker:config    # validate compose ไม่ต้องเปิด daemon
@@ -1790,6 +1791,51 @@ STEP 4 จดไว้ว่า "navbar อ่าน session ทำให้ท�
 `revalidateTag()` ทั้งโปรเจกต์** → cache หมดอายุด้วยเวลาเท่านั้น
 **ห้ามยืด `REVALIDATE_SECONDS` ให้นานกว่า 60 วินาทีก่อนที่การล้าง cache แบบเจาะจงจะใช้ได้จริง**
 ไม่งั้นราคาที่แก้ในหลังบ้านจะค้างนานขึ้นโดยไม่มีทางล้าง
+
+## Deployment (STEP 38 — ตรวจได้ด้วยเครื่องแล้ว)
+
+**เครื่องมือ: `node scripts/audit-deploy.mjs`** (ไม่ต้องมี Docker daemon · ต้องมี docker CLI สำหรับกลุ่ม C)
+· คู่มือ ขั้นตอน และสิ่งที่ยืนยันแล้ว/ยังไม่ยืนยัน อยู่ที่ [docs/06-deployment.md](docs/06-deployment.md)
+
+**ยืนยันจริงบนเครื่องนี้แล้ว:** production build + `npm start` ทั้งสองฝั่ง · `NEXT_PUBLIC_API_PROXY_PATH`
+ทำให้ `Set-Cookie` กลับมาเป็น first-party บนโดเมนของ frontend (ยิง `/backend/api/cart/items` ได้ 201 จริง) ·
+`/api/auth/*` ไม่ถูก proxy ทับ · HSTS + CSP ที่ไม่มี `unsafe-eval` · `<script>` ทุกตัวมี nonce ตรงกัน
+**ยังไม่เคยยืนยัน:** `docker build` และ `docker compose up` (เครื่องนี้ไม่มี daemon) — **ห้ามเขียนว่า image ใช้งานได้**
+
+### กฎที่ห้ามละเมิด
+
+1. **Dockerfile/compose คือโค้ดที่ไม่มีใครรันบนเครื่องนี้ → ต้องให้เครื่องตรวจแทน**
+   แก้ไฟล์ใน `docker/` หรือ `docker-compose.yml` แล้วต้องรัน `node scripts/audit-deploy.mjs`
+   ตอน STEP 38 ตรวจครั้งแรกเจอ **6 ข้อที่ทำให้ deploy ไม่สำเร็จ** ทั้งที่
+   `docs/06-deployment.md` เขียนถูกอยู่แล้ว 3 ข้อ — ไฟล์ที่ใช้จริงแค่ไม่ได้ทำตาม
+2. **ห้ามคัดลอก `node_modules` ของ workspace ข้าม stage** — npm workspaces hoist ขึ้น root
+   `frontend/node_modules` และ `database/node_modules` ไม่ถูกสร้างขึ้นเลย
+   `COPY --from=deps /app/database/node_modules` จึงทำให้ build ล้มที่บรรทัดนั้น
+   → ติดตั้งและ build ใน stage เดียวกัน (layer cache ยังทำงานเพราะ `npm ci` อยู่ก่อนการคัดลอกซอร์ส)
+3. **ทุก image ที่พึ่ง `@teenstyle/database` ต้อง `generate` + `build` มันก่อน**
+   Prisma Client เป็นโค้ดที่ถูก generate (ไม่อยู่ใน git) และ package ชี้ `exports.default` ไปที่ `dist/`
+   · runtime stage ต้องคัดลอก `database/dist` + `generated` + `prisma` มาด้วย ไม่ใช่แค่ตอน build
+4. **`npm ci --include=dev` ตอน build เสมอ** — โฮสต์ตั้ง `NODE_ENV=production` ไว้ ทำให้ npm
+   ข้าม devDependencies แล้ว tsc หา type ไม่เจอ (`TS7016`) · ส่วน stage ที่รันจริงใช้ `--omit=dev` ได้
+5. **ค่าที่ใช้ภายใน network ห้ามเป็น `localhost`** — ใน container `localhost` คือตัว container เอง
+   `DATABASE_URL` `REDIS_URL` `NEXT_PUBLIC_API_URL` ต้องเป็นชื่อ service
+   (ต่างจาก `AUTH_URL` `FRONTEND_URL` `NEXT_PUBLIC_SITE_URL` ที่เป็น URL ที่ **เบราว์เซอร์** ต้องเปิดได้)
+6. **ทุก service ที่พึ่ง `@teenstyle/database` ต้องได้ `DATABASE_URL`** รวมถึง **frontend**
+   เพราะ Auth.js เก็บ session ในฐานข้อมูลผ่าน Prisma adapter — ไม่มีค่านี้ เว็บเปิดได้แต่ล็อกอินไม่ได้เลย
+7. **`NEXT_PUBLIC_API_PROXY_PATH` ห้ามว่าง และห้ามขึ้นต้นด้วย `/api`**
+   ว่าง = เบราว์เซอร์ยิงข้าม origin แล้ว cookie ถูกบล็อก · `/api` = ทับ `/api/auth/*` ของ Auth.js
+8. **`<script>` ทุกตัวต้องมี nonce รวมถึง JSON-LD** — data block ไม่ถูก CSP บล็อกก็จริง
+   แต่ถ้ามี `<script>` ที่ไม่มี nonce ปนอยู่ วิธีตรวจของ STEP 28 จะเตือนผิดทุกครั้ง
+   แล้วคนจะเลิกเชื่อผลตรวจ (บทเรียนเดียวกับ STEP 30)
+
+### ⚠️ กับดักของเครื่องนี้ตอนทดสอบ deploy
+
+- **Git Bash แปลงค่า env ที่ขึ้นต้นด้วย `/` เป็น path ของ Windows** —
+  `NEXT_PUBLIC_API_PROXY_PATH=/backend` กลายเป็น `C:/Program Files/Git/backend`
+  แล้ว `next build` ล้มด้วย `Invalid rewrite found` → ใส่ `MSYS_NO_PATHCONV=1` เสมอ
+- **คำสั่งฆ่า process ที่กรองด้วย `*web003*` มองไม่เห็น backend ตอน production**
+  เพราะ command line เป็น `node dist/server.js` (ไม่มีคำว่า web003) → เพิ่มเงื่อนไข
+  `-or $_.CommandLine -like "*dist\server.js*"` ด้วย ไม่งั้นคิดว่าปิดแล้วแต่ยังฟังพอร์ตอยู่
 
 ## Testing (STEP 37 — เทสต์คอมโพเนนต์จริงแล้ว และวัด coverage แล้ว)
 

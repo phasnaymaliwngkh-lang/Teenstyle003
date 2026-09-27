@@ -169,6 +169,21 @@ node scripts/audit-performance.mjs --reuse    # ใช้ DB ที่ --keep �
 · ตัวเลขก่อน/หลัง เหตุผลของ index แต่ละตัว และจุดที่ยังหนักอยู่ ทั้งหมดอยู่ใน
 [10-performance.md](10-performance.md)
 
+## ตรวจของที่ใช้ deploy (STEP 38)
+
+```powershell
+node scripts/audit-deploy.mjs                       # ตรวจ Dockerfile / compose / env / railway.json
+node scripts/audit-deploy.mjs --env .env.prod        # ตรวจค่าในไฟล์ env ของ production ด้วย
+```
+
+**ไม่ต้องมี Docker daemon** (ต้องมีแค่ docker CLI สำหรับตรวจ compose) และไม่ต้องเปิด dev
+· ตรวจ **ข้อเท็จจริงที่อ่านจาก repo ได้** เท่านั้น — path ที่ `COPY`, workspace ที่พึ่งพากัน,
+env/ARG ที่ compose ต้องส่ง, ค่าที่ห้ามเป็น localhost, `.env.example`, migration, `railway.json`
+
+`exit 0` = ไม่มีข้อผิดพลาดที่อ่านจาก repo ได้ · `1` = มี
+⚠️ **ไม่เท่ากับ "docker build ผ่าน"** — ดูตาราง "ยืนยันแล้ว / ยังไม่ยืนยัน" ใน
+[06-deployment.md](06-deployment.md)
+
 ## Checklist ของ STEP 1 (ผลการตรวจจริง)
 
 | ข้อ                         | คำสั่ง / วิธีตรวจ                                                  | ผล                        |
