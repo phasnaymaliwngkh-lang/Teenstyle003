@@ -7,6 +7,7 @@ import { CustomerAccountActions } from "@/features/admin/components/customer-acc
 import { ApiClientError } from "@/lib/api";
 import { requirePermission } from "@/lib/dal";
 import { cn } from "@/lib/utils";
+import { LOYALTY_NOT_ACTIVE_LABEL } from "@/features/account/lib/loyalty";
 import { fetchAdminCustomerOnServer } from "@/services/customer.server";
 import type { AdminCustomerDetail } from "@/types/customer";
 
@@ -101,8 +102,9 @@ export default async function AdminCustomerPage({
             <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-lilac px-2.5 py-1 text-[11px] font-bold text-brand-dark">
               {customer.role}
             </span>
+            {/* ค่า points/loyaltyTier ไม่มีใครเขียน — ดู features/account/lib/loyalty.ts */}
             <span className="inline-flex items-center rounded-[var(--radius-pill)] border border-line px-2.5 py-1 text-[11px] font-bold text-muted">
-              {customer.loyaltyTier} · {customer.points} แต้ม
+              แต้มสะสม: {LOYALTY_NOT_ACTIVE_LABEL}
             </span>
           </div>
         </div>

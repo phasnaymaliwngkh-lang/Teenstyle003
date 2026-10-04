@@ -74,6 +74,20 @@ const IGNORED_CONSOLE = [
     match: /\[Fast Refresh\]|webpack-hmr|turbopack-hmr/i,
     why: 'ข้อความของเครื่องมือตอน dev เท่านั้น',
   },
+  {
+    match: /was detected as the Largest Contentful Paint \(LCP\)/i,
+    /**
+     * Next เตือนเรื่องที่ตัวเองจัดการอยู่แล้ว — ตรวจกับ HTML จริงแล้วพบว่า
+     * รูปที่มันเตือนคือรูปเดียวกับที่ Next ใส่ `<link rel="preload" as="image">`
+     * ให้ใน `<head>` เพราะเราใส่ `priority` ไว้ที่การ์ดแรกแล้ว (แก้ตอน STEP 39)
+     * และคำเตือนนี้ **ไม่ขึ้นทุกครั้ง** (รัน /looks 3 รอบติดกันแล้วสะอาดทั้งสามรอบ)
+     * = race ของตัวตรวจ LCP ฝั่ง client ของ Next ตอน dev ไม่ใช่ปัญหาของหน้าเว็บ
+     *
+     * ⚠️ ปิดเฉพาะข้อความนี้ · ถ้าวันหนึ่งพบว่า LCP ช้าจริง ให้วัดด้วยเครื่องมือ
+     *    performance ไม่ใช่เชื่อ/ไม่เชื่อคำเตือนบรรทัดนี้
+     */
+    why: 'Next เตือนรูปที่ตัวเอง preload ให้แล้วตาม priority ที่เราใส่ไว้ · และคำเตือนไม่คงที่',
+  },
 ];
 
 const isIgnored = (text) => IGNORED_CONSOLE.some((rule) => rule.match.test(text));
@@ -371,7 +385,8 @@ async function main() {
   const userDataDir = mkdtempSync(path.join(tmpdir(), 'teenstyle-chrome-'));
   let chrome;
   let cdp;
-  let createdSessions = [];
+  /** ส่งเข้าไปให้ prepareRoutes จดลงทันที — ลบใน finally ได้แม้มันโยน error กลางทาง */
+  const createdSessions = [];
 
   try {
     log('รอเซิร์ฟเวอร์…');
@@ -383,9 +398,8 @@ async function main() {
       apiBase: API_BASE,
       only: ONLY,
       tokenPrefix: 'audit-chrome',
+      createdSessions,
     });
-
-    createdSessions = prepared.createdSessions;
 
     const launched = await launchChrome({
       chromePath: args.get('chrome'),

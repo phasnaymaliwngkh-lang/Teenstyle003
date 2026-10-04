@@ -6,7 +6,7 @@ import { resolveStockStatus, type StockStatus } from './product.model.ts';
  *
  * หลักการเดียวกับ product.model.ts — เลือกส่งเฉพาะที่ต้องใช้ และคำนวณทุกอย่างที่ server:
  *   - `totalPrice` รวมจากราคาที่ลูกค้าจ่ายจริงของสินค้าในลุค (ห้ามให้ frontend บวกเอง)
- *   - `allItemsAvailable` บอกตรง ๆ ว่าซื้อครบชุดได้ไหม (STEP 8 จะใช้กับปุ่ม "ซื้อทั้งชุด")
+ *   - `allItemsAvailable` บอกตรง ๆ ว่าซื้อครบชุดได้ไหม (ปุ่ม "ซื้อทั้งชุด" ของ STEP 8 ใช้ค่านี้)
  *
  * ⚠️ สินค้าที่ถูกปิดขายหรือ soft delete จะไม่อยู่ใน `items`
  *    แต่ยังถูกนับใน `itemCount` (จำนวนชิ้นที่ลุคนี้จัดไว้) จึงรู้ได้ว่าลุคไม่ครบ

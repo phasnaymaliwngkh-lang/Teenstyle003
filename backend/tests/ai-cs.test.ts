@@ -5,6 +5,7 @@ import {
   getStorePolicyContent,
   runFallbackCs,
 } from '../src/services/ai-cs.service.ts';
+import { ORDER_NUMBER_EXAMPLE } from '../src/models/order.model.ts';
 import {
   adminSupportReplySchema,
   adminSupportStatusSchema,
@@ -89,7 +90,12 @@ describe('AI Customer Service (STEP 20)', () => {
       const result = await runFallbackCs('พัสดุถึงไหนแล้ว', { sessionId: 'test-session-1' });
       expect(result.isEscalation).toBe(false);
       expect(result.replyText).toContain('หมายเลขคำสั่งซื้อ');
-      expect(result.replyText).toContain('ORD-');
+      /**
+       * เดิมบรรทัดนี้เขียนว่า `toContain('ORD-')` ซึ่ง **ยืนยันรูปแบบที่ผิดไว้เอง**
+       * (ของจริงคือ `TS-YYYYMMDD-####`) จึงเป็นเหตุผลที่บั๊กอยู่รอดมาถึง STEP 40
+       * → ผูกกับแหล่งความจริงเดียวแทนการพิมพ์รูปแบบซ้ำในเทสต์
+       */
+      expect(result.replyText).toContain(ORDER_NUMBER_EXAMPLE);
     });
   });
 

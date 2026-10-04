@@ -6,6 +6,7 @@ import {
   STORE_AGENT_HOURS,
   STORE_AI_HOURS,
 } from '../config/store.ts';
+import { ORDER_NUMBER_EXAMPLE } from './order.model.ts';
 
 export type KnowledgeCategory =
   'SHIPPING' | 'RETURNS' | 'PAYMENTS' | 'SIZING' | 'CARE' | 'ORDERS' | 'GENERAL' | 'STYLING';
@@ -446,7 +447,7 @@ ${PAYMENT_METHOD_LINES}
 #### 1. ขั้นตอนการตรวจสอบ
 1. ล็อกอินเข้าสู่ระบบ TEENSTYLE AI
 2. ไปที่เมนูโปรไฟล์ของคุณ แล้วเลือก **"คำสั่งซื้อของฉัน" (My Orders)** หรือพิมพ์เลขคำสั่งซื้อที่เมนูติดตามสินค้า
-3. เลือกรหัสคำสั่งซื้อที่ต้องการดูรายละเอียด (เช่น \`ORD-20260918-ABCD\`)
+3. เลือกรหัสคำสั่งซื้อที่ต้องการดูรายละเอียด (เช่น \`${ORDER_NUMBER_EXAMPLE}\`)
 4. ระบบจะแสดงไทม์ไลน์สถานะจริง พร้อมหมายเลขติดตามพัสดุ (Tracking Number)
 
 #### 2. ความหมายของสถานะคำสั่งซื้อ

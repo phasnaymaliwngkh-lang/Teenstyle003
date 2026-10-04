@@ -48,12 +48,13 @@ const ROLE_LABEL: Record<string, string> = {
   SUPER_ADMIN: "ผู้ดูแลระบบ",
 };
 
-const TIER_LABEL: Record<string, string> = {
-  MEMBER: "Member",
-  SILVER: "Silver",
-  GOLD: "Gold",
-  VIP: "VIP",
-};
+/**
+ * ⚠️ ไม่แสดง "ระดับสมาชิก" ในหน้านี้ เพราะ `User.loyaltyTier` ไม่มีโค้ดไหนเขียนค่าเลย
+ *    ทุกบัญชีจึงเป็น MEMBER ตลอดกาล — การแสดงค่านั้นคือการบอกแอดมินว่าไม่มีลูกค้าระดับสูงเลย
+ *    (คลาสเดียวกับ `totalSpent` ของ STEP 25 · ดู features/account/lib/loyalty.ts)
+ *    ตัวกรอง `tier` ของ API ยังอยู่ตามสัญญาใน docs/09-api-reference.md แต่ยังไม่มี UI
+ *    เพราะกรองด้วยคอลัมน์ที่ไม่มีใครเขียนจะคืนผลว่างเสมอ — เปิดใช้พร้อมระบบแต้ม STEP 42
+ */
 
 const baht = (value: number) => `฿${value.toLocaleString("th-TH")}`;
 
@@ -249,7 +250,6 @@ export default async function AdminCustomersPage({
                     <p className="mt-1 text-sm break-all text-muted">{item.email}</p>
                     <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
                       <Cell label="บทบาท">{ROLE_LABEL[item.role] ?? item.role}</Cell>
-                      <Cell label="ระดับ">{TIER_LABEL[item.loyaltyTier] ?? item.loyaltyTier}</Cell>
                       <Cell label="คำสั่งซื้อ">
                         {item.stats.paidOrders} / {item.stats.totalOrders} ใบ
                       </Cell>
@@ -301,12 +301,7 @@ export default async function AdminCustomersPage({
                             <span className="block text-xs text-muted">{item.phone}</span>
                           )}
                         </td>
-                        <td className="px-4 py-3">
-                          {ROLE_LABEL[item.role] ?? item.role}
-                          <span className="block text-xs text-muted">
-                            {TIER_LABEL[item.loyaltyTier] ?? item.loyaltyTier}
-                          </span>
-                        </td>
+                        <td className="px-4 py-3">{ROLE_LABEL[item.role] ?? item.role}</td>
                         <td className="px-4 py-3">
                           <StatusBadge status={item.status} />
                         </td>

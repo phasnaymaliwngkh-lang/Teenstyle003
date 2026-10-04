@@ -260,7 +260,7 @@ async function createAlertNotification(row: AlertRow, severity: AlertSeverity): 
 
   await getPrisma().notification.create({
     data: {
-      // null = ประกาศถึงพนักงานทุกคน (การแจ้งเตือนรายบุคคลเป็นงานของ STEP 24)
+      // null = ประกาศถึงพนักงานทุกคน (การแจ้งเตือนรายบุคคลของลูกค้าทำแล้วตอน STEP 24)
       userId: null,
       type: 'LOW_STOCK',
       channel: 'IN_APP',

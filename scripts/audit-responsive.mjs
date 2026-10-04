@@ -225,6 +225,7 @@ const AUDIT_EXPRESSION = String.raw`
 async function main() {
   const prisma = getPrisma();
   const userDataDir = mkdtempSync(path.join(tmpdir(), 'teenstyle-audit-'));
+  /** ส่งเข้าไปให้ prepareRoutes จดลงทันที — ลบใน finally ได้แม้มันโยน error กลางทาง */
   const createdSessions = [];
   let chrome;
   let cdp;
@@ -234,18 +235,13 @@ async function main() {
     await waitForHttp(`${API_BASE}/health`, 'backend');
     await waitForHttp(WEB_BASE, 'frontend');
 
-    const {
-      routes,
-      createdSessions: sessions,
-      tokens,
-    } = await prepareRoutes({
+    const { routes, tokens } = await prepareRoutes({
       prisma,
       apiBase: API_BASE,
       only: ONLY,
       tokenPrefix: 'audit-responsive',
+      createdSessions,
     });
-
-    createdSessions.push(...sessions);
 
     const launched = await launchChrome({
       chromePath: args.get('chrome'),

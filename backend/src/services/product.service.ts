@@ -4,7 +4,7 @@ import { availableOf, getAvailableStockByProduct } from '../models/availability.
 import { toProductCard, type ProductCardDto } from '../models/product.model.ts';
 
 /**
- * Product service (STEP 5 — ใช้กับหน้าแรก · STEP 6 จะขยายเป็นหน้า /shop เต็มรูปแบบ)
+ * Product service (STEP 5 — ใช้กับหน้าแรก · หน้า /shop เต็มรูปแบบอยู่ที่ shop.service.ts ตั้งแต่ STEP 6)
  *
  * ทุก query กรอง `deletedAt: null` และ `status: 'ACTIVE'` เสมอ
  * เพราะสินค้าที่ถูก soft delete หรือยังเป็นฉบับร่างต้องไม่โผล่หน้าร้าน

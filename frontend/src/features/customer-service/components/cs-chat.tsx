@@ -462,7 +462,10 @@ export function CsChat() {
                 ? "การสนทนานี้ปิดแล้ว กรุณากดปุ่มเริ่มใหม่เพื่อคุยต่อ"
                 : status === "ESCALATED"
                   ? "พิมพ์ข้อความถึงเจ้าหน้าที่..."
-                  : "พิมพ์คำถาม เช่น เช็คพัสดุ ORD-..., ค่าส่ง, หรือคุยกับเจ้าหน้าที่..."
+                  : // รูปแบบเลขออเดอร์จริงคือ TS-YYYYMMDD-#### (ดู backend/src/models/order.model.ts)
+                    // เคยเขียนไว้เป็น "ORD-..." ซึ่งพาลูกค้าไปหาเลขที่ไม่มีอยู่จริง (เจอตอน STEP 40)
+                    // มีเทสต์ใน frontend/tests/order-number.test.ts เทียบกับไฟล์ต้นทาง
+                    "พิมพ์คำถาม เช่น เช็คพัสดุ TS-20260918-0001, ค่าส่ง, หรือคุยกับเจ้าหน้าที่..."
             }
             className="h-11 flex-1 rounded-full border border-line bg-lilac-50 px-4 text-xs sm:text-sm text-ink placeholder:text-muted focus:border-brand focus:bg-white focus:outline-hidden disabled:cursor-not-allowed disabled:bg-lilac-50"
           />

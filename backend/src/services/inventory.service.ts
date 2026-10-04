@@ -3,7 +3,7 @@ import type { Prisma } from '@teenstyle/database';
 import { ApiError } from '../utils/api-error.ts';
 
 /**
- * การเดินสต็อกที่ผูกกับคำสั่งซื้อ (STEP 11 · STEP 15 จะขยายเป็นระบบคลังเต็มรูปแบบ)
+ * การเดินสต็อกที่ผูกกับคำสั่งซื้อ (STEP 11) — ระบบคลังเต็มรูปแบบอยู่ที่ STEP 15 แล้ว
  *
  * วงจรของสต็อกในระบบนี้
  *   1. STEP 10 สั่งซื้อ  → `reservedQuantity += q`      (จองไว้ ยังไม่ตัด)

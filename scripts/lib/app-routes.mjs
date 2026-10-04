@@ -154,12 +154,19 @@ async function customerOrderNumber(prisma, userId) {
 /**
  * เตรียมทุกอย่างที่ต้องใช้เปิดหน้าจริง: session ตามบทบาท + แทนค่า {placeholder}
  *
- * คืน `createdSessions` มาให้ผู้เรียกลบใน `finally` เสมอ — session ที่ค้างในฐานข้อมูล
- * คือบัญชีที่ใครถือ token ก็เข้าได้ จึงห้ามปล่อยให้หลุด
+ * ⚠️ **ผู้เรียกต้องส่ง `createdSessions` เข้ามา** แล้วลบใน `finally` ของตัวเอง
+ *    ห้ามรับค่าที่ return แล้วเพิ่งเก็บไว้ลบ เพราะถ้าฟังก์ชันนี้ `throw` กลางทาง
+ *    (เช่น หาบัญชีลูกค้าไม่เจอ) ตัวแปรของผู้เรียกจะยังว่าง แล้ว session ของ admin
+ *    ที่สร้างไปก่อนหน้าจะค้างในฐานข้อมูล = ใครถือ token นั้นก็เป็น SUPER_ADMIN ได้ 2 ชั่วโมง
+ *    (เจอค้างจริง 1 แถวตอนตรวจรอบสุดท้ายของ STEP 40)
  */
-export async function prepareRoutes({ prisma, apiBase, only = '', tokenPrefix }) {
-  const createdSessions = [];
-
+export async function prepareRoutes({
+  prisma,
+  apiBase,
+  only = '',
+  tokenPrefix,
+  createdSessions = [],
+}) {
   log('สร้าง session ชั่วคราว…');
 
   const admin = await createSession(

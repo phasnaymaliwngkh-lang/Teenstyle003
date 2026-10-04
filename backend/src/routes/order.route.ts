@@ -20,7 +20,7 @@ import { verifyOrigin } from '../middlewares/verify-origin.ts';
  * - **ต้องล็อกอินทุกเส้นทาง** — คำสั่งซื้อผูกกับบัญชี (`Order.userId` required)
  *   guest ต้องเข้าสู่ระบบก่อน (ตะกร้าของ guest จะถูกรวมเข้าบัญชีให้อัตโนมัติ)
  * - `verifyOrigin` กัน CSRF สำหรับคำขอที่เปลี่ยนข้อมูล
- * - รายการคำสั่งซื้อทั้งหมด + สถานะการจัดส่ง จะทำใน STEP 12 (Order Tracking)
+ * - รายการคำสั่งซื้อทั้งหมด + สถานะการจัดส่ง อยู่ที่ STEP 12 (Order Tracking) แล้ว
  */
 export const checkoutRouter = Router();
 

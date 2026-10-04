@@ -433,7 +433,7 @@ export async function updateOrderStatus(
       },
     });
 
-    // audit trail: ใครเปลี่ยนอะไร เมื่อไร (STEP 27 จะทำหน้าดู log)
+    // audit trail: ใครเปลี่ยนอะไร เมื่อไร (หน้าดู log อยู่ที่ /admin/logs ตั้งแต่ STEP 27)
     await writeAdminLog(tx, {
       actor,
       action: 'order.status.update',

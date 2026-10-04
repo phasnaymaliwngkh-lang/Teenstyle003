@@ -17,7 +17,7 @@ import type { LookQuery } from '../validators/look.validator.ts';
  * ค่าจากผู้ใช้ส่งผ่าน parameter ของ Prisma.sql ทั้งหมด (กัน SQL injection)
  * ORDER BY มาจาก whitelist ที่ผ่าน Zod enum แล้วเท่านั้น
  *
- * STEP 8 จะเพิ่มหน้ารายละเอียดลุค (`/looks/[slug]`) + ปุ่มซื้อทั้งชุด
+ * หน้ารายละเอียดลุค (`/looks/[slug]`) + ปุ่มซื้อทั้งชุด เพิ่มแล้วตอน STEP 8
  */
 
 const ACTIVE_LOOK = { deletedAt: null, isActive: true } as const;

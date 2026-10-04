@@ -12,6 +12,7 @@ import {
   STORE_CUTOFF_TIME,
   STORE_SHIPPING_DAYS,
 } from '../config/store.ts';
+import { findOrderNumberIn, ORDER_NUMBER_EXAMPLE } from '../models/order.model.ts';
 import { ApiError } from '../utils/api-error.ts';
 import { logger } from '../utils/logger.ts';
 
@@ -65,14 +66,13 @@ const CS_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'lookup_order',
-      description:
-        'ค้นหาและตรวจสอบสถานะคำสั่งซื้อจริงในระบบ TEENSTYLE ด้วยเลขออเดอร์ (เช่น ORD-20260918-XXXX)',
+      description: `ค้นหาและตรวจสอบสถานะคำสั่งซื้อจริงในระบบ TEENSTYLE ด้วยเลขออเดอร์ (เช่น ${ORDER_NUMBER_EXAMPLE})`,
       parameters: {
         type: 'object',
         properties: {
           orderNumber: {
             type: 'string',
-            description: 'เลขอ้างอิงคำสั่งซื้อ เช่น ORD-20260918-ABCD',
+            description: `เลขอ้างอิงคำสั่งซื้อ เช่น ${ORDER_NUMBER_EXAMPLE}`,
           },
         },
         required: ['orderNumber'],
@@ -379,11 +379,10 @@ export async function runFallbackCs(
   }
 
   // 2. ตรวจสอบคำถามสถานะคำสั่งซื้อ / เลขพัสดุ (Order Status Intent)
-  const orderNumberMatch =
-    message.match(/ORD-\d{8}-[A-Za-z0-9]+/i) || message.match(/ORD-[A-Za-z0-9]+/i);
+  const orderNumberMatch = findOrderNumberIn(message);
 
   if (
-    orderNumberMatch ||
+    orderNumberMatch !== null ||
     lowerMsg.includes('สถานะ') ||
     lowerMsg.includes('พัสดุ') ||
     lowerMsg.includes('เช็คของ') ||
@@ -391,8 +390,8 @@ export async function runFallbackCs(
     lowerMsg.includes('เลขแทร็ก') ||
     lowerMsg.includes('tracking')
   ) {
-    if (orderNumberMatch) {
-      const orderNumber = orderNumberMatch[0].toUpperCase();
+    if (orderNumberMatch !== null) {
+      const orderNumber = orderNumberMatch.toUpperCase();
       const lookupResult = await lookupOrderForCs(orderNumber, owner);
       return {
         replyText: lookupResult.details || `ไม่พบคำสั่งซื้อ ${orderNumber}`,
@@ -404,7 +403,9 @@ export async function runFallbackCs(
 
     return {
       replyText:
-        'หากต้องการตรวจสอบสถานะคำสั่งซื้อ รบกวนแจ้ง **หมายเลขคำสั่งซื้อ** (เช่น `ORD-20260918-XXXX`) ให้ผมได้เลยครับ หรือคุณสามารถดูประวัติคำสั่งซื้อทั้งหมดได้ที่หน้า [ประวัติคำสั่งซื้อ](/account/orders) ครับ 📦',
+        'หากต้องการตรวจสอบสถานะคำสั่งซื้อ รบกวนแจ้ง **หมายเลขคำสั่งซื้อ** (เช่น `' +
+        ORDER_NUMBER_EXAMPLE +
+        '`) ให้ผมได้เลยครับ หรือคุณสามารถดูประวัติคำสั่งซื้อทั้งหมดได้ที่หน้า [ประวัติคำสั่งซื้อ](/account/orders) ครับ 📦',
       isEscalation: false,
       model: 'fallback-rules',
     };

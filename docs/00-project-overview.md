@@ -48,3 +48,4 @@
 | [10-performance.md](10-performance.md)               | ผลวัดกับข้อมูลปริมาณจริง index และงบเวลา           |
 | [11-testing.md](11-testing.md)                       | วิธีเทสต์ · coverage ที่วัดได้ · บั๊กที่เทสต์ไปเจอ |
 | [12-browser-testing.md](12-browser-testing.md)       | ตรวจในเบราว์เซอร์จริง (console · CSP · การกดจริง)  |
+| [13-final-audit.md](13-final-audit.md)               | ผลตรวจรอบสุดท้ายของ STEP 1–39 และสิ่งที่ยังเหลือ   |

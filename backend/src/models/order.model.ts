@@ -9,6 +9,57 @@ import { toNumber } from './pricing.ts';
  * และ **ไม่เปลี่ยนตามการแก้ราคาสินค้าภายหลัง** (นี่คือเหตุผลที่ OrderItem เก็บ snapshot)
  */
 
+/* ─────────────────── รูปแบบเลขคำสั่งซื้อ — แหล่งความจริงเดียว ─────────────────── */
+
+/**
+ * เลขคำสั่งซื้อมีรูปแบบ `TS-YYYYMMDD-####` (นับต่อวัน)
+ *
+ * ⚠️ **ทุกที่ที่พูดถึงหรืออ่านเลขคำสั่งซื้อต้องใช้ค่าจากไฟล์นี้** ห้ามพิมพ์รูปแบบเองซ้ำ
+ *
+ * เจอตอน STEP 40: ตัวสร้างเลขใช้ `TS-` แต่ฝั่ง AI Customer Service เขียนรูปแบบไว้เองเป็น
+ * `ORD-` ทั้ง 5 ที่ — รวมถึง **regex ที่ใช้จับเลขจากข้อความลูกค้า** ผลคือ
+ * ลูกค้าพิมพ์เลขจริง (`TS-20260918-0001`) แล้ว AI จับไม่ได้ → ตอบกลับว่า
+ * "รบกวนแจ้งหมายเลขคำสั่งซื้อ (เช่น ORD-…)" แล้ววนถามซ้ำไปเรื่อย ๆ
+ * → **การเช็คสถานะคำสั่งซื้อผ่านแชตไม่เคยทำงานเลย** และยังชี้ให้ลูกค้าไปหาเลขที่ไม่มีอยู่จริง
+ * (ผิดกฎข้อ 3: AI ห้ามแต่งข้อมูล Order)
+ */
+export const ORDER_NUMBER_PREFIX = 'TS';
+
+/** ตัวอย่างที่เอาไปโชว์ผู้ใช้ได้ — ต้องตรงรูปแบบจริงเสมอ (มีเทสต์ยืนยัน) */
+export const ORDER_NUMBER_EXAMPLE = `${ORDER_NUMBER_PREFIX}-20260918-0001`;
+
+/** ประกอบเลขคำสั่งซื้อจากวันและลำดับของวันนั้น */
+export function buildOrderNumber(date: Date, sequence: number): string {
+  const datePart = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('');
+
+  return `${ORDER_NUMBER_PREFIX}-${datePart}-${String(sequence).padStart(4, '0')}`;
+}
+
+/** prefix ของเลขทั้งหมดในวันนั้น — ใช้หาลำดับล่าสุดของวัน */
+export function orderNumberPrefixFor(date: Date): string {
+  return buildOrderNumber(date, 0).slice(0, -4);
+}
+
+/**
+ * หาเลขคำสั่งซื้อในข้อความที่ผู้ใช้พิมพ์มา (คืน `null` ถ้าไม่มี)
+ *
+ * ยอมให้พิมพ์ตัวพิมพ์เล็กและเว้นวรรครอบขีดได้ เพราะคนก๊อปมาจากอีเมล/แชตบ่อย
+ * แต่ **ไม่เดาให้** เมื่อรูปแบบไม่ตรง — การเดาเลขออเดอร์หมายถึงเปิดข้อมูลของคนอื่น
+ */
+export function findOrderNumberIn(text: string): string | null {
+  const match = new RegExp(`${ORDER_NUMBER_PREFIX}\\s*-\\s*(\\d{8})\\s*-\\s*(\\d{4})`, 'i').exec(
+    text,
+  );
+
+  if (match === null) return null;
+
+  return `${ORDER_NUMBER_PREFIX}-${match[1]}-${match[2]}`;
+}
+
 export interface OrderAddressSnapshot {
   recipientName: string;
   phone: string;

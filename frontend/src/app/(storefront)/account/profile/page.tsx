@@ -7,6 +7,7 @@ import { SectionError } from "@/components/shared/section";
 import { ProfileForm } from "@/features/account/components/profile-form";
 import { ApiClientError } from "@/lib/api";
 import { getSession } from "@/lib/dal";
+import { LOYALTY_NOT_ACTIVE_LABEL } from "@/features/account/lib/loyalty";
 import { fetchMyProfileOnServer } from "@/services/customer.server";
 import type { MyProfile } from "@/types/customer";
 
@@ -14,13 +15,6 @@ export const metadata: Metadata = {
   title: "ข้อมูลส่วนตัว",
   description: "แก้ชื่อ เบอร์โทร วันเกิด และการตั้งค่าความเป็นส่วนตัวของบัญชี",
   robots: { index: false, follow: false },
-};
-
-const TIER_LABEL: Record<string, string> = {
-  MEMBER: "Member",
-  SILVER: "Silver",
-  GOLD: "Gold",
-  VIP: "VIP",
 };
 
 /** หน้าข้อมูลส่วนตัว /account/profile (STEP 25) */
@@ -67,7 +61,8 @@ export default async function ProfilePage() {
             <InfoTile
               icon={<Award className="size-5 text-brand" aria-hidden />}
               label="ระดับสมาชิก"
-              value={`${TIER_LABEL[profile.loyaltyTier] ?? profile.loyaltyTier} · ${profile.points} แต้ม`}
+              /* ค่า points/loyaltyTier ไม่มีใครเขียน — ดู features/account/lib/loyalty.ts */
+              value={LOYALTY_NOT_ACTIVE_LABEL}
             />
             <InfoTile
               icon={<CalendarClock className="size-5 text-brand" aria-hidden />}

@@ -24,7 +24,7 @@ export const metadata: Metadata = { robots: NOINDEX_NOFOLLOW };
  * ตรวจสิทธิ์ที่ layout ด้วย เพื่อให้ทุกหน้าใต้ /admin ถูกป้องกันโดยปริยาย
  * ไม่ต้องพึ่งให้แต่ละหน้าจำใส่เอง (แต่ละหน้ายังตรวจสิทธิ์เฉพาะของตัวเองเพิ่มได้)
  *
- * STEP 13 จะเปลี่ยนแถบด้านบนนี้เป็น sidebar เต็มรูปแบบ
+ * แถบด้านบนนี้ยังเป็นเมนูแนวนอน — ยังไม่ได้ทำเป็น sidebar และยังไม่มี STEP ไหนรับงานนี้ไว้
  */
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   // ป้องกันทุกหน้าใต้ /admin ที่ชั้นนี้ — หน้าย่อยไม่ต้องจำใส่เอง

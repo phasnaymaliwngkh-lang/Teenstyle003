@@ -7,7 +7,12 @@ import {
   type ShippingMethodCode,
 } from '../config/shipping.ts';
 import { toCart, type CartItemDto } from '../models/cart.model.ts';
-import { toOrder, type OrderDto } from '../models/order.model.ts';
+import {
+  buildOrderNumber,
+  orderNumberPrefixFor,
+  toOrder,
+  type OrderDto,
+} from '../models/order.model.ts';
 import { resolveVariantPrice } from '../models/pricing.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type { CreateOrderInput, NewAddressInput } from '../validators/order.validator.ts';
@@ -262,16 +267,15 @@ export async function getCheckoutSummary(
   };
 }
 
-/** สร้างเลขคำสั่งซื้อรูปแบบ TS-YYYYMMDD-#### (นับต่อวัน) */
+/**
+ * สร้างเลขคำสั่งซื้อ (นับต่อวัน)
+ *
+ * รูปแบบอยู่ที่ [models/order.model.ts](../models/order.model.ts) ที่เดียว
+ * เพราะฝั่ง AI ต้องอ่านเลขที่ลูกค้าพิมพ์มาด้วยรูปแบบเดียวกันนี้ (ดูเหตุผลในไฟล์นั้น)
+ */
 async function nextOrderNumber(tx: Prisma.TransactionClient): Promise<string> {
   const now = new Date();
-  const datePart = [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-  ].join('');
-
-  const prefix = `TS-${datePart}-`;
+  const prefix = orderNumberPrefixFor(now);
   const last = await tx.order.findFirst({
     where: { orderNumber: { startsWith: prefix } },
     orderBy: { orderNumber: 'desc' },
@@ -281,7 +285,7 @@ async function nextOrderNumber(tx: Prisma.TransactionClient): Promise<string> {
   const lastSeq = last ? Number(last.orderNumber.slice(prefix.length)) : 0;
   const nextSeq = Number.isFinite(lastSeq) ? lastSeq + 1 : 1;
 
-  return `${prefix}${String(nextSeq).padStart(4, '0')}`;
+  return buildOrderNumber(now, nextSeq);
 }
 
 /** ที่อยู่ที่จะใช้ส่งของ + แถวที่บันทึกไว้ (ถ้าผู้ใช้เลือกให้บันทึก) */

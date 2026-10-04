@@ -16,19 +16,13 @@ import Link from "next/link";
 
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { requireUser } from "@/lib/dal";
+import { LOYALTY_NOT_ACTIVE_LABEL } from "@/features/account/lib/loyalty";
 import { isStaffRole } from "@/lib/permissions";
 import { NOINDEX_NOFOLLOW } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "บัญชีของฉัน",
   robots: NOINDEX_NOFOLLOW,
-};
-
-const TIER_LABEL: Record<string, string> = {
-  MEMBER: "Member",
-  SILVER: "Silver",
-  GOLD: "Gold",
-  VIP: "VIP",
 };
 
 export default async function AccountPage() {
@@ -60,8 +54,9 @@ export default async function AccountPage() {
           <InfoCard icon={<ShieldCheck className="size-5 text-brand" aria-hidden />} label="บทบาท">
             {user.role}
           </InfoCard>
+          {/* ค่า points/loyaltyTier ไม่มีใครเขียน — ห้ามแสดงเป็นความจริง (ดู features/account/lib/loyalty.ts) */}
           <InfoCard icon={<Award className="size-5 text-brand" aria-hidden />} label="ระดับสมาชิก">
-            {TIER_LABEL[user.loyaltyTier] ?? user.loyaltyTier} · {user.points} แต้ม
+            <span className="text-muted">{LOYALTY_NOT_ACTIVE_LABEL}</span>
           </InfoCard>
         </section>
 
