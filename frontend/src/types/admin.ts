@@ -481,3 +481,54 @@ export interface InventoryImportResult {
   adjustedCount?: number;
   preview?: InventoryImportPreview[];
 }
+
+/* ─── STEP 41: Coupon ─────────────────────────────────────────────────────── */
+
+export type CouponState = "ACTIVE" | "SCHEDULED" | "EXPIRED" | "INACTIVE" | "USED_UP";
+
+export interface AdminCoupon {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  type: "PERCENTAGE" | "FIXED_AMOUNT" | "FREE_SHIPPING";
+  value: number;
+  minOrderAmount: number | null;
+  maxDiscountAmount: number | null;
+  usageLimit: number | null;
+  usedCount: number;
+  perUserLimit: number | null;
+  startsAt: string;
+  endsAt: string;
+  isActive: boolean;
+  /** สถานะที่ server คำนวณสดจากเวลาและตัวนับ — หน้าเว็บไม่คำนวณซ้ำ */
+  state: CouponState;
+  productIds: string[];
+  categoryIds: string[];
+  createdAt: string;
+}
+
+export interface AdminCouponListResult {
+  items: AdminCoupon[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface CreateCouponInput {
+  code: string;
+  name: string;
+  description?: string;
+  type: AdminCoupon["type"];
+  value: number;
+  minOrderAmount?: number | null;
+  maxDiscountAmount?: number | null;
+  usageLimit?: number | null;
+  perUserLimit?: number | null;
+  startsAt: string;
+  endsAt: string;
+  isActive?: boolean;
+}
+
+export type UpdateCouponInput = Partial<CreateCouponInput>;

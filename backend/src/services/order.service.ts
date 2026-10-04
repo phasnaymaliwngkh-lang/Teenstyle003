@@ -13,7 +13,9 @@ import {
   toOrder,
   type OrderDto,
 } from '../models/order.model.ts';
+import type { AppliedCouponDto } from '../models/coupon.model.ts';
 import { resolveVariantPrice } from '../models/pricing.ts';
+import { checkCouponForCart, couponCartLinesOf, redeemCouponForOrder } from './coupon.service.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type { CreateOrderInput, NewAddressInput } from '../validators/order.validator.ts';
 
@@ -184,6 +186,10 @@ export interface CheckoutSummaryDto {
   discountTotal: number;
   shippingFee: number;
   total: number;
+  /** คูปองที่ใช้ได้จริงกับตะกร้านี้ — null = ไม่ได้ใส่ หรือใส่แล้วใช้ไม่ได้ */
+  appliedCoupon: AppliedCouponDto | null;
+  /** เหตุผลที่คูปองที่กรอกมาใช้ไม่ได้ — ต้องบอกผู้ใช้ ไม่ใช่เงียบแล้วไม่ลดให้ */
+  couponError: string | null;
   selectedShippingMethod: ShippingMethodCode;
   shippingOptions: ShippingOptionDto[];
   addresses: CheckoutAddressDto[];
@@ -222,6 +228,7 @@ function shippingOptionsFor(subtotal: number, province: string | null): Shipping
 export async function getCheckoutSummary(
   userId: string,
   shippingMethod: ShippingMethodCode,
+  couponCode?: string,
 ): Promise<CheckoutSummaryDto> {
   const prisma = getPrisma();
 
@@ -250,12 +257,38 @@ export async function getCheckoutSummary(
   if (addresses.length === 0) blockers.push('ยังไม่มีที่อยู่จัดส่ง — กรอกที่อยู่ใหม่ได้ในหน้านี้');
   if (!chosen.available) blockers.push('วิธีจัดส่งที่เลือกใช้กับที่อยู่นี้ไม่ได้');
 
-  const discountTotal = 0;
+  /**
+   * ส่วนลดคิดที่ `models/coupon.model.ts` ที่เดียว แล้ว **ยอดรวมทั้งคูปองส่วนลดและ
+   * คูปองส่งฟรีถูกยุบลง `discountTotal` ตัวเดียว** เพราะสูตรของบิลคือ
+   * `total = subtotal - discountTotal + shippingFee` (ตารางมีคอลัมน์ส่วนลดเดียว)
+   * คูปองส่งฟรีจึงกลายเป็น discountTotal = ค่าจัดส่ง แล้วหักกันพอดี
+   */
+  let discountTotal = 0;
+  let appliedCoupon: AppliedCouponDto | null = null;
+  let couponError: string | null = null;
+
+  if (couponCode !== undefined && couponCode !== '') {
+    try {
+      const result = await checkCouponForCart(userId, couponCode, chosen.code);
+
+      if (result.applied !== null) {
+        appliedCoupon = result.applied;
+        discountTotal = result.evaluation.discountTotal + result.evaluation.shippingDiscount;
+      } else {
+        couponError = result.evaluation.message;
+      }
+    } catch (error) {
+      // ไม่พบรหัส (404) ไม่ควรทำให้หน้าสรุปยอดพังทั้งหน้า — บอกเหตุผลแล้วคิดยอดตามปกติ
+      couponError = error instanceof ApiError ? error.message : 'ใช้คูปองนี้ไม่ได้';
+    }
+  }
 
   return {
     items,
     subtotal,
     discountTotal,
+    appliedCoupon,
+    couponError,
     shippingFee: chosen.fee,
     total: subtotal - discountTotal + chosen.fee,
     selectedShippingMethod: chosen.code,
@@ -466,7 +499,31 @@ export async function createOrder(
     }
 
     const shippingFee = calculateShippingFee(input.shippingMethod, subtotal);
-    const discountTotal = 0;
+
+    /**
+     * ⚠️ ส่วนลดคิดใหม่ **ที่นี่** ด้วยข้อมูลในทรานแซกชันนี้ ไม่ใช่เชื่อยอดที่หน้าเว็บโชว์
+     *    และการจองโควตาคูปองเป็น SQL เดียวแบบมีเงื่อนไข (ดู redeemCouponForOrder)
+     *    ถ้าคูปองใช้ไม่ได้แล้ว → โยน error → ทรานแซกชัน rollback ทั้งก้อน
+     *    ลูกค้าจะไม่ได้ออเดอร์ที่คิดส่วนลดผิด
+     */
+    let discountTotal = 0;
+    let couponId: string | null = null;
+    let couponCode: string | null = null;
+
+    if (input.couponCode !== undefined && input.couponCode !== '') {
+      const lines = await couponCartLinesOf(tx, userId);
+      const redeemed = await redeemCouponForOrder(tx, {
+        userId,
+        code: input.couponCode,
+        lines,
+        shippingFee,
+      });
+
+      couponId = redeemed.couponId;
+      couponCode = redeemed.couponCode;
+      discountTotal = redeemed.evaluation.discountTotal + redeemed.evaluation.shippingDiscount;
+    }
+
     const total = subtotal - discountTotal + shippingFee;
 
     const order = await tx.order.create({
@@ -477,6 +534,9 @@ export async function createOrder(
         discountTotal,
         shippingFee,
         total,
+        couponId,
+        // snapshot ของรหัสคูปอง — ประวัติต้องอ่านได้แม้คูปองถูกปิดใช้งานภายหลัง (กฎ STEP 10 ข้อ 5)
+        couponCode,
         shippingMethod: input.shippingMethod,
         shippingAddressId: addressId,
         addressSnapshot: snapshot,

@@ -10,9 +10,15 @@ import { useForm, useWatch } from "react-hook-form";
 import { checkoutFormSchema, type CheckoutFormValues } from "../lib/schema";
 
 import { ApiClientError } from "@/lib/api";
+import { describeApiError } from "@/lib/api-error-text";
 import { cn } from "@/lib/utils";
-import { createOrder } from "@/services/order.service";
-import type { CheckoutSummary, CreateOrderInput, ShippingOption } from "@/types/catalog";
+import { applyCoupon, createOrder } from "@/services/order.service";
+import type {
+  AppliedCoupon,
+  CheckoutSummary,
+  CreateOrderInput,
+  ShippingOption,
+} from "@/types/catalog";
 import { formatBaht } from "@/utils/format";
 
 /**
@@ -32,6 +38,18 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
   const [submitError, setSubmitError] = useState<{ message: string; stockIssue: boolean } | null>(
     null,
   );
+
+  /**
+   * คูปองส่วนลด (STEP 41)
+   *
+   * ⚠️ ค่าที่เก็บไว้คือ **รหัส** เท่านั้น ส่วนยอดที่โชว์มาจาก server
+   *    และ server คิดใหม่อีกครั้งตอนสร้างคำสั่งซื้อ — ถ้าคูปองใช้ไม่ได้แล้ว
+   *    การสั่งซื้อจะล้มพร้อมเหตุผล ไม่ใช่สั่งสำเร็จด้วยยอดที่ผิด
+   */
+  const [couponInput, setCouponInput] = useState(summary.appliedCoupon?.code ?? "");
+  const [coupon, setCoupon] = useState<AppliedCoupon | null>(summary.appliedCoupon);
+  const [couponMessage, setCouponMessage] = useState<string | null>(summary.couponError);
+  const [couponChecking, setCouponChecking] = useState(false);
 
   const defaultAddress =
     summary.addresses.find((address) => address.isDefault) ?? summary.addresses[0];
@@ -79,7 +97,44 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
     summary.shippingOptions.find((option) => option.code === shippingMethod) ??
     summary.shippingOptions[0]!;
   const shippingFee = chosenOption.fee;
-  const total = summary.subtotal - summary.discountTotal + shippingFee;
+  /**
+   * ส่วนลดที่โชว์ = ส่วนลดจาก server + ส่วนลดของคูปองที่เพิ่งตรวจในหน้านี้
+   * (คูปองส่งฟรีถูกยุบมาอยู่ในตัวเลขเดียวกัน เพราะสูตรบิลมีช่องส่วนลดช่องเดียว)
+   */
+  const couponDiscount = coupon === null ? 0 : coupon.discountTotal + coupon.shippingDiscount;
+  const discountTotal = coupon === null ? summary.discountTotal : couponDiscount;
+  const total = summary.subtotal - discountTotal + shippingFee;
+
+  async function checkCoupon() {
+    const code = couponInput.trim();
+
+    if (code === "") {
+      setCoupon(null);
+      setCouponMessage(null);
+      return;
+    }
+
+    setCouponChecking(true);
+    setCouponMessage(null);
+
+    try {
+      const result = await applyCoupon(code, shippingMethod);
+
+      setCoupon(result.applied);
+      setCouponMessage(result.usable ? null : result.message);
+    } catch (error) {
+      setCoupon(null);
+      setCouponMessage(describeApiError(error, "ตรวจคูปองไม่สำเร็จ กรุณาลองอีกครั้ง"));
+    } finally {
+      setCouponChecking(false);
+    }
+  }
+
+  function clearCoupon() {
+    setCouponInput("");
+    setCoupon(null);
+    setCouponMessage(null);
+  }
 
   async function onSubmit(values: CheckoutFormValues) {
     setSubmitError(null);
@@ -87,6 +142,7 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
     const input: CreateOrderInput = {
       shippingMethod: values.shippingMethod,
       idempotencyKey,
+      ...(coupon !== null ? { couponCode: coupon.code } : {}),
       ...(values.customerNote ? { customerNote: values.customerNote } : {}),
       ...(values.addressChoice === "new"
         ? {
@@ -341,11 +397,59 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
             ))}
           </ul>
 
+          {/* ─── คูปองส่วนลด (STEP 41) ─── */}
+          <div className="mt-4 border-b border-line pb-4">
+            <label htmlFor="coupon-code" className="block text-sm font-semibold">
+              รหัสคูปองส่วนลด
+            </label>
+            <div className="mt-2 flex gap-2">
+              <input
+                id="coupon-code"
+                value={couponInput}
+                onChange={(event) => setCouponInput(event.target.value.toUpperCase())}
+                placeholder="เช่น WELCOME100"
+                disabled={couponChecking || submitting}
+                className="min-h-11 w-full min-w-0 rounded-[12px] border border-line px-3 text-sm uppercase outline-none focus:border-brand-soft"
+              />
+              <button
+                type="button"
+                onClick={() => void checkCoupon()}
+                disabled={couponChecking || submitting || couponInput.trim() === ""}
+                className="min-h-11 shrink-0 rounded-[var(--radius-pill)] border border-brand px-4 text-sm font-bold text-brand-dark transition hover:bg-lilac-50 disabled:opacity-50"
+              >
+                {couponChecking ? "ตรวจ…" : "ใช้คูปอง"}
+              </button>
+            </div>
+
+            <div aria-live="polite">
+              {coupon !== null && (
+                <p className="mt-2 flex flex-wrap items-center gap-2 text-sm font-semibold text-success">
+                  <span>
+                    ใช้ {coupon.code} แล้ว — {coupon.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearCoupon}
+                    disabled={submitting}
+                    className="min-h-11 rounded-[var(--radius-pill)] px-2 text-xs font-bold text-muted underline transition hover:text-danger"
+                  >
+                    เอาออก
+                  </button>
+                </p>
+              )}
+              {couponMessage !== null && (
+                <p role="alert" className="mt-2 text-sm font-semibold text-warning">
+                  {couponMessage}
+                </p>
+              )}
+            </div>
+          </div>
+
           <dl className="mt-4 space-y-2 text-sm">
             <Row label="ยอดสินค้า" value={formatBaht(summary.subtotal)} />
             <Row
-              label="ส่วนลด"
-              value={summary.discountTotal > 0 ? `-${formatBaht(summary.discountTotal)}` : "—"}
+              label={coupon === null ? "ส่วนลด" : `ส่วนลด (${coupon.code})`}
+              value={discountTotal > 0 ? `-${formatBaht(discountTotal)}` : "—"}
             />
             <Row
               label={`ค่าจัดส่ง (${chosenOption.name})`}

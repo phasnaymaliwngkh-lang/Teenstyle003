@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { couponCodeSchema } from './coupon.validator.ts';
+
 import { SHIPPING_METHODS } from '../config/shipping.ts';
 
 /**
@@ -48,6 +50,11 @@ export const createOrderSchema = z
      * client สร้าง UUID หนึ่งค่าต่อการ checkout หนึ่งครั้ง แล้วใช้ค่าเดิมทุกครั้งที่ลองใหม่
      */
     idempotencyKey: z.string().uuid('idempotencyKey ต้องเป็น UUID'),
+    /**
+     * รหัสคูปอง (STEP 41) — client ส่งได้แค่ **รหัส** เท่านั้น
+     * ยอดส่วนลดคิดที่ server ใหม่ทุกครั้งตอนสร้างออเดอร์ ห้ามเชื่อยอดจาก client
+     */
+    couponCode: couponCodeSchema.optional(),
   })
   .refine((value) => value.addressId !== undefined || value.newAddress !== undefined, {
     message: 'ต้องเลือกที่อยู่จัดส่ง หรือกรอกที่อยู่ใหม่',
@@ -57,6 +64,8 @@ export const createOrderSchema = z
 export const checkoutSummaryQuerySchema = z.object({
   /** ดูค่าจัดส่งของวิธีที่เลือกไว้ (ไม่ส่งมา = คิดจาก STANDARD) */
   shippingMethod: z.enum(SHIPPING_METHODS).default('STANDARD'),
+  /** ดูยอดหลังใช้คูปองนี้ (STEP 41) — ไม่ส่งมา = ไม่คิดส่วนลด */
+  couponCode: couponCodeSchema.optional(),
 });
 
 /** สถานะคำสั่งซื้อ — ต้องตรงกับ enum OrderStatus ใน schema.prisma */

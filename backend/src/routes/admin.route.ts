@@ -66,6 +66,12 @@ import {
 import { adminSupportRouter } from './admin-support.route.ts';
 import { adminKnowledgeRouter } from './knowledge.route.ts';
 import multer from 'multer';
+import {
+  createCouponHandler,
+  deleteCouponHandler,
+  listCouponsHandler,
+  updateCouponHandler,
+} from '../controllers/coupon.controller.ts';
 import { mountRouter } from '../models/api-map.ts';
 import { describeMiddleware } from '../middlewares/describe.ts';
 import { requireAuth } from '../middlewares/authenticate.ts';
@@ -328,3 +334,15 @@ adminRouter.get(
   targetHistoryHandler,
 );
 adminRouter.get('/logs', requirePermission('log:read'), listAdminLogsHandler);
+
+/**
+ * คูปองส่วนลด (STEP 41) — `coupon:manage` (ADMIN ขึ้นไปตาม seed)
+ *
+ * พนักงานหน้าร้านไม่ควรออกส่วนลดได้เอง เพราะเป็นการให้เงินออกจากร้าน
+ * (แพตเทิร์นเดียวกับ `analytics:read` ของ STEP 26 ข้อ 7 ที่ EMPLOYEE ไม่มี)
+ * ⚠️ ลบคูปองเป็น **soft delete** เพราะ `Order.couponId` ยังอ้างถึงแถวนั้น
+ */
+adminRouter.get('/coupons', requirePermission('coupon:manage'), listCouponsHandler);
+adminRouter.post('/coupons', requirePermission('coupon:manage'), createCouponHandler);
+adminRouter.patch('/coupons/:couponId', requirePermission('coupon:manage'), updateCouponHandler);
+adminRouter.delete('/coupons/:couponId', requirePermission('coupon:manage'), deleteCouponHandler);

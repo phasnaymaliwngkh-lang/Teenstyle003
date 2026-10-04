@@ -340,10 +340,36 @@ export interface ShippingOption {
   unavailableReason: string | null;
 }
 
+/* ─── STEP 41: Coupon ─────────────────────────────────────────────────────── */
+
+export type DiscountType = "PERCENTAGE" | "FIXED_AMOUNT" | "FREE_SHIPPING";
+
+export interface AppliedCoupon {
+  code: string;
+  name: string;
+  type: DiscountType;
+  discountTotal: number;
+  shippingDiscount: number;
+}
+
+export interface CouponApplyResult {
+  applied: AppliedCoupon | null;
+  usable: boolean;
+  reason: string | null;
+  /** เหตุผลที่ใช้ไม่ได้ เป็นข้อความไทยจาก server — แสดงตรง ๆ ได้เลย */
+  message: string | null;
+  discountTotal: number;
+  shippingDiscount: number;
+}
+
 export interface CheckoutSummary {
   items: CartItem[];
   subtotal: number;
   discountTotal: number;
+  /** คูปองที่ใช้ได้จริงกับตะกร้านี้ — null = ไม่ได้ใส่ หรือใส่แล้วใช้ไม่ได้ */
+  appliedCoupon: AppliedCoupon | null;
+  /** เหตุผลที่คูปองที่กรอกใช้ไม่ได้ — ต้องแสดงให้ผู้ใช้เห็น */
+  couponError: string | null;
   shippingFee: number;
   total: number;
   selectedShippingMethod: ShippingMethodCode;
@@ -452,6 +478,8 @@ export interface CreateOrderInput {
   shippingMethod: ShippingMethodCode;
   customerNote?: string;
   idempotencyKey: string;
+  /** ส่งได้แค่ **รหัส** — ยอดส่วนลดคิดที่ server ใหม่ทุกครั้ง (STEP 41) */
+  couponCode?: string;
 }
 
 /* ─── STEP 11: Payment ────────────────────────────────────────────────────── */

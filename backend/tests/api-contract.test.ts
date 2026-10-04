@@ -113,6 +113,7 @@ const STRICT_RATE_LIMITED = new Set([
   'POST /api/ai/knowledge/ask',
   'POST /api/ai/knowledge/articles/:id/helpful',
   'GET /api/ai/knowledge/articles/:slug', // เพิ่ม viewCount ที่ฐานข้อมูล
+  'POST /api/coupons/apply', // เดารหัสคูปองได้ถ้ายิงรัว (STEP 41)
 ]);
 
 /** เส้นทางที่รับไฟล์อัปโหลดได้ — มีแค่การนำเข้าข้อมูลของหลังบ้าน */
@@ -122,7 +123,7 @@ const UPLOAD_ROUTES = new Set([
 ]);
 
 /** กลุ่มที่เอกสารประกาศว่า "ยังไม่มี" — ต้องไม่มีอยู่จริง */
-const PLANNED_PREFIXES = ['/api/brands', '/api/coupons', '/api/returns', '/api/shipments'];
+const PLANNED_PREFIXES = ['/api/brands', '/api/returns', '/api/shipments'];
 
 // ─── เอกสาร ────────────────────────────────────────────────────────────────
 

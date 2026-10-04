@@ -1,5 +1,11 @@
 import { apiFetch } from "@/lib/api";
-import type { CheckoutSummary, CreateOrderInput, Order, ShippingMethodCode } from "@/types/catalog";
+import type {
+  CheckoutSummary,
+  CouponApplyResult,
+  CreateOrderInput,
+  Order,
+  ShippingMethodCode,
+} from "@/types/catalog";
 
 /**
  * ชั้นเดียวที่เรียก API ของ checkout/คำสั่งซื้อ (STEP 10)
@@ -12,8 +18,32 @@ import type { CheckoutSummary, CreateOrderInput, Order, ShippingMethodCode } fro
  * (ตอน dev เบราว์เซอร์ส่ง cookie ข้าม port ได้ · production ใช้หน้า server เป็นตัวอ่าน)
  */
 
-export function fetchCheckoutSummary(shippingMethod: ShippingMethodCode): Promise<CheckoutSummary> {
-  return apiFetch<CheckoutSummary>(`/api/checkout/summary?shippingMethod=${shippingMethod}`, {
+export function fetchCheckoutSummary(
+  shippingMethod: ShippingMethodCode,
+  couponCode?: string,
+): Promise<CheckoutSummary> {
+  const query = new URLSearchParams({ shippingMethod });
+
+  if (couponCode) query.set("couponCode", couponCode);
+
+  return apiFetch<CheckoutSummary>(`/api/checkout/summary?${query.toString()}`, {
+    cache: "no-store",
+  });
+}
+
+/**
+ * ตรวจคูปองกับตะกร้าของตัวเอง (STEP 41)
+ *
+ * ⚠️ **ยังไม่ถือว่าใช้คูปอง** — โควตาถูกจองตอนสร้างคำสั่งซื้อเท่านั้น
+ *    และ server คิดส่วนลดใหม่อีกครั้งตอนนั้น ค่าที่ได้จากที่นี่ใช้แสดงผลล่วงหน้าเท่านั้น
+ */
+export function applyCoupon(
+  code: string,
+  shippingMethod: ShippingMethodCode,
+): Promise<CouponApplyResult> {
+  return apiFetch<CouponApplyResult>("/api/coupons/apply", {
+    method: "POST",
+    json: { code, shippingMethod },
     cache: "no-store",
   });
 }

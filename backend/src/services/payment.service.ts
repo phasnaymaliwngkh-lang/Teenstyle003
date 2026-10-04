@@ -15,6 +15,7 @@ import { toNumber } from '../models/pricing.ts';
 import { ApiError } from '../utils/api-error.ts';
 import { logger } from '../utils/logger.ts';
 
+import { releaseCouponForCancelledOrder } from './coupon.service.ts';
 import { deductStockForOrder, releaseReservationForOrder } from './inventory.service.ts';
 import {
   notifyCodConfirmed,
@@ -607,6 +608,7 @@ async function releaseOrderFromSession(
     releasedVariantIds = variantIdsOf(order);
 
     await releaseReservationForOrder(tx, order);
+    await releaseCouponForCancelledOrder(tx, orderId);
 
     await tx.payment.updateMany({
       where: { orderId },
@@ -679,6 +681,7 @@ export async function cancelUnpaidOrder(userId: string, orderNumber: string): Pr
     }
 
     await releaseReservationForOrder(tx, order);
+    await releaseCouponForCancelledOrder(tx, order.id);
 
     await tx.payment.updateMany({
       where: { orderId: order.id, status: { in: ['PENDING', 'PROCESSING'] } },
@@ -746,6 +749,7 @@ export async function expireOverdueOrders(now: Date = new Date()): Promise<numbe
       if (fresh.status !== 'PENDING_PAYMENT' || fresh.paymentStatus === 'PAID') return;
 
       await releaseReservationForOrder(tx, order);
+      await releaseCouponForCancelledOrder(tx, order.id);
 
       await tx.payment.updateMany({
         where: { orderId: order.id, status: { in: ['PENDING', 'PROCESSING'] } },

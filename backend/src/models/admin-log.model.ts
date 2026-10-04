@@ -32,6 +32,7 @@ export const TARGET_TYPES = [
   'User',
   'KnowledgeArticle',
   'AIConversation',
+  'Coupon',
 ] as const;
 
 export type TargetType = (typeof TARGET_TYPES)[number];
@@ -65,6 +66,8 @@ const TARGET_META: Readonly<Record<TargetType, TargetMeta>> = {
     aliases: ['AI_CONVERSATION'],
     hrefPrefix: null,
   },
+  // คูปองแก้ได้ที่หน้ารายการ ยังไม่มีหน้ารายตัว จึงไม่มีลิงก์ (ห้ามเดาลิงก์ — กฎ STEP 27 ข้อ 6)
+  Coupon: { label: 'คูปองส่วนลด', aliases: ['COUPON'], hrefPrefix: null },
 };
 
 /** ทุกชื่อที่เคยใช้แทนชนิดนี้ — ใช้กับ `where.targetType.in` ตอนกรอง */
@@ -117,6 +120,9 @@ export const ACTION_LABELS: Readonly<Record<string, string>> = {
   'knowledge.update': 'แก้ไขบทความคลังความรู้',
   'knowledge.delete': 'ลบบทความคลังความรู้',
   'knowledge.reset': 'รีเซ็ตคลังความรู้เป็นค่าตั้งต้น',
+  'coupon.create': 'สร้างคูปองส่วนลด',
+  'coupon.update': 'แก้ไขคูปองส่วนลด',
+  'coupon.delete': 'ปิดใช้งานคูปองส่วนลด',
   'support.ticket.assign': 'รับเรื่องจากลูกค้า',
   'support.ticket.reply': 'ตอบลูกค้าในนามเจ้าหน้าที่',
   'support.ticket.status': 'เปลี่ยนสถานะเคสบริการลูกค้า',

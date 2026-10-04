@@ -1,6 +1,9 @@
 import { apiFetch } from "@/lib/api";
 import { publicEnv } from "@/lib/env";
 import type {
+  AdminCoupon,
+  CreateCouponInput,
+  UpdateCouponInput,
   AdjustStockInput,
   AdminOrder,
   AdminProduct,
@@ -257,4 +260,30 @@ export function downloadAdminLogs(query: string, format: FileFormat): Promise<vo
     `/api/admin/logs/export?format=${format}${q ? `&${q}` : ""}`,
     `admin_logs.${format}`,
   );
+}
+
+/* ─── STEP 41: Coupon ─────────────────────────────────────────────────────── */
+
+export function createCoupon(input: CreateCouponInput): Promise<AdminCoupon> {
+  return apiFetch<AdminCoupon>("/api/admin/coupons", {
+    method: "POST",
+    json: input,
+    cache: "no-store",
+  });
+}
+
+export function updateCoupon(couponId: string, input: UpdateCouponInput): Promise<AdminCoupon> {
+  return apiFetch<AdminCoupon>(`/api/admin/coupons/${encodeURIComponent(couponId)}`, {
+    method: "PATCH",
+    json: input,
+    cache: "no-store",
+  });
+}
+
+/** ปิดใช้งาน (soft delete) — `Order.couponId` ยังอ้างถึงแถวนี้ จึงลบถาวรไม่ได้ */
+export function deleteCoupon(couponId: string): Promise<{ success: boolean }> {
+  return apiFetch<{ success: boolean }>(`/api/admin/coupons/${encodeURIComponent(couponId)}`, {
+    method: "DELETE",
+    cache: "no-store",
+  });
 }

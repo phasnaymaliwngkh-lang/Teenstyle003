@@ -10,6 +10,7 @@ import { cartRouter } from './cart.route.ts';
 import { categoryRouter, lookRouter, productRouter } from './catalog.route.ts';
 import { healthRouter } from './health.route.ts';
 import { notificationRouter } from './notification.route.ts';
+import { couponRouter } from './coupon.route.ts';
 import { checkoutRouter, orderRouter } from './order.route.ts';
 import { paymentRouter } from './payment.route.ts';
 import { reviewRouter } from './review.route.ts';
@@ -63,6 +64,12 @@ const API_GROUPS: readonly ApiGroup[] = [
   },
   { path: '/checkout', router: checkoutRouter, step: 10, note: 'สรุปยอดก่อนสั่งซื้อ' },
   {
+    path: '/coupons',
+    router: couponRouter,
+    step: 41,
+    note: 'ตรวจคูปองส่วนลดกับตะกร้าของตัวเอง (ต้องล็อกอิน · คุมความถี่แบบเข้ม)',
+  },
+  {
     path: '/orders',
     router: orderRouter,
     step: 12,
@@ -114,7 +121,6 @@ const PLANNED_GROUPS = [
     note: 'รายการแบรนด์แยกกลุ่ม — ตอนนี้กรองแบรนด์ผ่าน /api/products ได้แล้ว',
   },
   { path: '/api/shipments', step: 44, note: 'จัดการใบจัดส่งและผู้ให้บริการขนส่ง' },
-  { path: '/api/coupons', step: 41, note: 'คูปองและส่วนลด' },
   { path: '/api/returns', step: 43, note: 'คืนสินค้าและคืนเงิน' },
 ] as const;
 

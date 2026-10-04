@@ -68,6 +68,7 @@ export const ROUTES = [
   { path: '/admin/barcodes?code={sku}', as: 'admin' },
   { path: '/admin/barcodes/labels?variantId={variantId}', as: 'admin' },
   { path: '/admin/import-export', as: 'admin' },
+  { path: '/admin/coupons', as: 'admin' },
   { path: '/admin/reviews', as: 'admin' },
   { path: '/admin/customers', as: 'admin' },
   { path: '/admin/customers/{customerId}', as: 'admin' },

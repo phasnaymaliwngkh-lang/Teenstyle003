@@ -1,6 +1,7 @@
 import { getPrisma, Prisma } from '@teenstyle/database';
 
 import { toOrder, type OrderDto } from '../models/order.model.ts';
+import { releaseCouponForCancelledOrder } from './coupon.service.ts';
 import { toNumber } from '../models/pricing.ts';
 import { writeAdminLog } from '../models/admin-log.model.ts';
 import { ApiError } from '../utils/api-error.ts';
@@ -365,6 +366,7 @@ export async function updateOrderStatus(
        */
       if (current.status === 'PENDING_PAYMENT') {
         await releaseReservationForOrder(tx, current);
+        await releaseCouponForCancelledOrder(tx, current.id);
       } else {
         await restockForOrder(
           tx,
