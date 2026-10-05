@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { LOYALTY_TIERS, ROLE_NAMES, USER_STATUSES } from '../models/customer.model.ts';
+import { LOYALTY_TIER_CODES } from '../config/loyalty.ts';
+import { ROLE_NAMES, USER_STATUSES } from '../models/customer.model.ts';
 
 /**
  * Validator ของข้อมูลลูกค้า (STEP 25)
@@ -134,7 +135,8 @@ export const adminCustomerQuerySchema = z.object({
   q: z.string().trim().max(120).optional(),
   status: z.enum(USER_STATUSES).optional(),
   role: z.enum(ROLE_NAMES).optional(),
-  tier: z.enum(LOYALTY_TIERS).optional(),
+  /** ระดับสมาชิก — คำนวณสดจากยอดที่จ่ายจริง (STEP 42) จึงกรองด้วยช่วงยอด ไม่ใช่คอลัมน์ */
+  tier: z.enum(LOYALTY_TIER_CODES).optional(),
   sort: z.enum(CUSTOMER_SORTS).default('recent'),
   page: z.coerce.number().int().min(1).max(1000).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(20),

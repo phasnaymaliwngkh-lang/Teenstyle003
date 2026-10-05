@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   Bell,
   CircleX,
+  Coins,
   Loader2,
   Package,
   Star,
@@ -33,6 +34,7 @@ const LOOK: Record<NotificationType, { icon: typeof Bell; tone: string }> = {
   WISHLIST_UPDATE: { icon: Tag, tone: "text-brand" },
   PROMOTION: { icon: Tag, tone: "text-brand" },
   REVIEW_UPDATE: { icon: Star, tone: "text-warning" },
+  LOYALTY_UPDATE: { icon: Coins, tone: "text-brand" },
   LOW_STOCK: { icon: Bell, tone: "text-warning" },
   SYSTEM: { icon: Bell, tone: "text-muted" },
 };

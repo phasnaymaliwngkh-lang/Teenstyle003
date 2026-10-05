@@ -1,3 +1,5 @@
+import type { Prisma } from '@teenstyle/database';
+
 import { findShippingOption, type ShippingMethodCode } from '../config/shipping.ts';
 
 import { toNumber } from './pricing.ts';
@@ -60,6 +62,23 @@ export function findOrderNumberIn(text: string): string | null {
   return `${ORDER_NUMBER_PREFIX}-${match[1]}-${match[2]}`;
 }
 
+/* ───────────── "ร้านได้รับเงินแล้ว" — เกณฑ์เดียวที่ทุกยอดเงินจริงใช้ ───────────── */
+
+/**
+ * คำสั่งซื้อที่นับเป็น **เงินที่ร้านได้รับจริง** — จ่ายแล้วและไม่ถูกยกเลิก/คืนเงิน
+ *
+ * ใช้ทั้ง "ยอดที่ได้รับ" ของลูกค้าในหลังบ้าน (STEP 25) และยอดสะสมที่ใช้ตัดสินระดับสมาชิก
+ * (STEP 42) — สองตัวเลขนี้ต้องตรงกันเสมอ ไม่งั้นแอดมินเห็นยอด 12,000 แต่ลูกค้ายังเป็น Silver
+ *
+ * ⚠️ คิวรีแบบ raw SQL ที่ต้องใช้เกณฑ์เดียวกันอยู่ที่ `findUserIdsBySpendRange()`
+ *    ใน admin-customer.service.ts — มีเทสต์เทียบผลของสองทางนี้ตรง ๆ
+ */
+export const PAID_ORDER_WHERE: Prisma.OrderWhereInput = {
+  deletedAt: null,
+  paymentStatus: 'PAID',
+  status: { notIn: ['CANCELLED', 'REFUNDED'] },
+};
+
 export interface OrderAddressSnapshot {
   recipientName: string;
   phone: string;
@@ -117,6 +136,15 @@ export interface OrderDto {
   paymentStatus: string;
   subtotal: number;
   discountTotal: number;
+  /** แต้มที่ใช้เป็นส่วนลด (STEP 42) — มูลค่าเป็นบาทอยู่ใน pointsDiscount */
+  pointsRedeemed: number;
+  /** ส่วนหนึ่งของ discountTotal ที่มาจากแต้ม — ไม่ใช่ส่วนลดก้อนที่สอง */
+  pointsDiscount: number;
+  /**
+   * แต้มสุทธิที่ได้จากคำสั่งซื้อนี้ (ได้ − ถูกหักคืนเมื่อยกเลิก)
+   * 0 = ยังไม่ได้ (แต้มเข้าเมื่อร้านได้รับเงิน) หรือยอดไม่ถึงหนึ่งแต้ม
+   */
+  pointsEarned: number;
   shippingFee: number;
   total: number;
   shippingMethod: ShippingMethodCode;
@@ -144,6 +172,10 @@ export interface OrderRow {
   paymentStatus: string;
   subtotal: unknown;
   discountTotal: unknown;
+  /** STEP 42 — ไม่บังคับ เพื่อให้ผู้เรียกเก่ายังใช้ได้ */
+  pointsRedeemed?: number;
+  pointsDiscount?: unknown;
+  pointTransactions?: { type: string; delta: number }[];
   shippingFee: unknown;
   total: unknown;
   shippingMethod: string;
@@ -279,6 +311,11 @@ export function toOrder(order: OrderRow): OrderDto {
     paymentStatus: order.paymentStatus,
     subtotal: toNumber(order.subtotal),
     discountTotal: toNumber(order.discountTotal),
+    pointsRedeemed: order.pointsRedeemed ?? 0,
+    pointsDiscount: toNumber(order.pointsDiscount),
+    pointsEarned: (order.pointTransactions ?? [])
+      .filter((row) => row.type === 'EARN' || row.type === 'EARN_REVERSAL')
+      .reduce((sum, row) => sum + row.delta, 0),
     shippingFee: toNumber(order.shippingFee),
     total: toNumber(order.total),
     shippingMethod: method,

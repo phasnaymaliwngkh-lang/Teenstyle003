@@ -18,6 +18,12 @@ import { logger } from '../utils/logger.ts';
 import { releaseCouponForCancelledOrder } from './coupon.service.ts';
 import { deductStockForOrder, releaseReservationForOrder } from './inventory.service.ts';
 import {
+  awardPointsForPaidOrder,
+  notifyAfterAward,
+  releasePointsForCancelledOrder,
+  type PointsAward,
+} from './loyalty.service.ts';
+import {
   notifyCodConfirmed,
   notifyOrderCancelled,
   notifyPaymentFailed,
@@ -50,6 +56,10 @@ const ORDER_FOR_PAYMENT_SELECT = {
   paymentStatus: true,
   subtotal: true,
   discountTotal: true,
+  // แต้มที่ใช้/ได้จากคำสั่งซื้อนี้ (STEP 42)
+  pointsRedeemed: true,
+  pointsDiscount: true,
+  pointTransactions: { select: { type: true, delta: true } },
   shippingFee: true,
   total: true,
   shippingMethod: true,
@@ -482,6 +492,11 @@ async function markOrderPaid(
 
   // เก็บไว้ตรวจเตือนสต็อกหลังทรานแซกชัน commit — ตั้งค่าเฉพาะเส้นทางที่ตัดสต็อกจริง
   let deductedVariantIds: string[] = [];
+  /**
+   * แต้มที่ให้ในทรานแซกชันนี้ — แจ้งลูกค้าหลัง commit (STEP 42)
+   * เขียนแบบ `as` เพราะ TypeScript ไม่ติดตามการกำหนดค่าใน callback แล้วจะถือว่ายังเป็น null เสมอ
+   */
+  let pointsAward = null as PointsAward | null;
 
   const action = await prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
@@ -547,6 +562,9 @@ async function markOrderPaid(
       data: { status: 'PAID', paymentStatus: 'PAID', paidAt },
     });
 
+    // ร้านได้รับเงินแล้ว → ให้แต้ม (STEP 42) — หลังตั้ง PAID เพราะยอดสะสมนับจากออเดอร์ที่จ่ายแล้ว
+    pointsAward = await awardPointsForPaidOrder(tx, orderId);
+
     return 'paid';
   });
 
@@ -570,10 +588,13 @@ async function markOrderPaid(
           notifyPaymentSuccess(
             { userId: paid.userId, orderId, orderNumber: paid.orderNumber },
             toNumber(paid.total),
+            { pointsEarned: pointsAward?.points ?? 0 },
           ),
         `order:${orderId}:paid`,
       );
     }
+
+    await notifyAfterAward(pointsAward);
   }
 
   return action;
@@ -609,6 +630,7 @@ async function releaseOrderFromSession(
 
     await releaseReservationForOrder(tx, order);
     await releaseCouponForCancelledOrder(tx, orderId);
+    await releasePointsForCancelledOrder(tx, orderId);
 
     await tx.payment.updateMany({
       where: { orderId },
@@ -682,6 +704,7 @@ export async function cancelUnpaidOrder(userId: string, orderNumber: string): Pr
 
     await releaseReservationForOrder(tx, order);
     await releaseCouponForCancelledOrder(tx, order.id);
+    await releasePointsForCancelledOrder(tx, order.id);
 
     await tx.payment.updateMany({
       where: { orderId: order.id, status: { in: ['PENDING', 'PROCESSING'] } },
@@ -750,6 +773,7 @@ export async function expireOverdueOrders(now: Date = new Date()): Promise<numbe
 
       await releaseReservationForOrder(tx, order);
       await releaseCouponForCancelledOrder(tx, order.id);
+      await releasePointsForCancelledOrder(tx, order.id);
 
       await tx.payment.updateMany({
         where: { orderId: order.id, status: { in: ['PENDING', 'PROCESSING'] } },

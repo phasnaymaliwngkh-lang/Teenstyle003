@@ -28,7 +28,7 @@ export function CartSummaryCard({ summary, isGuest }: { summary: CartSummary; is
         <Row
           label="ส่วนลด"
           value={summary.discountTotal > 0 ? `-${formatBaht(summary.discountTotal)}` : "—"}
-          hint={summary.discountTotal === 0 ? "ใส่คูปองได้ใน STEP 41" : undefined}
+          hint={summary.discountTotal === 0 ? "ใส่คูปองและใช้แต้มได้ที่หน้าชำระเงิน" : undefined}
         />
 
         <Row

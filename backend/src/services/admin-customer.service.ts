@@ -1,4 +1,6 @@
-import { getPrisma, type Prisma } from '@teenstyle/database';
+import { getPrisma, Prisma } from '@teenstyle/database';
+
+import { LOYALTY_TIERS, type LoyaltyTierCode } from '../config/loyalty.ts';
 
 import {
   ADDRESS_SELECT,
@@ -13,6 +15,7 @@ import {
   type RoleNameCode,
 } from '../models/customer.model.ts';
 import { writeAdminLog } from '../models/admin-log.model.ts';
+import { PAID_ORDER_WHERE } from '../models/order.model.ts';
 import { toNumber } from '../models/pricing.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type {
@@ -26,10 +29,11 @@ import type {
  *
  * กฎที่ห้ามละเมิด
  *
- *   1. **ยอดซื้อนับจากตาราง `Order` จริงเท่านั้น** — ห้ามอ่านคอลัมน์ `User.totalSpent`
- *      ซึ่งยังไม่มีใครเขียน (เป็น 0 ทุกคน · จะมาพร้อมระบบแต้ม STEP 42)
- *      และ "ยอดที่ได้รับ" นับเฉพาะ `paymentStatus = PAID` ส่วน COD ที่ยังไม่เก็บเงิน
+ *   1. **ยอดซื้อนับจากตาราง `Order` จริงเท่านั้น** — ไม่มีคอลัมน์ cache ให้อ่าน
+ *      (`User.totalSpent` ที่ไม่มีใครเขียนถูกถอดออกตอน STEP 42)
+ *      "ยอดที่ได้รับ" นับเฉพาะ `paymentStatus = PAID` ส่วน COD ที่ยังไม่เก็บเงิน
  *      แยกเป็นอีกช่อง (เกณฑ์เดียวกับ dashboard STEP 13 ข้อ 6)
+ *      และระดับสมาชิกคิดจากยอดเดียวกันนี้ (STEP 42) — สองตัวเลขจึงไม่มีทางขัดกัน
  *
  *   2. **ห้ามแก้บัญชีตัวเอง** — ทั้งสถานะและบทบาท
  *      ระงับตัวเองคือการล็อกตัวเองออกจากร้าน ลดบทบาทตัวเองคือการทิ้งกุญแจ
@@ -62,12 +66,49 @@ export interface CustomerActor {
   userAgent?: string | undefined;
 }
 
-/** ออเดอร์ที่นับเป็น "ได้รับเงินแล้ว" — เกณฑ์เดียวกับหน้า dashboard */
-const PAID_WHERE: Prisma.OrderWhereInput = {
-  deletedAt: null,
-  paymentStatus: 'PAID',
-  status: { notIn: ['CANCELLED', 'REFUNDED'] },
-};
+/** ออเดอร์ที่นับเป็น "ได้รับเงินแล้ว" — เกณฑ์เดียวกับหน้า dashboard และระดับสมาชิก */
+const PAID_WHERE = PAID_ORDER_WHERE;
+
+/**
+ * ผู้ใช้ที่ยอดที่จ่ายจริงสะสมอยู่ในช่วง [min, max) — ใช้กรองตามระดับสมาชิก
+ *
+ * ⚠️ ต้องเป็นเงื่อนไขเดียวกับ `PAID_ORDER_WHERE` ทุกข้อ (มีเทสต์เทียบสองทางนี้ตรง ๆ)
+ *    ที่ต้องเขียนเป็น SQL เพราะ Prisma กรองด้วยผลรวม (HAVING) ไม่ได้
+ * ⚠️ กรอง **ก่อน** แบ่งหน้าเสมอ (บทเรียนจากตัวกรองสต็อกต่ำของ STEP 14 ข้อ 7)
+ */
+export async function findUserIdsBySpendRange(
+  min: number,
+  maxExclusive: number | null,
+): Promise<string[]> {
+  const upper =
+    maxExclusive === null ? Prisma.empty : Prisma.sql`AND SUM(o."total") < ${maxExclusive}`;
+
+  const rows = await getPrisma().$queryRaw<{ userId: string }[]>`
+    SELECT o."userId"
+      FROM "Order" o
+     WHERE o."deletedAt" IS NULL
+       AND o."paymentStatus" = 'PAID'
+       AND o."status" NOT IN ('CANCELLED', 'REFUNDED')
+     GROUP BY o."userId"
+    HAVING SUM(o."total") >= ${min} ${upper}`;
+
+  return rows.map((row) => row.userId);
+}
+
+/** เงื่อนไขของผู้ใช้ที่อยู่ระดับนี้ — ระดับแรก (ยอด 0) รวมคนที่ยังไม่เคยจ่ายเงินเลยด้วย */
+async function tierWhere(code: LoyaltyTierCode): Promise<Prisma.UserWhereInput> {
+  const index = LOYALTY_TIERS.findIndex((tier) => tier.code === code);
+  const tier = LOYALTY_TIERS[index]!;
+  const next = LOYALTY_TIERS[index + 1] ?? null;
+
+  if (tier.minSpend <= 0) {
+    // คนที่ไม่เคยมีคำสั่งซื้อที่จ่ายแล้วไม่มีแถวให้ GROUP BY → นับแบบ "ไม่ได้อยู่ระดับที่สูงกว่า"
+    if (next === null) return {};
+    return { id: { notIn: await findUserIdsBySpendRange(next.minSpend, null) } };
+  }
+
+  return { id: { in: await findUserIdsBySpendRange(tier.minSpend, next?.minSpend ?? null) } };
+}
 
 /** COD ที่ยืนยันแล้วแต่เงินยังไม่ถึงมือร้าน — ห้ามรวมกับยอดขาย */
 const PENDING_COD_WHERE: Prisma.OrderWhereInput = {
@@ -168,8 +209,8 @@ export async function adminListCustomers(
   const where: Prisma.UserWhereInput = { deletedAt: null };
 
   if (query.status !== undefined) where.status = query.status;
-  if (query.tier !== undefined) where.loyaltyTier = query.tier;
   if (query.role !== undefined) where.role = { name: query.role };
+  if (query.tier !== undefined) Object.assign(where, await tierWhere(query.tier));
 
   if (query.q !== undefined && query.q.length > 0) {
     where.OR = [
@@ -267,12 +308,12 @@ function rankOf(role: string): number {
 }
 
 /**
- * ด่านกลางของทุกการแก้บัญชีผู้อื่น
+ * ด่านกลางของทุกการแก้บัญชีผู้อื่น — รวมถึงการปรับแต้มของ STEP 42 (loyalty.service.ts)
  *
  * คืนแถวเป้าหมาย หรือโยน error ที่บอกเหตุผลตรง ๆ
  * (ตรวจ **ก่อน** เขียนอะไรทั้งสิ้น และอยู่ในทรานแซกชันเดียวกับการเขียน)
  */
-async function assertCanManage(
+export async function assertCanManage(
   tx: Prisma.TransactionClient,
   targetUserId: string,
   actor: CustomerActor,

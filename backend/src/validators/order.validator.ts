@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { couponCodeSchema } from './coupon.validator.ts';
+import { pointsToRedeemSchema } from './loyalty.validator.ts';
 
 import { SHIPPING_METHODS } from '../config/shipping.ts';
 
@@ -55,6 +56,11 @@ export const createOrderSchema = z
      * ยอดส่วนลดคิดที่ server ใหม่ทุกครั้งตอนสร้างออเดอร์ ห้ามเชื่อยอดจาก client
      */
     couponCode: couponCodeSchema.optional(),
+    /**
+     * แต้มที่จะใช้เป็นส่วนลด (STEP 42) — client ส่งได้แค่ **จำนวนแต้ม**
+     * มูลค่าเป็นบาท · แต้มคงเหลือ · เพดานของบิล คิดที่ server จากฐานข้อมูลทั้งหมด
+     */
+    pointsToRedeem: pointsToRedeemSchema.optional(),
   })
   .refine((value) => value.addressId !== undefined || value.newAddress !== undefined, {
     message: 'ต้องเลือกที่อยู่จัดส่ง หรือกรอกที่อยู่ใหม่',
@@ -66,6 +72,8 @@ export const checkoutSummaryQuerySchema = z.object({
   shippingMethod: z.enum(SHIPPING_METHODS).default('STANDARD'),
   /** ดูยอดหลังใช้คูปองนี้ (STEP 41) — ไม่ส่งมา = ไม่คิดส่วนลด */
   couponCode: couponCodeSchema.optional(),
+  /** ดูยอดหลังใช้แต้มจำนวนนี้ (STEP 42) — ไม่ส่งมา = ไม่ใช้แต้ม */
+  pointsToRedeem: pointsToRedeemSchema.optional(),
 });
 
 /** สถานะคำสั่งซื้อ — ต้องตรงกับ enum OrderStatus ใน schema.prisma */

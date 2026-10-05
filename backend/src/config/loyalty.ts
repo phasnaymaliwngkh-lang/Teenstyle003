@@ -1,0 +1,65 @@
+/**
+ * กติกาแต้มสะสมและระดับสมาชิก (STEP 42)
+ *
+ * ⚠️ นี่คือ **แหล่งความจริงเดียว** ของตัวเลขทุกตัวในระบบแต้ม — ทั้งที่คิดจริงตอนให้/ใช้แต้ม
+ *    และที่หน้าเว็บอธิบายให้ลูกค้าอ่าน (หน้าเว็บอ่านค่าเหล่านี้ผ่าน API ไม่ได้พิมพ์เอง)
+ *    กฎเดียวกับ config/shipping.ts และ config/store.ts: ตัวเลขที่บอกลูกค้ากับตัวเลขที่คิดจริง
+ *    ต้องมาจากที่เดียวกัน ไม่งั้นวันหนึ่งจะไม่ตรงกันแล้วไม่มีใครรู้ (บทเรียนจาก STEP 21)
+ *
+ * ค่าเหล่านี้ฝังในโค้ด — ยังไม่มีหน้าให้ร้านแก้เอง (การตั้งค่าร้านเป็นงานของ STEP 49)
+ */
+
+/** ทุก ๆ กี่บาทที่ **จ่ายจริง** ได้ 1 แต้ม (ก่อนคูณตามระดับสมาชิก) */
+export const EARN_BAHT_PER_POINT = 10;
+
+/** ใช้กี่แต้มแลกส่วนลด 1 บาท */
+export const REDEEM_POINTS_PER_BAHT = 10;
+
+/**
+ * แลกได้ทีละกี่แต้ม — เท่ากับ "1 บาท" พอดี ส่วนลดจึงเป็นจำนวนเต็มบาทเสมอ
+ * (ไม่มีเศษสตางค์ที่ต้องทอนตอนเก็บเงินปลายทาง)
+ */
+export const REDEEM_STEP_POINTS = REDEEM_POINTS_PER_BAHT;
+
+/** แลกขั้นต่ำต่อคำสั่งซื้อ (แต้ม) */
+export const REDEEM_MINIMUM_POINTS = 100;
+
+/**
+ * แต้มจ่ายแทนเงินได้ไม่เกินกี่ % ของยอดสินค้า
+ * ส่วนที่เหลือต้องจ่ายเป็นเงินจริง — คำสั่งซื้อที่จ่ายด้วยแต้มล้วนจะไม่มีเงินเข้าร้านเลย
+ */
+export const REDEEM_MAX_PERCENT_OF_SUBTOTAL = 50;
+
+export const LOYALTY_TIER_CODES = ['MEMBER', 'SILVER', 'GOLD', 'VIP'] as const;
+
+export type LoyaltyTierCode = (typeof LOYALTY_TIER_CODES)[number];
+
+export interface LoyaltyTierRule {
+  code: LoyaltyTierCode;
+  name: string;
+  /** ยอดที่จ่ายจริงสะสม (บาท) ที่ทำให้ได้ระดับนี้ */
+  minSpend: number;
+  /**
+   * ตัวคูณแต้มเป็น "ร้อยละ" (100 = ×1) — เก็บเป็นจำนวนเต็มเพื่อไม่ให้ทศนิยมลอยของ JS
+   * ทำให้แต้มที่ควรได้หายไปหนึ่งแต้ม (เช่น 0.1 × 3 ≠ 0.3)
+   */
+  earnMultiplierPercent: number;
+}
+
+/**
+ * ระดับสมาชิก — ต้องเรียงจากเกณฑ์ต่ำไปสูง และระดับแรกต้องเริ่มที่ 0
+ * (มีเทสต์ตรวจทั้งสองข้อ ไม่งั้นบางยอดจะไม่ตกอยู่ในระดับใดเลย)
+ *
+ * ⚠️ ระดับคิดจาก **ยอดที่จ่ายจริงสะสมตลอดอายุบัญชี** — ยังไม่มีการลดระดับตามเวลา
+ *    เพราะการนับย้อนหลังแบบ "12 เดือนล่าสุด" ต้องมี job ตามเวลามาแจ้งเตือนตอนระดับลด
+ *    (job ตามเวลาเป็นงานของ STEP 52)
+ */
+export const LOYALTY_TIERS: readonly LoyaltyTierRule[] = [
+  { code: 'MEMBER', name: 'Member', minSpend: 0, earnMultiplierPercent: 100 },
+  { code: 'SILVER', name: 'Silver', minSpend: 3_000, earnMultiplierPercent: 125 },
+  { code: 'GOLD', name: 'Gold', minSpend: 10_000, earnMultiplierPercent: 150 },
+  { code: 'VIP', name: 'VIP', minSpend: 30_000, earnMultiplierPercent: 200 },
+];
+
+/** ปรับแต้มด้วยมือได้ไม่เกินเท่านี้ต่อครั้ง — กันพิมพ์เลขศูนย์เกินแล้วให้แต้มเป็นล้าน */
+export const ADJUSTMENT_MAX_POINTS = 100_000;

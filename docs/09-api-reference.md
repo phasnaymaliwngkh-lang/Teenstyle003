@@ -1,6 +1,6 @@
 # 09 — REST API Reference (STEP 29)
 
-Endpoint ทั้งหมดของ TEENSTYLE AI ที่เปิดใช้จริง **124 เส้นทาง** (นับรวม `GET /health` และ `GET /api`)
+Endpoint ทั้งหมดของ TEENSTYLE AI ที่เปิดใช้จริง **128 เส้นทาง** (นับรวม `GET /health` และ `GET /api`)
 
 > **เอกสารนี้ถูกบังคับให้ตรงกับโค้ด**
 > [backend/tests/api-contract.test.ts](../backend/tests/api-contract.test.ts) อ่านแผนผัง endpoint
@@ -149,18 +149,21 @@ backend อ่าน token ได้ 2 ทาง:
 
 ## บัญชีของฉัน — `/api/users`
 
-| Method | Path                                         | ต้องมี  | รายละเอียด                                                                           |
-| ------ | -------------------------------------------- | ------- | ------------------------------------------------------------------------------------ |
-| GET    | `/api/users/me`                              | ล็อกอิน | ตัวตนย่อ ๆ ของผู้ใช้ปัจจุบัน + บทบาทและสิทธิ์                                        |
-| GET    | `/api/users/me/profile`                      | ล็อกอิน | ชื่อ เบอร์โทร วันเกิด และสวิตช์การแนะนำแบบ personalized                              |
-| PATCH  | `/api/users/me/profile`                      | ล็อกอิน | แก้ได้เฉพาะ 4 ค่าที่ลูกค้ากรอกเอง — `email` `role` `status` `points` แก้ทางนี้ไม่ได้ |
-| GET    | `/api/users/me/addresses`                    | ล็อกอิน | สมุดที่อยู่ทั้งหมดของตัวเอง                                                          |
-| POST   | `/api/users/me/addresses`                    | ล็อกอิน | เพิ่มที่อยู่ (สูงสุด 20 แห่งต่อบัญชี)                                                |
-| PATCH  | `/api/users/me/addresses/:addressId/default` | ล็อกอิน | ตั้งเป็นที่อยู่เริ่มต้น — ปลดอันเดิมในทรานแซกชันเดียวกัน                             |
-| PATCH  | `/api/users/me/addresses/:addressId`         | ล็อกอิน | แก้ที่อยู่ — **ไม่กระทบปลายทางของคำสั่งซื้อที่สั่งไปแล้ว** (ใช้ snapshot)            |
-| DELETE | `/api/users/me/addresses/:addressId`         | ล็อกอิน | ลบแบบ soft delete · ถ้าลบอันที่เป็นค่าเริ่มต้น ระบบเลื่อนอันอื่นขึ้นแทน              |
+| Method | Path                                         | ต้องมี  | รายละเอียด                                                                             |
+| ------ | -------------------------------------------- | ------- | -------------------------------------------------------------------------------------- |
+| GET    | `/api/users/me`                              | ล็อกอิน | ตัวตนย่อ ๆ ของผู้ใช้ปัจจุบัน + บทบาทและสิทธิ์                                          |
+| GET    | `/api/users/me/profile`                      | ล็อกอิน | ชื่อ เบอร์โทร วันเกิด และสวิตช์การแนะนำแบบ personalized                                |
+| PATCH  | `/api/users/me/profile`                      | ล็อกอิน | แก้ได้เฉพาะ 4 ค่าที่ลูกค้ากรอกเอง — `email` `role` `status` `points` แก้ทางนี้ไม่ได้   |
+| GET    | `/api/users/me/addresses`                    | ล็อกอิน | สมุดที่อยู่ทั้งหมดของตัวเอง                                                            |
+| POST   | `/api/users/me/addresses`                    | ล็อกอิน | เพิ่มที่อยู่ (สูงสุด 20 แห่งต่อบัญชี)                                                  |
+| PATCH  | `/api/users/me/addresses/:addressId/default` | ล็อกอิน | ตั้งเป็นที่อยู่เริ่มต้น — ปลดอันเดิมในทรานแซกชันเดียวกัน                               |
+| PATCH  | `/api/users/me/addresses/:addressId`         | ล็อกอิน | แก้ที่อยู่ — **ไม่กระทบปลายทางของคำสั่งซื้อที่สั่งไปแล้ว** (ใช้ snapshot)              |
+| DELETE | `/api/users/me/addresses/:addressId`         | ล็อกอิน | ลบแบบ soft delete · ถ้าลบอันที่เป็นค่าเริ่มต้น ระบบเลื่อนอันอื่นขึ้นแทน                |
+| GET    | `/api/users/me/loyalty`                      | ล็อกอิน | แต้มคงเหลือ ระดับสมาชิก ยอดที่ต้องจ่ายเพิ่มเพื่อขึ้นระดับ และกติกาจาก config (STEP 42) |
+| GET    | `/api/users/me/loyalty/transactions`         | ล็อกอิน | ประวัติแต้มของตัวเอง (ได้ · ใช้ · คืน · ถูกหัก · ร้านปรับ) ใหม่สุดก่อน                 |
 
 ไม่มีเส้นทางใดรับ `userId` จาก client — เจ้าของข้อมูลมาจาก session เท่านั้น จึงไม่มีช่องอ่าน/แก้ข้อมูลของคนอื่น
+· แต้มสะสม **อ่านได้อย่างเดียว** ทางนี้ — เปลี่ยนได้จากคำสั่งซื้อจริงหรือร้านปรับให้เท่านั้น (ดู [15-loyalty.md](15-loyalty.md))
 
 ## สินค้า — `/api/products` · `/api/categories`
 
@@ -212,7 +215,7 @@ backend อ่าน token ได้ 2 ทาง:
 
 | Method | Path                               | ต้องมี  | รายละเอียด                                                                                       |
 | ------ | ---------------------------------- | ------- | ------------------------------------------------------------------------------------------------ |
-| GET    | `/api/checkout/summary`            | ล็อกอิน | ที่อยู่ที่เลือกได้ วิธีจัดส่งที่ใช้ได้ และยอดรวมก่อนสั่ง · รับ `couponCode` เพื่อดูยอดหลังส่วนลด |
+| GET    | `/api/checkout/summary`            | ล็อกอิน | ที่อยู่ที่เลือกได้ วิธีจัดส่งที่ใช้ได้ และยอดรวมก่อนสั่ง · รับ `couponCode` และ `pointsToRedeem` |
 | GET    | `/api/orders`                      | ล็อกอิน | ประวัติคำสั่งซื้อของตัวเอง + `counts` ต่อสถานะที่ตรงกับผลกรองจริง                                |
 | POST   | `/api/orders`                      | ล็อกอิน | สร้างคำสั่งซื้อ + **จองสต็อกแบบ atomic** · ซ้ำด้วย `idempotencyKey` เดิมได้ออเดอร์เดิม (200)     |
 | GET    | `/api/orders/:orderNumber/payment` | ล็อกอิน | สถานะการชำระ กำหนดชำระ และประวัติการจ่าย                                                         |
@@ -222,8 +225,9 @@ backend อ่าน token ได้ 2 ทาง:
 | GET    | `/api/payments/methods`            | สาธารณะ | ช่องทางที่เปิดใช้จริง **พร้อมเหตุผลถ้าปิด** (ห้ามมีปุ่มที่ทำให้ "จ่ายแล้ว" เอง)                  |
 | POST   | `/api/payments/webhook/stripe`     | สาธารณะ | Webhook ของ Stripe — **raw body + ตรวจลายเซ็น** · idempotent 3 ชั้น                              |
 
-**client ส่งได้แค่** `addressId`/`newAddress` + `shippingMethod` + `customerNote` + `idempotencyKey` + `couponCode`
-ราคา ยอดรวม ค่าจัดส่ง และรายการสินค้า อ่านจากตะกร้า+ฐานข้อมูลที่ server ทั้งหมด
+**client ส่งได้แค่** `addressId`/`newAddress` + `shippingMethod` + `customerNote` + `idempotencyKey` + `couponCode` +
+`pointsToRedeem` (จำนวนแต้ม ไม่ใช่มูลค่า — STEP 42)
+ราคา ยอดรวม ค่าจัดส่ง ส่วนลด และรายการสินค้า อ่านจากตะกร้า+ฐานข้อมูลที่ server ทั้งหมด
 · `paymentStatus = PAID` เปลี่ยนได้จากทางเดียวคือ webhook ที่ลายเซ็นถูกต้อง (COD ได้เงินตอนกด `DELIVERED`)
 · ออเดอร์ของคนอื่นได้ **404**
 
@@ -386,23 +390,25 @@ backend อ่าน token ได้ 2 ทาง:
 
 ### ตรวจรีวิว · ลูกค้า · รายงาน · ประวัติการแก้ไข
 
-| Method | Path                                           | ต้องมี             | รายละเอียด                                                                                |
-| ------ | ---------------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------- |
-| GET    | `/api/admin/reviews`                           | `review:moderate`  | คิวตรวจรีวิว — เห็นชื่อ/อีเมลจริงได้เพราะต้องติดต่อกลับ                                   |
-| PATCH  | `/api/admin/reviews/:reviewId/status`          | `review:moderate`  | อนุมัติ / ซ่อน / ไม่อนุมัติ — **ซ่อนหรือไม่อนุมัติต้องกรอกเหตุผล**                        |
-| GET    | `/api/admin/customers`                         | `customer:read`    | บัญชีผู้ใช้ทุกบทบาท + ค้นหาและกรอง (สรุปแยก "ลูกค้า" ออกจาก "ทีมงาน")                     |
-| GET    | `/api/admin/customers/:userId`                 | `customer:read`    | ข้อมูลลูกค้า + **ยอดซื้อที่นับจากตาราง `Order` จริง** ไม่ใช่คอลัมน์ `totalSpent`          |
-| PATCH  | `/api/admin/customers/:userId/status`          | `customer:update`  | ระงับ/ปลดระงับ — ระงับแล้ว **ลบ `Session` ทั้งหมด**ในทรานแซกชันเดียวกัน · ต้องมี `reason` |
-| PATCH  | `/api/admin/customers/:userId/role`            | `user:role:manage` | เปลี่ยนบทบาท — แตะได้แค่บัญชีที่ต่ำกว่าตัวเอง และตั้งได้ไม่เกินระดับตัวเอง                |
-| GET    | `/api/admin/analytics/summary`                 | `analytics:read`   | KPI + กราฟยอดขายตามช่วงเวลา — ตัดรอบตาม `paidAt` ไม่ใช่ `createdAt`                       |
-| GET    | `/api/admin/analytics/products`                | `analytics:read`   | อันดับสินค้า (จัดกลุ่มด้วย `productId` เท่านั้น ไม่ใช่ชื่อที่เป็น snapshot)               |
-| GET    | `/api/admin/analytics/customers`               | `analytics:read`   | อันดับลูกค้าตามยอดซื้อ — เรียงใน SQL ก่อนแบ่งหน้า                                         |
-| GET    | `/api/admin/analytics/breakdown`               | `analytics:read`   | แยกยอดตามหมวดหมู่ / ช่องทางชำระเงิน / วิธีจัดส่ง                                          |
-| GET    | `/api/admin/analytics/export`                  | `analytics:read`   | ดาวน์โหลดรายงาน — **ใช้ฟังก์ชันเดียวกับที่หน้าเว็บใช้** ไฟล์กับจอจึงตรงกันเสมอ            |
-| GET    | `/api/admin/logs/filters`                      | `log:read`         | ตัวเลือกของตัวกรองที่นับจากข้อมูลจริงในช่วงที่เลือก                                       |
-| GET    | `/api/admin/logs/export`                       | `log:read`         | ดาวน์โหลดประวัติการแก้ไข                                                                  |
-| GET    | `/api/admin/logs/target/:targetType/:targetId` | `log:read`         | ประวัติทั้งหมดของข้อมูลชิ้นเดียว (รวมชื่อชนิดแบบเก่าให้ด้วย)                              |
-| GET    | `/api/admin/logs`                              | `log:read`         | ประวัติการแก้ไขหลังบ้าน — **มีแต่ GET** สร้าง/แก้/ลบ log ไม่ได้                           |
+| Method | Path                                           | ต้องมี             | รายละเอียด                                                                                     |
+| ------ | ---------------------------------------------- | ------------------ | ---------------------------------------------------------------------------------------------- |
+| GET    | `/api/admin/reviews`                           | `review:moderate`  | คิวตรวจรีวิว — เห็นชื่อ/อีเมลจริงได้เพราะต้องติดต่อกลับ                                        |
+| PATCH  | `/api/admin/reviews/:reviewId/status`          | `review:moderate`  | อนุมัติ / ซ่อน / ไม่อนุมัติ — **ซ่อนหรือไม่อนุมัติต้องกรอกเหตุผล**                             |
+| GET    | `/api/admin/customers`                         | `customer:read`    | บัญชีผู้ใช้ทุกบทบาท + ค้นหาและกรอง (สรุปแยก "ลูกค้า" ออกจาก "ทีมงาน")                          |
+| GET    | `/api/admin/customers/:userId`                 | `customer:read`    | ข้อมูลลูกค้า + **ยอดซื้อและระดับสมาชิกที่นับจากตาราง `Order` จริง** + แต้มคงเหลือ              |
+| PATCH  | `/api/admin/customers/:userId/status`          | `customer:update`  | ระงับ/ปลดระงับ — ระงับแล้ว **ลบ `Session` ทั้งหมด**ในทรานแซกชันเดียวกัน · ต้องมี `reason`      |
+| PATCH  | `/api/admin/customers/:userId/role`            | `user:role:manage` | เปลี่ยนบทบาท — แตะได้แค่บัญชีที่ต่ำกว่าตัวเอง และตั้งได้ไม่เกินระดับตัวเอง                     |
+| GET    | `/api/admin/customers/:userId/points`          | `customer:read`    | ประวัติแต้มของลูกค้า + ผู้ที่ปรับ (STEP 42) — พนักงานต้องตอบได้ว่าแต้มมาจากไหน                 |
+| POST   | `/api/admin/customers/:userId/points`          | `loyalty:adjust`   | ปรับแต้ม `{ delta, reason, idempotencyKey }` — หักเกินยอดคงเหลือได้ **409** · ลูกค้าเห็นเหตุผล |
+| GET    | `/api/admin/analytics/summary`                 | `analytics:read`   | KPI + กราฟยอดขายตามช่วงเวลา — ตัดรอบตาม `paidAt` ไม่ใช่ `createdAt`                            |
+| GET    | `/api/admin/analytics/products`                | `analytics:read`   | อันดับสินค้า (จัดกลุ่มด้วย `productId` เท่านั้น ไม่ใช่ชื่อที่เป็น snapshot)                    |
+| GET    | `/api/admin/analytics/customers`               | `analytics:read`   | อันดับลูกค้าตามยอดซื้อ — เรียงใน SQL ก่อนแบ่งหน้า                                              |
+| GET    | `/api/admin/analytics/breakdown`               | `analytics:read`   | แยกยอดตามหมวดหมู่ / ช่องทางชำระเงิน / วิธีจัดส่ง                                               |
+| GET    | `/api/admin/analytics/export`                  | `analytics:read`   | ดาวน์โหลดรายงาน — **ใช้ฟังก์ชันเดียวกับที่หน้าเว็บใช้** ไฟล์กับจอจึงตรงกันเสมอ                 |
+| GET    | `/api/admin/logs/filters`                      | `log:read`         | ตัวเลือกของตัวกรองที่นับจากข้อมูลจริงในช่วงที่เลือก                                            |
+| GET    | `/api/admin/logs/export`                       | `log:read`         | ดาวน์โหลดประวัติการแก้ไข                                                                       |
+| GET    | `/api/admin/logs/target/:targetType/:targetId` | `log:read`         | ประวัติทั้งหมดของข้อมูลชิ้นเดียว (รวมชื่อชนิดแบบเก่าให้ด้วย)                                   |
+| GET    | `/api/admin/logs`                              | `log:read`         | ประวัติการแก้ไขหลังบ้าน — **มีแต่ GET** สร้าง/แก้/ลบ log ไม่ได้                                |
 
 ช่วงเวลาของรายงานและ log จำกัดไม่เกิน **366 วันต่อครั้ง** และตัดวันตามเวลาร้าน (`Asia/Bangkok`)
 · `changePercent` เป็น `null` เมื่อช่วงก่อนหน้าเป็น 0 ไม่ใช่ 0 หรือ +100%

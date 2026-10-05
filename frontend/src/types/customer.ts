@@ -1,3 +1,5 @@
+import type { LoyaltyTier } from "./loyalty";
+
 /**
  * Type ของข้อมูลลูกค้า (STEP 25) — ต้องตรงกับ DTO ฝั่ง backend
  *   backend/src/models/customer.model.ts
@@ -10,9 +12,6 @@ export type UserStatus = (typeof USER_STATUSES)[number];
 
 export const ROLE_NAMES = ["CUSTOMER", "EMPLOYEE", "ADMIN", "SUPER_ADMIN"] as const;
 export type CustomerRoleName = (typeof ROLE_NAMES)[number];
-
-export const LOYALTY_TIERS = ["MEMBER", "SILVER", "GOLD", "VIP"] as const;
-export type LoyaltyTier = (typeof LOYALTY_TIERS)[number];
 
 export interface Address {
   id: string;
@@ -50,8 +49,6 @@ export interface MyProfile {
   birthDate: string | null;
   allowPersonalization: boolean;
   role: string;
-  loyaltyTier: string;
-  points: number;
   status: string;
   lastLoginAt: string | null;
   memberSince: string;
@@ -92,7 +89,7 @@ export interface DeleteAddressResult {
 /**
  * ยอดซื้อที่คิดจากตาราง `Order` จริง
  *
- * ⚠️ **ไม่ใช่คอลัมน์ `User.totalSpent`** ซึ่งยังไม่มีใครเขียน (จะมาพร้อม STEP 42)
+ * ไม่มีคอลัมน์ cache ของยอดซื้อในตาราง User — คอลัมน์ `totalSpent` ที่ไม่มีใครเขียนถูกถอดออกตอน STEP 42
  */
 export interface CustomerOrderStats {
   totalOrders: number;
@@ -112,7 +109,9 @@ export interface AdminCustomer {
   phone: string | null;
   role: string;
   status: string;
-  loyaltyTier: string;
+  /** ระดับสมาชิก — คำนวณจาก `stats.totalPaid` ตัวเดียวกับที่แถวนี้โชว์ (STEP 42) */
+  tier: LoyaltyTier;
+  /** แต้มคงเหลือ */
   points: number;
   lastLoginAt: string | null;
   createdAt: string;

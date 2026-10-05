@@ -9,6 +9,12 @@ import type { UpdateOrderStatusInput } from '../validators/admin.validator.ts';
 
 import { releaseReservationForOrder, restockForOrder } from './inventory.service.ts';
 import {
+  awardPointsForPaidOrder,
+  notifyAfterAward,
+  releasePointsForCancelledOrder,
+  type PointsAward,
+} from './loyalty.service.ts';
+import {
   notifyOrderCancelled,
   notifyOrderDelivered,
   notifyOrderShipped,
@@ -345,6 +351,12 @@ export async function updateOrderStatus(
     throw ApiError.badRequest('ต้องระบุผู้ให้บริการขนส่งและเลขพัสดุจริงก่อนเปลี่ยนเป็นจัดส่งแล้ว');
   }
 
+  /**
+   * แต้มที่ให้ในทรานแซกชันนี้ (COD ได้เงินตอนส่งถึง — STEP 42) เพื่อแจ้งลูกค้าหลัง commit
+   * เขียนแบบ `as` เพราะ TypeScript ไม่ติดตามการกำหนดค่าใน callback แล้วจะถือว่ายังเป็น null เสมอ
+   */
+  let pointsAward = null as PointsAward | null;
+
   await prisma.$transaction(async (tx) => {
     // อ่านสถานะซ้ำในทรานแซกชัน กันพนักงานสองคนกดพร้อมกัน
     const fresh = await tx.order.findUniqueOrThrow({
@@ -375,6 +387,12 @@ export async function updateOrderStatus(
           `รับคืนเข้าคลังจากการยกเลิกคำสั่งซื้อ ${current.orderNumber}`,
         );
       }
+
+      /**
+       * แต้ม (STEP 42) — ทั้งสองกรณี: คืนแต้มที่ลูกค้าใช้เป็นส่วนลด และหักแต้มที่เคยได้
+       * (ใบที่จ่ายแล้วแต่ถูกยกเลิก ไม่ใช่ "เงินที่ร้านได้รับ" อีกต่อไป จึงต้องไม่เหลือแต้มค้าง)
+       */
+      await releasePointsForCancelledOrder(tx, current.id);
 
       paymentUpdate.paymentStatus = fresh.paymentStatus === 'PAID' ? 'PAID' : 'CANCELLED';
 
@@ -434,6 +452,11 @@ export async function updateOrderStatus(
         ...(input.adminNote !== undefined ? { adminNote: input.adminNote } : {}),
       },
     });
+
+    // COD: เพิ่งได้รับเงินตอนส่งถึง → ให้แต้มหลังตั้ง PAID แล้ว (ยอดสะสมนับจากออเดอร์ที่จ่ายแล้ว)
+    if (paymentUpdate.paymentStatus === 'PAID' && fresh.paymentStatus !== 'PAID') {
+      pointsAward = await awardPointsForPaidOrder(tx, current.id);
+    }
 
     // audit trail: ใครเปลี่ยนอะไร เมื่อไร (หน้าดู log อยู่ที่ /admin/logs ตั้งแต่ STEP 27)
     await writeAdminLog(tx, {
@@ -501,10 +524,16 @@ export async function updateOrderStatus(
      */
     if (current.paymentStatus !== 'PAID') {
       await notifySafely(
-        () => notifyPaymentSuccess(target, toNumber(current.total)),
+        () =>
+          notifyPaymentSuccess(target, toNumber(current.total), {
+            pointsEarned: pointsAward?.points ?? 0,
+            collectedOnDelivery: true,
+          }),
         `order:${current.id}:cod-paid`,
       );
     }
+
+    await notifyAfterAward(pointsAward);
   }
 
   if (input.status === 'CANCELLED') {

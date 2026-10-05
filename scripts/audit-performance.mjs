@@ -234,13 +234,13 @@ INSERT INTO "Size" (id, name, code, "sortOrder", "createdAt", "updatedAt")
 SELECT gen_random_uuid(), 'ไซซ์ ' || g, 'SZ' || g, g, now(), now()
 FROM generate_series(1, 8) g;
 
-INSERT INTO "User" (id, email, name, phone, "roleId", status, "loyaltyTier", points, "totalSpent",
+INSERT INTO "User" (id, email, name, phone, "roleId", status, points,
                     "allowPersonalization", "createdAt", "updatedAt")
 SELECT gen_random_uuid(), 'customer' || g || '@example.com', 'ลูกค้าทดสอบ หมายเลข ' || g,
        '08' || lpad(g::text, 8, '0'),
        (SELECT id FROM "Role" WHERE name = 'CUSTOMER'),
        CASE WHEN g % 97 = 0 THEN 'SUSPENDED'::"UserStatus" ELSE 'ACTIVE'::"UserStatus" END,
-       'MEMBER', 0, 0, true, now() - (g % 700) * interval '1 day', now()
+       0, true, now() - (g % 700) * interval '1 day', now()
 FROM generate_series(1, ${VOLUME.users}) g;
 
 INSERT INTO "Product" (id, name, slug, description, sku, price, "salePrice", "categoryId", "brandId",

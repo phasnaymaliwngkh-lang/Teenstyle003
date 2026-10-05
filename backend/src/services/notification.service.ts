@@ -1,5 +1,7 @@
 import { getPrisma, type Prisma } from '@teenstyle/database';
 
+import type { LoyaltyTierCode } from '../config/loyalty.ts';
+import { tierByCode } from '../models/loyalty.model.ts';
 import {
   toNotificationDto,
   typesInGroup,
@@ -129,12 +131,29 @@ export function notifyOrderCreated(
 export function notifyPaymentSuccess(
   order: OrderNotificationTarget,
   total: number,
+  options: {
+    /** แต้มที่ได้จากใบนี้ (STEP 42) — แจ้งรวมในรายการเดียว ไม่แยกเป็นการแจ้งเตือนอีกอัน */
+    pointsEarned?: number;
+    /**
+     * COD ได้เงินตอนส่งถึง — ของถึงมือลูกค้าแล้ว จึงห้ามบอกว่า "กำลังเตรียมจัดส่ง"
+     * (เดิมข้อความเดียวใช้ทั้งสองกรณี · แก้ตอน STEP 42)
+     */
+    collectedOnDelivery?: boolean;
+  } = {},
 ): Promise<boolean> {
+  const next = options.collectedOnDelivery
+    ? 'ร้านได้รับเงินปลายทางเรียบร้อยแล้ว ขอบคุณที่ช้อปกับเรา'
+    : 'ร้านกำลังเตรียมจัดส่งให้คุณ';
+  const points =
+    options.pointsEarned !== undefined && options.pointsEarned > 0
+      ? ` · ได้รับ ${options.pointsEarned.toLocaleString('th-TH')} แต้มสะสม`
+      : '';
+
   return notifyOnce({
     userId: order.userId,
     type: 'PAYMENT_SUCCESS',
     title: `ได้รับชำระเงินคำสั่งซื้อ ${order.orderNumber} แล้ว`,
-    body: `ยอด ${total.toLocaleString('th-TH')} บาท — ร้านกำลังเตรียมจัดส่งให้คุณ`,
+    body: `ยอด ${total.toLocaleString('th-TH')} บาท — ${next}${points}`,
     data: { orderId: order.orderId, orderNumber: order.orderNumber, event: 'PAYMENT_SUCCESS' },
     dedupe: { orderId: order.orderId, event: 'PAYMENT_SUCCESS' },
   });
@@ -260,6 +279,54 @@ export function notifyReviewModerated(params: {
     },
     // แจ้งแยกตามผลการตรวจ — อนุมัติแล้วซ่อนทีหลังต้องแจ้งอีกครั้ง
     dedupe: { reviewId: params.reviewId, event: `REVIEW_${params.status}` },
+  });
+}
+
+/**
+ * ขึ้นระดับสมาชิก (STEP 42)
+ *
+ * แจ้งครั้งเดียวต่อระดับตลอดอายุบัญชี — ถ้าระดับลดเพราะคำสั่งซื้อถูกยกเลิกแล้วกลับขึ้นมาใหม่
+ * จะไม่แจ้งซ้ำ (เรื่องเดิมที่ลูกค้ารู้แล้ว แจ้งอีกคือ noise — กฎ STEP 24 ข้อ 5)
+ */
+export function notifyTierUpgraded(
+  userId: string,
+  tierCode: LoyaltyTierCode,
+  orderNumber: string,
+): Promise<boolean> {
+  const tier = tierByCode(tierCode);
+  const multiplier = tier.earnMultiplierPercent / 100;
+
+  return notifyOnce({
+    userId,
+    type: 'LOYALTY_UPDATE',
+    title: `ยินดีด้วย! คุณเป็นสมาชิกระดับ ${tier.name} แล้ว`,
+    body: `จากคำสั่งซื้อ ${orderNumber} — ตั้งแต่ใบถัดไปได้แต้มสะสม ×${multiplier} ของปกติ`,
+    data: { event: 'TIER_UP', tier: tier.code, orderNumber },
+    dedupe: { event: 'TIER_UP', tier: tier.code },
+  });
+}
+
+/**
+ * ร้านปรับแต้มให้ (STEP 42) — ลูกค้าต้องรู้ทุกครั้งที่ยอดของตัวเองถูกแก้โดยคนอื่น
+ * พร้อมเหตุผลที่ร้านกรอก (ข้อความเดียวกับที่อยู่ในประวัติแต้ม)
+ */
+export function notifyPointsAdjusted(params: {
+  userId: string;
+  transactionId: string;
+  delta: number;
+  reason: string;
+  balanceAfter: number;
+}): Promise<boolean> {
+  const amount = Math.abs(params.delta).toLocaleString('th-TH');
+
+  return notifyOnce({
+    userId: params.userId,
+    type: 'LOYALTY_UPDATE',
+    title:
+      params.delta > 0 ? `ร้านเพิ่มแต้มให้คุณ ${amount} แต้ม` : `ร้านหักแต้มของคุณ ${amount} แต้ม`,
+    body: `เหตุผล: ${params.reason} · คงเหลือ ${params.balanceAfter.toLocaleString('th-TH')} แต้ม`,
+    data: { event: 'POINTS_ADJUSTED', transactionId: params.transactionId },
+    dedupe: { event: 'POINTS_ADJUSTED', transactionId: params.transactionId },
   });
 }
 

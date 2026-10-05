@@ -351,7 +351,7 @@ export function ProductForm({
                     </button>
                   </div>
 
-                  <label className="mt-2 flex items-center gap-2 text-sm">
+                  <label className="mt-2 flex min-h-11 items-center gap-2 text-sm">
                     <input
                       type="checkbox"
                       {...form.register(`images.${index}.isMain`)}

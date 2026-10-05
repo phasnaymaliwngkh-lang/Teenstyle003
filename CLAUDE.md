@@ -4,9 +4,9 @@
 > Full Stack Fashion E-Commerce สำหรับวัยรุ่น — Next.js + Express + PostgreSQL + Prisma + OpenAI
 
 โปรเจกต์นี้เดินตาม **Master Prompt STEP 1–55** ทำทีละ STEP แล้วหยุดรอคำสั่งถัดไป
-สถานะปัจจุบัน: **STEP 1–41 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
-หน้าร้าน → ตะกร้า → checkout → ชำระเงิน (COD จริง · Stripe รอใส่ key) → ติดตามคำสั่งซื้อ → รีวิวสินค้า → แจ้งเตือนในบัญชี
-→ **บัญชีของฉัน: ข้อมูลส่วนตัว + สมุดที่อยู่**
+สถานะปัจจุบัน: **STEP 1–42 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
+หน้าร้าน → ตะกร้า → checkout (คูปอง + ใช้แต้ม) → ชำระเงิน (COD จริง · Stripe รอใส่ key) → ติดตามคำสั่งซื้อ → รีวิวสินค้า → แจ้งเตือนในบัญชี
+→ **บัญชีของฉัน: ข้อมูลส่วนตัว + สมุดที่อยู่ + แต้มสะสม/ระดับสมาชิก (STEP 42)**
 → **หลังบ้าน: ภาพรวมร้าน + รายงานยอดขาย + จัดการคำสั่งซื้อ + จัดการสินค้า + คลังสินค้า + แจ้งเตือนสต็อก + บาร์โค้ด/QR + นำเข้า/ส่งออก (CSV, Excel) + ตรวจรีวิว + จัดการลูกค้า + ประวัติการแก้ไข (Audit)**
 → **AI: AI Stylist (STEP 19) · AI Customer Service + Human Handoff (STEP 20) · AI Knowledge Base / FAQ (STEP 21)**
 ทุกตัวมี Intelligent Fallback Engine ทำงานได้เต็มรูปแบบแม้ไม่มี `OPENAI_API_KEY`
@@ -42,7 +42,7 @@ npm run dev              # db:sync + backend :4000 + frontend :3000
 npm run build            # db:sync → tsc backend → next build
 npm run typecheck        # tsc ทั้ง 3 workspace — ต้องผ่านก่อน commit
 npm run lint             # eslint backend + frontend
-npm test                 # vitest ของ backend + frontend (761 เคส)
+npm test                 # vitest ของ backend + frontend (863 เคส)
 npm run test:coverage    # วัดว่าโค้ดส่วนไหนยังไม่มีเทสต์แตะเลย (ไม่ใช่เป้าให้ไล่ถึง 100%)
 
 npm run db:sync          # prisma generate + build database (รันหลังแก้ schema ทุกครั้ง)
@@ -142,6 +142,7 @@ app/
 │   ├── account/addresses/  สมุดที่อยู่ (STEP 25 · ต้องล็อกอิน)
 │   ├── account/reviews/    รีวิวของฉัน ทุกสถานะ (STEP 23 · ต้องล็อกอิน)
 │   ├── account/notifications/  การแจ้งเตือนของฉัน (STEP 24 · ต้องล็อกอิน)
+│   ├── account/points/     แต้มสะสม ระดับ ประวัติแต้ม (STEP 42 · ต้องล็อกอิน)
 │   ├── ai-stylist          ผู้ช่วยเลือกชุดและสไตล์ (STEP 19)
 │   ├── customer-service faq    ← AI CS + คลังความรู้ (STEP 20–21)
 │   ├── wishlist            รายการที่ถูกใจ (STEP 22 · ต้องล็อกอิน)
@@ -1099,15 +1100,14 @@ PATCH /api/admin/customers/:userId/role    { role, reason }     (user:role:manag
 
 1. **ลูกค้าแก้ได้แค่ข้อมูลที่ตัวเองกรอก** — `name` · `phone` · `birthDate` · `allowPersonalization`
    **`email` แก้ไม่ได้** เพราะเป็นตัวระบุตัวตนของบัญชี Google ที่ callback `signIn` ใช้ผูกบัญชี
-   (ดูเหตุผลของ `allowDangerousEmailAccountLinking`) · `role` `status` `points` `loyaltyTier`
-   `totalSpent` **ไม่อยู่ในสคีมาของ PATCH เลย** ส่งมาก็ถูก Zod ตัดทิ้ง (มี test ยัดมาแล้วยืนยัน)
+   (ดูเหตุผลของ `allowDangerousEmailAccountLinking`) · `role` `status` `points`
+   **ไม่อยู่ในสคีมาของ PATCH เลย** ส่งมาก็ถูก Zod ตัดทิ้ง (มี test ยัดมาแล้วยืนยัน)
    · **รูปโปรไฟล์ยังเปลี่ยนเองไม่ได้** — รับ URL จาก client = แปะรูปจากที่ไหนก็ได้ (STEP 47)
-2. **ยอดซื้อในหลังบ้านนับจากตาราง `Order` จริงทุกครั้ง — ห้ามอ่านคอลัมน์ `User.totalSpent`**
-   คอลัมน์นั้นเป็น cache ที่ยังไม่มีใครเขียน (เป็น 0 ทุกคน · จะมาพร้อมระบบแต้ม STEP 42)
-   เอามาแสดงคือบอกร้านว่าลูกค้าทุกคนไม่เคยซื้ออะไรเลย
+2. **ยอดซื้อในหลังบ้านนับจากตาราง `Order` จริงทุกครั้ง** — เดิมมีคอลัมน์ `User.totalSpent`
+   ที่ไม่มีใครเขียน (0 ทุกคน) **ถูกถอดออกจาก schema ตอน STEP 42** · ระดับสมาชิกก็คิดจากยอดเดียวกันนี้
    (ปัญหาชนิดเดียวกับ `Product.totalStock` ที่ไม่ใช่ "จำนวนที่ขายได้จริง" — STEP 15)
    · "ยอดที่ได้รับ" นับเฉพาะ `paymentStatus = PAID` · COD ที่ยังไม่เก็บเงินแยกช่อง (STEP 13 ข้อ 6)
-   · มี test ที่ตั้ง `totalSpent = 999999` ไว้หลอก แล้วยืนยันว่าเลขนั้นไม่โผล่ใน response
+   · เกณฑ์อยู่ที่ `PAID_ORDER_WHERE` ใน [order.model.ts](backend/src/models/order.model.ts) ที่เดียว
 3. **ห้ามแก้บัญชีของตัวเอง** (ทั้งสถานะและบทบาท) → **400**
    ระงับตัวเองคือการล็อกตัวเองออกจากร้าน · ลดบทบาทตัวเองคือการทิ้งกุญแจ
 4. **แตะได้แค่บัญชีที่บทบาทต่ำกว่าตัวเอง** (SUPER_ADMIN แตะได้ทุกคนยกเว้นตัวเอง) → ไม่ผ่านคืน **403**
@@ -1829,6 +1829,54 @@ STEP 4 จดไว้ว่า "navbar อ่าน session ทำให้ท�
 ที่ไม่เกี่ยวกับโค้ด — **เกิดจริงตอน STEP 41: ค้าง 18 ชิ้นโดยที่ตาราง `Order` ว่างเปล่า**
 → ลด `reservedQuantity` ตามรายการของออเดอร์ที่ยังถือการจอง **ก่อน** ลบแถว
 
+## Loyalty / Points (STEP 42 — ใช้งานได้จริงแล้ว)
+
+**รายละเอียดทั้งหมดอยู่ที่ [docs/15-loyalty.md](docs/15-loyalty.md)**
+`/account/points` แต้ม/ระดับ/ประวัติ · `/checkout` ช่องใช้แต้ม · `/admin/customers` ระดับ + ตัวกรอง + ปรับแต้ม
+· กติกาทุกตัวเลขอยู่ที่ [config/loyalty.ts](backend/src/config/loyalty.ts) · กฎล้วนอยู่ที่
+[models/loyalty.model.ts](backend/src/models/loyalty.model.ts) · ตัวเขียนอยู่ที่
+[services/loyalty.service.ts](backend/src/services/loyalty.service.ts)
+
+### กฎที่ห้ามละเมิด
+
+1. **`User.points` เปลี่ยนได้ทางเดียวคือ `postPointTransaction()`** ซึ่งเขียนแถว `PointTransaction`
+   (append-only) คู่กันในทรานแซกชันเดียว ด้วย `UPDATE … WHERE "points" + delta >= 0` (แย่งกันสำเร็จรายเดียว)
+   → `points = SUM(delta)` เสมอ (มีเทสต์ไล่ตรวจทุกบัญชี) · แก้/ลบรายการย้อนหลังไม่ได้
+2. **ระดับสมาชิกไม่ใช่คอลัมน์** — คำนวณสดจาก "ยอดที่ได้รับ" (`PAID_ORDER_WHERE`) ด้วย `tierForSpend()`
+   **ห้ามเพิ่มคอลัมน์ cache ของระดับกลับมา** — มันค้างค่าเก่าทันทีที่เกณฑ์ใน config เปลี่ยน
+   (เดิม `User.loyaltyTier` / `totalSpent` ไม่มีใครเขียน · ถูกถอดออกตอน STEP 42)
+3. **ได้แต้มเมื่อร้านได้รับเงินจริงเท่านั้น** — เรียก `awardPointsForPaidOrder()` **หลังตั้ง PAID**
+   ในทรานแซกชันเดียวกัน: Stripe webhook · COD ตอนกด DELIVERED · ฐานคือ `Order.total` คิดเป็นสตางค์
+   จำนวนเต็มก่อนปัดลง · ตัวคูณใช้ระดับ **ก่อน** นับใบนี้
+4. **client ส่งได้แค่ `pointsToRedeem`** — มูลค่า/เพดาน/แต้มคงเหลือคิดที่ server ·
+   ส่วนลดจากแต้ม **ยุบลง `discountTotal`** (กฎ STEP 41 ข้อ 8) · `Order.pointsDiscount` บอกแค่ว่าก้อนไหนมาจากแต้ม
+   · แต้มคิด **หลังคูปอง** (ส่วนลดทุกก้อนรวมกันห้ามเกินยอดสินค้า — CHECK ของฐานข้อมูล)
+5. **ใช้ไม่ได้ต้องปฏิเสธพร้อมเหตุผล ห้ามปรับลดให้เงียบ ๆ** — ยอดที่เก็บเงินต้องเท่ากับที่ลูกค้าเห็น
+   · หน้าเว็บไม่คิดส่วนลดเอง: ช่องใช้แต้มถาม `GET /api/checkout/summary?pointsToRedeem=` ด้วยคูปองและวิธีจัดส่ง
+   ชุดเดียวกับที่จะสั่ง และล้างค่าเมื่อคูปองเปลี่ยน
+6. **ยกเลิกคำสั่งซื้อทุกเส้นทางต้องเรียก `releasePointsForCancelledOrder()`** คู่กับ
+   `releaseCouponForCancelledOrder()` — คืนแต้มที่ใช้ + หักแต้มที่ได้ (หักได้ไม่เกินยอดคงเหลือ
+   แล้วบันทึกส่วนที่ขาดไว้ตรง ๆ — **การยกเลิกห้ามล้มเพราะแต้มถูกใช้ไปแล้ว**)
+   · **STEP 43 (คืนเงิน) ต้องเรียกฟังก์ชันนี้ด้วย** และยอดสะสมต้องไม่นับใบที่ `REFUNDED` (`PAID_ORDER_WHERE` กันไว้แล้ว)
+7. **ร้านปรับแต้ม = `loyalty:adjust` (ADMIN ขึ้นไป)** · ต้องกรอกเหตุผล **ซึ่งลูกค้าเห็น** · AdminLog ในทรานแซกชันเดียวกัน
+   · ใช้ `assertCanManage()` ด่านเดียวกับการระงับบัญชี (ห้ามปรับตัวเอง · แตะได้แค่บทบาทที่ต่ำกว่า)
+   · ไม่มีช่อง "ตั้งยอดคงเหลือ" มีแค่ "เพิ่ม/หักเท่าไร เพราะอะไร" · `idempotencyKey` กันกดซ้ำ
+8. **แต้มและระดับไม่อยู่ใน session ของ Auth.js** — อ่านจาก `/api/users/me/loyalty` ที่เดียว
+   · โหลดแต้มไม่ได้ → บอกว่าโหลดไม่ได้ **ห้ามแสดง "0 แต้ม"** (กฎเดียวกับป้ายกระดิ่ง STEP 16 ข้อ 8)
+9. **สิทธิ์ `loyalty:adjust` มาจาก seed** — deploy แล้วต้องรัน `npm run db:seed` ซ้ำ (ไม่รัน = 403 ล้มแบบปลอดภัย)
+
+### ⚠️ เรียงประวัติแต้มด้วย `sequence` ไม่ใช่ `createdAt`
+
+สองแถวที่เขียนในทรานแซกชันเดียวกัน (คืนแต้ม + หักแต้มตอนยกเลิก) ได้ `createdAt` **เท่ากันเป๊ะ**
+เพราะ `CURRENT_TIMESTAMP` ของ PostgreSQL = เวลาเริ่มทรานแซกชัน และ uuid v7 ไม่รับประกันลำดับในมิลลิวินาทีเดียว
+→ ประวัติสลับบรรทัดจนยอด "คงเหลือ" อ่านไม่ต่อกัน (เจอตอนเขียนเทสต์ที่ไล่ `balanceBefore` ต่อ `balanceAfter`)
+**บทเรียนใช้ต่อได้:** ตาราง append-only ที่ต้องเรียงตามลำดับเกิด ห้ามพึ่ง `createdAt` อย่างเดียว
+
+### ⚠️ ทศนิยมลอยของ JS ทำให้ลูกค้าเสียแต้มเงียบ ๆ
+
+`199.7 + 0.1 + 0.2 = 199.99999999999997` → `Math.floor(x / 10)` ได้ 19 แทน 20
+ทุกการคิดแต้มจากเงินต้องแปลงเป็นสตางค์จำนวนเต็มก่อน (`Math.round(baht * 100)`) — มีเทสต์ที่ยืนยันว่ากับดักยังอยู่จริง
+
 ## Final Audit (STEP 40 — ตรวจรอบสุดท้ายของ STEP 1–39 แล้ว)
 
 **เครื่องมือ: `node scripts/audit-final.mjs`** · ผลทั้งหมดและสิ่งที่ยังเหลืออยู่ที่
@@ -1944,7 +1992,7 @@ status ของเอกสารตรงกับที่คาด · **ก�
 
 ## Testing (STEP 37 — เทสต์คอมโพเนนต์จริงแล้ว และวัด coverage แล้ว)
 
-**รายละเอียดทั้งหมดอยู่ที่ [docs/11-testing.md](docs/11-testing.md)** · `npm test` = **761 เคส**
+**รายละเอียดทั้งหมดอยู่ที่ [docs/11-testing.md](docs/11-testing.md)** · `npm test` = **863 เคส** (ตอนปิด STEP 42)
 (backend 634 + frontend 127) · `npm run test:coverage` วัดว่าส่วนไหนยังไม่มีเทสต์แตะเลย
 
 frontend แยกเป็น 2 project ใน [vitest.config.mts](frontend/vitest.config.mts) เพราะสภาพแวดล้อมต่างกันจริง

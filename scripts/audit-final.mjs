@@ -138,9 +138,6 @@ const writtenFieldNames = collectWrittenFieldNames();
  * ⚠️ เพิ่มชื่อที่นี่คือการปิดตาตัวตรวจ ต้องเขียนเหตุผลไว้ทุกครั้ง
  */
 const WRITE_EXEMPT = {
-  'User.points': 'ยังไม่เปิดใช้ระบบแต้ม (STEP 42) — หน้าเว็บบอกตรง ๆ ว่ายังไม่เปิดใช้',
-  'User.loyaltyTier': 'ยังไม่เปิดใช้ระบบแต้ม (STEP 42) — ถอดออกจากหน้าเว็บแล้ว',
-  'User.totalSpent': 'cache ที่ยังไม่มีใครเขียน — หลังบ้านนับจากตาราง Order จริงแทน (STEP 25)',
   'Review.isVerifiedPurchase':
     'ยืนยันแล้วว่าเขียนจริงที่ review.service.ts (`const data = {…}` แล้วส่งต่อ จึงหาด้วย regex ไม่เจอ)',
   'KnowledgeArticle.notHelpfulCount':

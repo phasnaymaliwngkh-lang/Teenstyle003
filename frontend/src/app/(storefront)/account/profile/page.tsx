@@ -7,9 +7,10 @@ import { SectionError } from "@/components/shared/section";
 import { ProfileForm } from "@/features/account/components/profile-form";
 import { ApiClientError } from "@/lib/api";
 import { getSession } from "@/lib/dal";
-import { LOYALTY_NOT_ACTIVE_LABEL } from "@/features/account/lib/loyalty";
 import { fetchMyProfileOnServer } from "@/services/customer.server";
+import { fetchMyLoyaltyOnServer } from "@/services/loyalty.server";
 import type { MyProfile } from "@/types/customer";
+import type { MyLoyalty } from "@/types/loyalty";
 
 export const metadata: Metadata = {
   title: "ข้อมูลส่วนตัว",
@@ -28,11 +29,23 @@ export default async function ProfilePage() {
   let profile: MyProfile | null = null;
   let errorMessage: string | null = null;
 
-  try {
-    profile = await fetchMyProfileOnServer();
-  } catch (error) {
-    errorMessage = error instanceof ApiClientError ? error.message : "โหลดข้อมูลส่วนตัวไม่สำเร็จ";
+  // แต้มโหลดแยกจากโปรไฟล์ — โหลดแต้มไม่ได้ต้องไม่ทำให้แก้ข้อมูลส่วนตัวไม่ได้ (กฎ STEP 5 ข้อ 1)
+  const [profileResult, loyaltyResult] = await Promise.allSettled([
+    fetchMyProfileOnServer(),
+    fetchMyLoyaltyOnServer(),
+  ]);
+
+  if (profileResult.status === "fulfilled") {
+    profile = profileResult.value;
+  } else {
+    errorMessage =
+      profileResult.reason instanceof ApiClientError
+        ? profileResult.reason.message
+        : "โหลดข้อมูลส่วนตัวไม่สำเร็จ";
   }
+
+  const loyalty: MyLoyalty | null =
+    loyaltyResult.status === "fulfilled" ? loyaltyResult.value : null;
 
   return (
     <main className="mx-auto w-full max-w-[900px] px-4 py-10 sm:px-6">
@@ -61,8 +74,12 @@ export default async function ProfilePage() {
             <InfoTile
               icon={<Award className="size-5 text-brand" aria-hidden />}
               label="ระดับสมาชิก"
-              /* ค่า points/loyaltyTier ไม่มีใครเขียน — ดู features/account/lib/loyalty.ts */
-              value={LOYALTY_NOT_ACTIVE_LABEL}
+              /* โหลดไม่ได้ → บอกว่าโหลดไม่ได้ ห้ามโชว์ "0 แต้ม" (0 แปลว่าไม่มีแต้ม ไม่ใช่ยังไม่รู้) */
+              value={
+                loyalty === null
+                  ? "โหลดแต้มไม่สำเร็จ"
+                  : `${loyalty.tier.name} · ${loyalty.points.toLocaleString("th-TH")} แต้ม`
+              }
             />
             <InfoTile
               icon={<CalendarClock className="size-5 text-brand" aria-hidden />}
@@ -74,9 +91,11 @@ export default async function ProfilePage() {
           </section>
 
           <p className="mt-3 text-xs text-muted">
-            บทบาท ระดับสมาชิก และแต้ม เป็นค่าที่ร้านกำหนด แก้จากหน้านี้ไม่ได้
+            บทบาทเป็นค่าที่ร้านกำหนด · ระดับสมาชิกและแต้มคิดจากคำสั่งซื้อจริง แก้จากหน้านี้ไม่ได้
             {" · "}
-            ระบบแลกแต้มจะเปิดใน STEP 42
+            <Link href="/account/points" className="font-semibold text-brand-dark underline">
+              ดูแต้มสะสมและประวัติ
+            </Link>
           </p>
 
           <section className="mt-6 rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)] sm:p-7">

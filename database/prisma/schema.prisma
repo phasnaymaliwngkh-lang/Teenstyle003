@@ -45,12 +45,23 @@ enum UserStatus {
   BANNED
 }
 
-/// ระดับสมาชิก (STEP 42 — Loyalty)
-enum LoyaltyTier {
-  MEMBER
-  SILVER
-  GOLD
-  VIP
+/// ชนิดของรายการแต้มสะสม (STEP 42 — Loyalty)
+///
+/// ⚠️ ระดับสมาชิก **ไม่ใช่ enum ในฐานข้อมูลอีกแล้ว** — เดิมมี enum `LoyaltyTier` + คอลัมน์
+/// `User.loyaltyTier` ที่ไม่มีโค้ดไหนเขียนเลย (ทุกคนเป็น MEMBER ตลอดกาล · เจอตอน STEP 40)
+/// ตอนนี้ระดับ **คำนวณสดจากยอดที่จ่ายจริง** ที่ backend/src/models/loyalty.model.ts
+/// จึงไม่มีทางค้างค่าเก่าเมื่อเกณฑ์ใน config เปลี่ยน
+enum PointTransactionType {
+  /// ได้แต้มจากคำสั่งซื้อที่ร้านได้รับเงินแล้ว
+  EARN
+  /// ใช้แต้มเป็นส่วนลดตอนสั่งซื้อ
+  REDEEM
+  /// คืนแต้มที่ใช้ไป เพราะคำสั่งซื้อนั้นถูกยกเลิก
+  REDEEM_REFUND
+  /// หักแต้มที่เคยได้คืน เพราะคำสั่งซื้อที่ชำระแล้วถูกยกเลิก (หักได้ไม่เกินยอดคงเหลือ)
+  EARN_REVERSAL
+  /// ร้านปรับให้เอง — ต้องมีเหตุผลและผู้ทำรายการเสมอ
+  ADJUSTMENT
 }
 
 enum ProductStatus {
@@ -154,6 +165,8 @@ enum NotificationType {
   ORDER_UPDATE
   ORDER_CANCELLED
   REVIEW_UPDATE
+  /// เพิ่มใน STEP 42 — ขึ้นระดับสมาชิก · ร้านปรับแต้มให้
+  LOYALTY_UPDATE
 }
 
 enum NotificationChannel {
@@ -239,11 +252,16 @@ model User {
   roleId String @db.Uuid
   role   Role   @relation(fields: [roleId], references: [id])
 
-  status      UserStatus  @default(ACTIVE)
-  loyaltyTier LoyaltyTier @default(MEMBER)
-  /// แต้มคงเหลือ — ห้ามติดลบ (บังคับด้วย CHECK constraint ระดับฐานข้อมูล)
-  points      Int         @default(0)
-  totalSpent  Decimal     @default(0) @db.Decimal(12, 2)
+  status UserStatus @default(ACTIVE)
+  /// แต้มคงเหลือ = cache ของ `SUM(PointTransaction.delta)` (STEP 42)
+  ///
+  /// ⚠️ **ห้ามเขียนตรง ๆ** — เปลี่ยนได้ทางเดียวคือ `postPointTransaction()` ใน
+  /// backend/src/services/loyalty.service.ts ซึ่งเขียนแถวในสมุดแต้มคู่กันในทรานแซกชันเดียว
+  /// ห้ามติดลบ (CHECK `User_points_non_negative` — ด่านสุดท้ายตอนสองคำสั่งซื้อแย่งแต้มกัน)
+  ///
+  /// ระดับสมาชิกและยอดซื้อสะสม **ไม่เก็บเป็นคอลัมน์** — คำนวณสดจากตาราง Order
+  /// (เดิมมี `loyaltyTier` / `totalSpent` ที่ไม่มีใครเขียน · ถอดออกตอน STEP 42)
+  points Int        @default(0)
 
   /// STEP 46 / 53 — ผู้ใช้ปิดการแนะนำแบบ personalized ได้
   allowPersonalization Boolean @default(true)
@@ -267,6 +285,8 @@ model User {
   assignedAiChats    AIConversation[]    @relation("AIConversationAgent")
   adminLogs          AdminLog[]
   inventoryMovements InventoryMovement[]
+  pointTransactions  PointTransaction[]  @relation("PointTransactionOwner")
+  pointAdjustments   PointTransaction[]  @relation("PointTransactionActor")
 
   @@index([roleId])
   @@index([status])
@@ -685,8 +705,8 @@ model Cart {
 
   items CartItem[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   /// ตะกร้าของ guest หมดอายุเมื่อถึงเวลานี้ (job ลบทิ้งใน STEP 52)
   expiresAt DateTime?
 
@@ -746,6 +766,13 @@ model Order {
   coupon     Coupon? @relation(fields: [couponId], references: [id])
   couponCode String?
 
+  /// แต้มที่ใช้เป็นส่วนลดในคำสั่งซื้อนี้ (STEP 42) — snapshot ของบิล
+  pointsRedeemed Int     @default(0)
+  /// มูลค่าส่วนลดจากแต้ม **ซึ่งเป็นส่วนหนึ่งของ `discountTotal` แล้ว** ไม่ใช่ช่องส่วนลดที่สอง
+  /// สูตรบิลยังเป็น `total = subtotal − discountTotal + shippingFee` (กฎ STEP 41 ข้อ 8)
+  /// ช่องนี้มีไว้ให้แยกได้ว่าส่วนลดก้อนไหนมาจากแต้ม (CHECK: ไม่เกิน discountTotal)
+  pointsDiscount Decimal @default(0) @db.Decimal(12, 2)
+
   /// เก็บทั้ง relation (อ้างอิงกลับได้) และ snapshot (ประวัติไม่เปลี่ยนตามการแก้ที่อยู่)
   shippingAddressId String?  @db.Uuid
   shippingAddress   Address? @relation(fields: [shippingAddressId], references: [id])
@@ -774,10 +801,11 @@ model Order {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  items     OrderItem[]
-  payments  Payment[]
-  shipments Shipment[]
-  reviews   Review[]
+  items             OrderItem[]
+  payments          Payment[]
+  shipments         Shipment[]
+  reviews           Review[]
+  pointTransactions PointTransaction[]
 
   @@index([userId, createdAt])
   @@index([status])
@@ -1000,6 +1028,58 @@ model Wishlist {
   @@unique([userId, productId])
   @@index([userId, createdAt])
   @@index([productId])
+}
+
+// ============================================================================
+// LOYALTY  (STEP 42)
+// ============================================================================
+
+/// สมุดแต้มสะสม — **append-only** (แพตเทิร์นเดียวกับ InventoryMovement ของ STEP 15)
+///
+/// `User.points` ต้องเท่ากับ `SUM(delta)` ของผู้ใช้คนนั้นเสมอ เพราะทั้งสองถูกเขียน
+/// ในทรานแซกชันเดียวกันผ่าน `postPointTransaction()` เท่านั้น
+/// แก้/ลบย้อนหลังไม่ได้ — บันทึกผิดต้องปรับกลับด้วยรายการใหม่
+model PointTransaction {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  userId String @db.Uuid
+  user   User   @relation("PointTransactionOwner", fields: [userId], references: [id], onDelete: Cascade)
+
+  type          PointTransactionType
+  /// บวก = ได้แต้ม · ลบ = ใช้/ถูกหัก (ทิศทางต้องตรงกับ type — CHECK ในฐานข้อมูล)
+  delta         Int
+  /// ยอดก่อน/หลัง เพื่อให้อ่านประวัติย้อนหลังได้โดยไม่ต้องรวมยอดใหม่
+  balanceBefore Int
+  balanceAfter  Int
+
+  /// คำสั่งซื้อที่ทำให้เกิดรายการนี้ — SetNull เพราะประวัติแต้มต้องอยู่ต่อแม้แถวออเดอร์หายไป
+  /// (เลขคำสั่งซื้อถูกเก็บไว้ใน `description` ด้วยเหตุผลเดียวกัน)
+  orderId String? @db.Uuid
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  /// ข้อความที่ลูกค้าเห็นในประวัติแต้ม — รวมเหตุผลที่ร้านกรอกตอนปรับแต้ม
+  description String
+
+  /// พนักงานที่ปรับแต้ม (ADJUSTMENT เท่านั้น) — null = ระบบทำเอง
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("PointTransactionActor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  /// กันรายการซ้ำ เช่น `order:<id>:earn` (webhook ยิงซ้ำ · กดปุ่มซ้ำ)
+  idempotencyKey String @unique
+
+  /// ลำดับที่เขียนจริง — ใช้เรียงประวัติ **แทน createdAt**
+  /// สองแถวที่เขียนในทรานแซกชันเดียวกัน (คืนแต้มที่ใช้ + หักแต้มที่ได้ตอนยกเลิก) ได้ createdAt
+  /// เท่ากันเป๊ะ เพราะ CURRENT_TIMESTAMP ของ PostgreSQL คือเวลาเริ่มทรานแซกชัน และ id (uuid v7)
+  /// ก็ไม่รับประกันลำดับภายในมิลลิวินาทีเดียวกัน → ประวัติจะสลับบรรทัดจน balanceAfter อ่านไม่ต่อกัน
+  /// ของผู้ใช้คนเดียวกันเขียนทีละรายการเสมอ (UPDATE "User" ล็อกแถวไว้จน commit) ลำดับนี้จึงตรงกับ
+  /// ลำดับของยอดคงเหลือจริง
+  sequence Int @default(autoincrement())
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, sequence])
+  @@index([orderId])
+  @@index([type])
 }
 
 // ============================================================================

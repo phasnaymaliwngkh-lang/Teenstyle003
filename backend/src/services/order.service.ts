@@ -14,8 +14,16 @@ import {
   type OrderDto,
 } from '../models/order.model.ts';
 import type { AppliedCouponDto } from '../models/coupon.model.ts';
+import {
+  loyaltyRules,
+  toTierDto,
+  tierForSpend,
+  type LoyaltyRulesDto,
+  type LoyaltyTierDto,
+} from '../models/loyalty.model.ts';
 import { resolveVariantPrice } from '../models/pricing.ts';
 import { checkCouponForCart, couponCartLinesOf, redeemCouponForOrder } from './coupon.service.ts';
+import { evaluateRedemptionFor, lifetimeSpendOf, redeemPointsForOrder } from './loyalty.service.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type { CreateOrderInput, NewAddressInput } from '../validators/order.validator.ts';
 
@@ -46,6 +54,10 @@ const ORDER_SELECT = {
   paymentStatus: true,
   subtotal: true,
   discountTotal: true,
+  // แต้มที่ใช้/ได้จากคำสั่งซื้อนี้ (STEP 42)
+  pointsRedeemed: true,
+  pointsDiscount: true,
+  pointTransactions: { select: { type: true, delta: true } },
   shippingFee: true,
   total: true,
   shippingMethod: true,
@@ -179,17 +191,37 @@ export interface ShippingOptionDto {
   unavailableReason: string | null;
 }
 
+/** แต้มสะสมในหน้า checkout (STEP 42) — ทุกตัวเลขมาจาก server */
+export interface CheckoutLoyaltyDto {
+  /** แต้มคงเหลือในบัญชีตอนนี้ */
+  balance: number;
+  tier: LoyaltyTierDto;
+  /** แต้มสูงสุดที่ใช้กับบิลนี้ได้ (คิดจากคูปองและวิธีจัดส่งที่ส่งมาในคำขอนี้) */
+  maxRedeemablePoints: number;
+  /** แต้มที่ใช้ได้จริงตามที่ขอ — 0 = ไม่ได้ใช้ หรือใช้ไม่ได้ (ดู error) */
+  appliedPoints: number;
+  /** มูลค่าส่วนลดจากแต้ม (บาท) — รวมอยู่ใน discountTotal แล้ว */
+  pointsDiscount: number;
+  /** เหตุผลที่ใช้แต้มตามที่ขอไม่ได้ — ต้องบอกผู้ใช้ ไม่ใช่เงียบแล้วไม่ลดให้ */
+  error: string | null;
+  rules: LoyaltyRulesDto;
+}
+
 export interface CheckoutSummaryDto {
   /** รายการที่ติ๊กเลือกไว้ในตะกร้า (ตรวจสต็อกใหม่แล้ว) */
   items: CartItemDto[];
   subtotal: number;
+  /** ส่วนลดทั้งหมด (คูปอง + แต้ม) — ตัวเลขเดียวกับที่จะบันทึกลง Order.discountTotal */
   discountTotal: number;
+  /** ส่วนลดจากคูปอง (รวมคูปองส่งฟรี) — แยกไว้ให้หน้าเว็บแสดงทีละบรรทัด */
+  couponDiscount: number;
   shippingFee: number;
   total: number;
   /** คูปองที่ใช้ได้จริงกับตะกร้านี้ — null = ไม่ได้ใส่ หรือใส่แล้วใช้ไม่ได้ */
   appliedCoupon: AppliedCouponDto | null;
   /** เหตุผลที่คูปองที่กรอกมาใช้ไม่ได้ — ต้องบอกผู้ใช้ ไม่ใช่เงียบแล้วไม่ลดให้ */
   couponError: string | null;
+  loyalty: CheckoutLoyaltyDto;
   selectedShippingMethod: ShippingMethodCode;
   shippingOptions: ShippingOptionDto[];
   addresses: CheckoutAddressDto[];
@@ -229,16 +261,18 @@ export async function getCheckoutSummary(
   userId: string,
   shippingMethod: ShippingMethodCode,
   couponCode?: string,
+  pointsToRedeem = 0,
 ): Promise<CheckoutSummaryDto> {
   const prisma = getPrisma();
 
-  const [cart, addresses] = await Promise.all([
+  const [cart, addresses, lifetimeSpend] = await Promise.all([
     prisma.cart.findFirst({ where: { userId }, select: CART_SELECT }),
     prisma.address.findMany({
       where: { userId, deletedAt: null },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
       select: ADDRESS_SELECT,
     }),
+    lifetimeSpendOf(prisma, userId),
   ]);
 
   const items = cart ? toCart(cart).items.filter((item) => item.selected) : [];
@@ -283,12 +317,38 @@ export async function getCheckoutSummary(
     }
   }
 
+  /**
+   * แต้มคิดหลังคูปองเสมอ — เพดานของแต้มคือยอดสินค้าที่ยังเหลือหลังหักคูปอง
+   * (ส่วนลดทุกก้อนรวมกันต้องไม่เกินยอดสินค้า: CHECK Order_discount_not_over_subtotal)
+   * กฎอยู่ที่ models/loyalty.model.ts ที่เดียว — ตัวเดียวกับที่ createOrder ใช้
+   */
+  const couponDiscount = discountTotal;
+  const redemption = await evaluateRedemptionFor(prisma, {
+    userId,
+    requested: pointsToRedeem,
+    subtotal,
+    otherDiscount: couponDiscount,
+  });
+  const pointsDiscount = redemption.ok ? redemption.discount : 0;
+
+  discountTotal = couponDiscount + pointsDiscount;
+
   return {
     items,
     subtotal,
     discountTotal,
+    couponDiscount,
     appliedCoupon,
     couponError,
+    loyalty: {
+      balance: redemption.balance,
+      tier: toTierDto(tierForSpend(lifetimeSpend)),
+      maxRedeemablePoints: redemption.maxPoints,
+      appliedPoints: redemption.ok ? redemption.points : 0,
+      pointsDiscount,
+      error: redemption.ok ? null : redemption.message,
+      rules: loyaltyRules(),
+    },
     shippingFee: chosen.fee,
     total: subtotal - discountTotal + chosen.fee,
     selectedShippingMethod: chosen.code,
@@ -524,6 +584,32 @@ export async function createOrder(
       discountTotal = redeemed.evaluation.discountTotal + redeemed.evaluation.shippingDiscount;
     }
 
+    /**
+     * ⚠️ แต้มคิดใหม่ที่นี่จากแต้มคงเหลือในฐานข้อมูล ไม่ใช่เชื่อยอดที่หน้าเว็บโชว์ (STEP 42)
+     *    ใช้ไม่ได้ → โยน 400 พร้อมเหตุผล → ทรานแซกชัน rollback ทั้งก้อน
+     *    ห้ามลดจำนวนให้เงียบ ๆ เพราะยอดที่เก็บเงินจะไม่ตรงกับที่ลูกค้าเห็นตอนกดยืนยัน
+     *    มูลค่าถูกยุบลง discountTotal (สูตรบิลมีช่องส่วนลดช่องเดียว — กฎ STEP 41 ข้อ 8)
+     */
+    let pointsRedeemed = 0;
+    let pointsDiscount = 0;
+
+    if (input.pointsToRedeem !== undefined && input.pointsToRedeem > 0) {
+      const redemption = await evaluateRedemptionFor(tx, {
+        userId,
+        requested: input.pointsToRedeem,
+        subtotal,
+        otherDiscount: discountTotal,
+      });
+
+      if (!redemption.ok) {
+        throw ApiError.badRequest(redemption.message ?? 'ใช้แต้มกับคำสั่งซื้อนี้ไม่ได้');
+      }
+
+      pointsRedeemed = redemption.points;
+      pointsDiscount = redemption.discount;
+      discountTotal += pointsDiscount;
+    }
+
     const total = subtotal - discountTotal + shippingFee;
 
     const order = await tx.order.create({
@@ -532,6 +618,8 @@ export async function createOrder(
         userId,
         subtotal,
         discountTotal,
+        pointsRedeemed,
+        pointsDiscount,
         shippingFee,
         total,
         couponId,
@@ -544,7 +632,15 @@ export async function createOrder(
         idempotencyKey: input.idempotencyKey,
         items: { createMany: { data: orderItems } },
       },
-      select: { id: true },
+      select: { id: true, orderNumber: true },
+    });
+
+    // หักแต้มแบบ atomic หลังมีแถวออเดอร์ให้อ้างถึง — แต้มไม่พอแล้ว (ถูกใช้พร้อมกัน) → 409 → rollback
+    await redeemPointsForOrder(tx, {
+      userId,
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      points: pointsRedeemed,
     });
 
     // ย้ายของออกจากตะกร้า (รายการที่ไม่ได้ติ๊กยังอยู่)

@@ -5,6 +5,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.ts';
+import { tierForSpend } from '../src/models/loyalty.model.ts';
 
 /**
  * Integration test ของ Customer Management (STEP 25)
@@ -204,7 +205,7 @@ describe('PATCH /api/users/me/profile', () => {
     expect(on.body.data.allowPersonalization).toBe(true);
   });
 
-  it('เมินฟิลด์ที่ลูกค้าตั้งเองไม่ได้ (email · role · status · points · loyaltyTier)', async () => {
+  it('เมินฟิลด์ที่ลูกค้าตั้งเองไม่ได้ (email · role · status · points · ระดับสมาชิก)', async () => {
     const response = await request(app)
       .patch('/api/users/me/profile')
       .set(auth(customer.token))
@@ -227,8 +228,6 @@ describe('PATCH /api/users/me/profile', () => {
         email: true,
         status: true,
         points: true,
-        loyaltyTier: true,
-        totalSpent: true,
         role: { select: { name: true } },
       },
     });
@@ -236,8 +235,8 @@ describe('PATCH /api/users/me/profile', () => {
     expect(row.email).toBe(customer.email);
     expect(row.status).toBe('ACTIVE');
     expect(row.points).toBe(0);
-    expect(row.loyaltyTier).toBe('MEMBER');
-    expect(Number(String(row.totalSpent))).toBe(0);
+    // แต้มเปลี่ยนได้ทางเดียวคือสมุดแต้ม (STEP 42) — ต้องไม่มีรายการเกิดขึ้นจากการแก้โปรไฟล์
+    expect(await prisma.pointTransaction.count({ where: { userId: customer.id } })).toBe(0);
     expect(row.role.name).toBe('CUSTOMER');
   });
 
@@ -546,16 +545,13 @@ describe('GET /api/admin/customers', () => {
     }
   });
 
-  it('ยอดซื้อนับจากตาราง Order จริง ไม่ใช่คอลัมน์ cache User.totalSpent', async () => {
+  it('ยอดซื้อและระดับสมาชิกนับจากตาราง Order จริง (ไม่มีคอลัมน์ cache ให้ค้างค่าเก่า)', async () => {
     await createOrder(customer.id, 1_200);
     await createOrder(customer.id, 800);
     // ออเดอร์ที่ยกเลิกต้องไม่ถูกนับเป็นยอดขาย
     await createOrder(customer.id, 5_000, { status: 'CANCELLED', paymentStatus: 'CANCELLED' });
     // COD ที่ยังไม่เก็บเงินต้องแยกออกจากยอดที่ได้รับ
     await createOrder(customer.id, 300, { status: 'SHIPPING', paymentStatus: 'PENDING' });
-
-    // ใส่ค่าหลอกไว้ในคอลัมน์ cache — ถ้าโค้ดอ่านคอลัมน์นี้ เทสต์จะจับได้ทันที
-    await prisma.user.update({ where: { id: customer.id }, data: { totalSpent: 999_999 } });
 
     const response = await request(app)
       .get(`/api/admin/customers?q=${encodeURIComponent(customer.email)}`)
@@ -569,9 +565,8 @@ describe('GET /api/admin/customers', () => {
     expect(item.stats.totalOrders).toBe(5);
     expect(item.stats.pendingCodAmount).toBe(300);
     expect(item.stats.lastOrderAt).not.toBeNull();
-    expect(JSON.stringify(response.body)).not.toContain('999999');
-
-    await prisma.user.update({ where: { id: customer.id }, data: { totalSpent: 0 } });
+    // ระดับคิดจากยอดที่ได้รับตัวเดียวกับที่แถวนี้โชว์ (STEP 42) — สองตัวเลขจึงขัดกันไม่ได้
+    expect(item.tier.code).toBe(tierForSpend(item.stats.totalPaid).code);
   });
 });
 

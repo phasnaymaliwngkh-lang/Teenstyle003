@@ -9,6 +9,10 @@ import {
   updateMyAddressHandler,
   updateMyProfileHandler,
 } from '../controllers/customer.controller.ts';
+import {
+  getMyLoyaltyHandler,
+  listMyPointTransactionsHandler,
+} from '../controllers/loyalty.controller.ts';
 import { getMe } from '../controllers/user.controller.ts';
 import { requireAuth } from '../middlewares/authenticate.ts';
 import { verifyOrigin } from '../middlewares/verify-origin.ts';
@@ -21,8 +25,9 @@ import { verifyOrigin } from '../middlewares/verify-origin.ts';
  *   ไม่ต้องมีสิทธิ์พิเศษเพิ่ม (แพตเทิร์นเดียวกับ `/api/orders` และ `/api/notifications`):
  *   ขอบเขตความปลอดภัยคือ "เป็นเจ้าของแถวไหม" ไม่ใช่ "มีสิทธิ์อะไร"
  * - `verifyOrigin` ทุกเส้นทาง กัน CSRF — production ใช้ `SameSite=None` จึงต้องตรวจ Origin เอง
- * - **บทบาท สถานะ แต้ม ระดับสมาชิก และอีเมล แก้ทางนี้ไม่ได้** (ดู customer.validator.ts)
+ * - **บทบาท สถานะ แต้ม และอีเมล แก้ทางนี้ไม่ได้** (ดู customer.validator.ts)
  *   การเปลี่ยนค่าพวกนั้นเป็นงานของหลังบ้าน `/api/admin/customers/*`
+ *   แต้มสะสม **ดูได้อย่างเดียว** (STEP 42) — เปลี่ยนได้จากคำสั่งซื้อจริงหรือร้านปรับให้เท่านั้น
  */
 export const userRouter = Router();
 
@@ -40,3 +45,7 @@ userRouter.post('/me/addresses', createMyAddressHandler);
 userRouter.patch('/me/addresses/:addressId/default', setMyDefaultAddressHandler);
 userRouter.patch('/me/addresses/:addressId', updateMyAddressHandler);
 userRouter.delete('/me/addresses/:addressId', deleteMyAddressHandler);
+
+// แต้มสะสมและระดับสมาชิก (STEP 42) — อ่านอย่างเดียว
+userRouter.get('/me/loyalty', getMyLoyaltyHandler);
+userRouter.get('/me/loyalty/transactions', listMyPointTransactionsHandler);

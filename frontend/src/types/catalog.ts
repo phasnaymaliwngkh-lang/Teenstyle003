@@ -1,3 +1,5 @@
+import type { CheckoutLoyalty } from "./loyalty";
+
 /**
  * Type ของข้อมูลหน้าร้าน — ต้องตรงกับ DTO ฝั่ง backend
  *   backend/src/models/product.model.ts
@@ -365,11 +367,16 @@ export interface CouponApplyResult {
 export interface CheckoutSummary {
   items: CartItem[];
   subtotal: number;
+  /** ส่วนลดทั้งหมด (คูปอง + แต้ม) — ตัวเลขเดียวกับที่จะบันทึกลงคำสั่งซื้อ */
   discountTotal: number;
+  /** ส่วนลดจากคูปอง (รวมคูปองส่งฟรี) */
+  couponDiscount: number;
   /** คูปองที่ใช้ได้จริงกับตะกร้านี้ — null = ไม่ได้ใส่ หรือใส่แล้วใช้ไม่ได้ */
   appliedCoupon: AppliedCoupon | null;
   /** เหตุผลที่คูปองที่กรอกใช้ไม่ได้ — ต้องแสดงให้ผู้ใช้เห็น */
   couponError: string | null;
+  /** แต้มสะสม (STEP 42) */
+  loyalty: CheckoutLoyalty;
   shippingFee: number;
   total: number;
   selectedShippingMethod: ShippingMethodCode;
@@ -433,6 +440,12 @@ export interface Order {
   paymentStatus: string;
   subtotal: number;
   discountTotal: number;
+  /** แต้มที่ใช้เป็นส่วนลด (STEP 42) — มูลค่าเป็นบาทอยู่ใน pointsDiscount */
+  pointsRedeemed: number;
+  /** ส่วนหนึ่งของ discountTotal ที่มาจากแต้ม */
+  pointsDiscount: number;
+  /** แต้มสุทธิที่ได้จากใบนี้ — 0 = ยังไม่ได้ (เข้าเมื่อร้านได้รับเงิน) */
+  pointsEarned: number;
   shippingFee: number;
   total: number;
   shippingMethod: ShippingMethodCode;
@@ -480,6 +493,8 @@ export interface CreateOrderInput {
   idempotencyKey: string;
   /** ส่งได้แค่ **รหัส** — ยอดส่วนลดคิดที่ server ใหม่ทุกครั้ง (STEP 41) */
   couponCode?: string;
+  /** ส่งได้แค่ **จำนวนแต้ม** — มูลค่าส่วนลดคิดที่ server ใหม่ทุกครั้ง (STEP 42) */
+  pointsToRedeem?: number;
 }
 
 /* ─── STEP 11: Payment ────────────────────────────────────────────────────── */
@@ -879,7 +894,9 @@ export type NotificationType =
   | "SYSTEM"
   | "ORDER_UPDATE"
   | "ORDER_CANCELLED"
-  | "REVIEW_UPDATE";
+  | "REVIEW_UPDATE"
+  /** STEP 42 — ขึ้นระดับสมาชิก · ร้านปรับแต้มให้ */
+  | "LOYALTY_UPDATE";
 
 export type NotificationGroup = "ORDER" | "PRICE" | "REVIEW" | "OTHER";
 

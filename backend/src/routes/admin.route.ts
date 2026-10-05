@@ -77,6 +77,10 @@ import { describeMiddleware } from '../middlewares/describe.ts';
 import { requireAuth } from '../middlewares/authenticate.ts';
 import { requirePermission, requireStaff } from '../middlewares/authorize.ts';
 import { verifyOrigin } from '../middlewares/verify-origin.ts';
+import {
+  adjustCustomerPointsHandler,
+  adminListPointTransactionsHandler,
+} from '../controllers/loyalty.controller.ts';
 import { ApiError } from '../utils/api-error.ts';
 
 export const adminRouter = Router();
@@ -290,6 +294,22 @@ adminRouter.patch(
   '/customers/:userId/role',
   requirePermission('user:role:manage'),
   updateCustomerRoleHandler,
+);
+
+/**
+ * แต้มสะสมของลูกค้า (STEP 42)
+ *   - ดูประวัติแต้ม → `customer:read` (EMPLOYEE มี — ต้องตอบได้ว่าแต้มมาจากไหน)
+ *   - ปรับแต้ม     → `loyalty:adjust` (ADMIN ขึ้นไป — แต้มมีมูลค่าเท่าเงิน เหมือนการออกคูปอง)
+ */
+adminRouter.get(
+  '/customers/:userId/points',
+  requirePermission('customer:read'),
+  adminListPointTransactionsHandler,
+);
+adminRouter.post(
+  '/customers/:userId/points',
+  requirePermission('loyalty:adjust'),
+  adjustCustomerPointsHandler,
 );
 
 /**

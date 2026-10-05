@@ -19,7 +19,7 @@ import { getSession } from "@/lib/dal";
 import { cn } from "@/lib/utils";
 import { fetchPaymentStateOnServer } from "@/services/payment.server";
 import { fetchReviewEligibilityOnServer } from "@/services/review.server";
-import type { PaymentState, ReviewEligibility } from "@/types/catalog";
+import type { Order, PaymentState, ReviewEligibility } from "@/types/catalog";
 import { formatBaht } from "@/utils/format";
 
 type PageProps = { params: Promise<{ orderNumber: string }> };
@@ -252,8 +252,18 @@ export default async function OrderTrackingPage({ params }: PageProps) {
 
             <dl className="mt-3 space-y-2 text-sm">
               <Row label="ยอดสินค้า" value={formatBaht(order.subtotal)} />
-              {order.discountTotal > 0 && (
-                <Row label="ส่วนลด" value={`-${formatBaht(order.discountTotal)}`} />
+              {/* discountTotal รวมส่วนลดจากแต้มไว้แล้ว — แยกให้เห็นทีละก้อน (STEP 42) */}
+              {order.discountTotal - order.pointsDiscount > 0 && (
+                <Row
+                  label="ส่วนลด"
+                  value={`-${formatBaht(order.discountTotal - order.pointsDiscount)}`}
+                />
+              )}
+              {order.pointsDiscount > 0 && (
+                <Row
+                  label={`ส่วนลดจากแต้ม (${order.pointsRedeemed.toLocaleString("th-TH")} แต้ม)`}
+                  value={`-${formatBaht(order.pointsDiscount)}`}
+                />
               )}
               <Row
                 label={`ค่าจัดส่ง (${order.shippingMethodName})`}
@@ -266,6 +276,8 @@ export default async function OrderTrackingPage({ params }: PageProps) {
                 </dd>
               </div>
             </dl>
+
+            <PointsNote order={order} />
           </section>
 
           <section className="rounded-[var(--radius-card)] border border-line bg-white p-5">
@@ -298,6 +310,41 @@ export default async function OrderTrackingPage({ params }: PageProps) {
       </div>
     </main>
   );
+}
+
+/**
+ * แต้มของคำสั่งซื้อนี้ (STEP 42) — ตัวเลขมาจากสมุดแต้มจริงที่ backend รวมให้
+ * ยังไม่ได้รับเงิน → บอกว่าแต้มจะเข้าเมื่อไร ไม่ใช่โชว์ "0 แต้ม" ซึ่งอ่านว่า "ไม่ได้แต้ม"
+ */
+function PointsNote({ order }: { order: Order }) {
+  if (order.pointsEarned > 0) {
+    return (
+      <p className="mt-3 border-t border-line pt-3 text-xs font-semibold text-success">
+        ได้รับ {order.pointsEarned.toLocaleString("th-TH")} แต้มจากคำสั่งซื้อนี้ ·{" "}
+        <Link href="/account/points" className="underline">
+          ดูแต้มสะสม
+        </Link>
+      </p>
+    );
+  }
+
+  if (order.status === "CANCELLED" || order.status === "REFUNDED") {
+    return order.pointsRedeemed > 0 ? (
+      <p className="mt-3 border-t border-line pt-3 text-xs text-muted">
+        แต้มที่ใช้ในคำสั่งซื้อนี้ถูกคืนเข้าบัญชีแล้ว
+      </p>
+    ) : null;
+  }
+
+  if (order.paymentStatus !== "PAID") {
+    return (
+      <p className="mt-3 border-t border-line pt-3 text-xs text-muted">
+        แต้มสะสมจะเข้าบัญชีเมื่อร้านได้รับเงินแล้ว
+      </p>
+    );
+  }
+
+  return null;
 }
 
 function Row({ label, value }: { label: string; value: string }) {

@@ -57,6 +57,7 @@ export const FOOTER_SECTIONS: readonly {
       { label: "ประวัติคำสั่งซื้อ", href: "/account/orders" },
       { label: "รีวิวของฉัน", href: "/account/reviews" },
       { label: "การแจ้งเตือน", href: "/account/notifications" },
+      { label: "แต้มสะสม", href: "/account/points" },
     ],
   },
   {

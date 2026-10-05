@@ -49,6 +49,7 @@ export const ROUTES = [
   { path: '/account/orders/{orderNumber}', as: 'customer' },
   { path: '/account/reviews', as: 'customer' },
   { path: '/account/notifications', as: 'customer' },
+  { path: '/account/points', as: 'customer' },
   { path: '/wishlist', as: 'customer' },
   { path: '/cart', as: 'customer', note: 'ตะกร้าที่มีของจริง — แถวสินค้าคือจุดที่แน่นที่สุด' },
   { path: '/checkout', as: 'customer' },
@@ -118,10 +119,15 @@ async function resolvePlaceholders(prisma, apiBase, adminToken) {
     return body.data;
   };
 
-  const [product] = (await asAdmin('/api/admin/products?limit=1')).products ?? [];
+  /**
+   * ⚠️ รายการของหลังบ้านทุกเส้นคืน `items` (ไม่ใช่ `products` / `orders` / `customers`)
+   *    เดิมอ่านชื่อผิด → ค่าว่างเสมอ → หน้ารายละเอียดสินค้า/คำสั่งซื้อ/ลูกค้าในหลังบ้าน
+   *    ถูกข้ามทุกรอบโดยไม่มีใครรู้ (แก้ตอน STEP 42 เพราะต้องตรวจหน้าลูกค้าที่เพิ่มแต้มเข้าไป)
+   */
+  const [product] = (await asAdmin('/api/admin/products?limit=1')).items ?? [];
   const [inventory] = (await asAdmin('/api/admin/inventory?limit=1')).items ?? [];
-  const [order] = (await asAdmin('/api/admin/orders?limit=1')).orders ?? [];
-  const [customer] = (await asAdmin('/api/admin/customers?limit=1&role=CUSTOMER')).customers ?? [];
+  const [order] = (await asAdmin('/api/admin/orders?limit=1')).items ?? [];
+  const [customer] = (await asAdmin('/api/admin/customers?limit=1&role=CUSTOMER')).items ?? [];
 
   const publicProduct = await prisma.product.findFirst({
     where: { status: 'ACTIVE', deletedAt: null },

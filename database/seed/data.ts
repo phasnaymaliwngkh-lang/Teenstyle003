@@ -32,6 +32,7 @@ export const PERMISSIONS: ReadonlyArray<{ key: string; description: string }> = 
   { key: 'review:moderate', description: 'อนุมัติ ซ่อน หรือลบรีวิว' },
   { key: 'wishlist:manage', description: 'จัดการรายการที่ถูกใจของตัวเอง' },
   { key: 'coupon:manage', description: 'จัดการคูปองและโปรโมชั่น' },
+  { key: 'loyalty:adjust', description: 'ปรับแต้มสะสมของลูกค้า (ต้องกรอกเหตุผล)' },
   { key: 'look:manage', description: 'จัดการ Look และสินค้าในลุค' },
   { key: 'ai:read', description: 'ดูบทสนทนากับ AI' },
   { key: 'ai:handoff', description: 'รับเรื่องต่อจาก AI เพื่อคุยกับลูกค้า' },
@@ -72,6 +73,8 @@ const ADMIN_PERMISSIONS = [
   'customer:update',
   'review:moderate',
   'coupon:manage',
+  // ปรับแต้ม = ให้มูลค่าเท่าเงินออกจากร้าน จึงเป็นของ ADMIN ขึ้นไปเหมือนคูปอง (STEP 42)
+  'loyalty:adjust',
   'look:manage',
   'ai:knowledge:manage',
   'analytics:read',

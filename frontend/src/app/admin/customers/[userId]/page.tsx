@@ -3,13 +3,20 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { Pagination } from "@/components/shared/pagination";
+import { SectionError } from "@/components/shared/section";
 import { CustomerAccountActions } from "@/features/admin/components/customer-account-actions";
+import { PointsAdjustForm } from "@/features/admin/components/points-adjust-form";
+import { LoyaltyStandingCard } from "@/features/loyalty/components/loyalty-standing-card";
+import { PointHistory } from "@/features/loyalty/components/point-history";
 import { ApiClientError } from "@/lib/api";
 import { requirePermission } from "@/lib/dal";
+import { toSearchParams, type RawSearchParams } from "@/lib/query-params";
 import { cn } from "@/lib/utils";
-import { LOYALTY_NOT_ACTIVE_LABEL } from "@/features/account/lib/loyalty";
 import { fetchAdminCustomerOnServer } from "@/services/customer.server";
+import { fetchCustomerPointsOnServer } from "@/services/loyalty.server";
 import type { AdminCustomerDetail } from "@/types/customer";
+import type { AdminPointTransactionList } from "@/types/loyalty";
 
 export const metadata: Metadata = {
   title: "ข้อมูลลูกค้า",
@@ -59,11 +66,17 @@ const thaiDate = (value: string) =>
  */
 export default async function AdminCustomerPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ userId: string }>;
+  searchParams: Promise<RawSearchParams>;
 }) {
   const session = await requirePermission("customer:read");
   const { userId } = await params;
+  const query = toSearchParams(await searchParams);
+  const requestedPointsPage = Number(query.get("pointsPage") ?? "1");
+  const pointsPage =
+    Number.isInteger(requestedPointsPage) && requestedPointsPage > 0 ? requestedPointsPage : 1;
 
   let customer: AdminCustomerDetail;
 
@@ -77,6 +90,22 @@ export default async function AdminCustomerPage({
   }
 
   const stats = customer.stats;
+
+  /**
+   * แต้มสะสมโหลดแยกจากข้อมูลหลัก (STEP 42) — โหลดไม่ได้ต้องไม่ทำให้ทั้งหน้าพัง (กฎ STEP 5 ข้อ 1)
+   * และไม่ใช้ข้อมูลชุดนี้ตัดสิน 404 (ตัดสินจากข้อมูลหลักด้านบนไปแล้ว)
+   */
+  let points: AdminPointTransactionList | null = null;
+  let pointsError: string | null = null;
+
+  try {
+    points = await fetchCustomerPointsOnServer(customer.id, pointsPage);
+  } catch (error) {
+    pointsError = error instanceof ApiClientError ? error.message : "โหลดแต้มสะสมไม่สำเร็จ";
+  }
+
+  const canAdjustPoints =
+    session.user.permissions.includes("loyalty:adjust") && session.user.id !== customer.id;
 
   return (
     <main className="mx-auto w-full max-w-[1000px] px-4 py-8 sm:px-6">
@@ -102,9 +131,9 @@ export default async function AdminCustomerPage({
             <span className="inline-flex items-center rounded-[var(--radius-pill)] bg-lilac px-2.5 py-1 text-[11px] font-bold text-brand-dark">
               {customer.role}
             </span>
-            {/* ค่า points/loyaltyTier ไม่มีใครเขียน — ดู features/account/lib/loyalty.ts */}
-            <span className="inline-flex items-center rounded-[var(--radius-pill)] border border-line px-2.5 py-1 text-[11px] font-bold text-muted">
-              แต้มสะสม: {LOYALTY_NOT_ACTIVE_LABEL}
+            {/* ระดับคิดจาก "ยอดที่ได้รับ" ตัวเดียวกับในหน้านี้ · แต้ม = ผลรวมของสมุดแต้ม (STEP 42) */}
+            <span className="inline-flex items-center rounded-[var(--radius-pill)] border border-line px-2.5 py-1 text-[11px] font-bold text-ink-soft">
+              {customer.tier.name} · {customer.points.toLocaleString("th-TH")} แต้ม
             </span>
           </div>
         </div>
@@ -165,6 +194,60 @@ export default async function AdminCustomerPage({
             label="รีวิว · ถูกใจ"
             value={`${customer.reviewCount} · ${customer.wishlistCount}`}
           />
+        </div>
+      </section>
+
+      {/* ─── แต้มสะสม (STEP 42) ─── */}
+      <section aria-labelledby="points-heading" className="mt-6">
+        <h2 id="points-heading" className="text-lg">
+          แต้มสะสม
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          แต้มคงเหลือคือผลรวมของประวัติด้านล่างทุกบรรทัด — ระดับคิดจากยอดที่ได้รับด้านบน
+        </p>
+
+        <div className="mt-3 space-y-4">
+          {points === null ? (
+            <SectionError message={pointsError ?? "โหลดแต้มสะสมไม่สำเร็จ"} />
+          ) : (
+            <>
+              <LoyaltyStandingCard standing={points.standing} audience="staff" />
+
+              {points.items.length === 0 ? (
+                <p className="rounded-[var(--radius-card)] border border-dashed border-line bg-lilac-50 p-4 text-sm text-muted">
+                  ยังไม่มีประวัติแต้ม — แต้มเข้าเมื่อร้านได้รับเงินจากคำสั่งซื้อของลูกค้าคนนี้
+                </p>
+              ) : (
+                <>
+                  <PointHistory
+                    items={points.items}
+                    orderHref={(orderNumber) => `/admin/orders/${encodeURIComponent(orderNumber)}`}
+                  />
+                  <Pagination
+                    page={points.page}
+                    totalPages={points.totalPages}
+                    hrefFor={(target) =>
+                      target <= 1
+                        ? `/admin/customers/${customer.id}`
+                        : `/admin/customers/${customer.id}?pointsPage=${target}`
+                    }
+                  />
+                </>
+              )}
+
+              {canAdjustPoints && (
+                <div className="rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)]">
+                  <h3 className="text-sm font-extrabold">ปรับแต้ม</h3>
+                  <p className="mt-1 text-xs text-muted">
+                    บันทึกเป็นรายการใหม่ในประวัติ (แก้/ลบรายการเดิมไม่ได้) และเขียนลง Audit log
+                  </p>
+                  <div className="mt-3">
+                    <PointsAdjustForm userId={customer.id} balance={points.standing.points} />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </section>
 

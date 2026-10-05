@@ -14,8 +14,6 @@ declare module "next-auth" {
       /** key ของสิทธิ์ เช่น "product:create" — ใช้ซ่อน/แสดง UI เท่านั้น */
       permissions: string[];
       status: string;
-      loyaltyTier: string;
-      points: number;
     } & DefaultSession["user"];
   }
 }

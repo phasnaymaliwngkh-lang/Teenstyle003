@@ -398,6 +398,18 @@ async function main() {
       log(`\nเขียนผลละเอียดไว้ที่ ${JSON_OUT}`);
     }
 
+    /**
+     * ⚠️ ตรวจ 0 หน้าแล้วบอกว่า "มีปัญหา 0" คือการผ่านแบบหลอก ๆ (กฎ STEP 39 ข้อ 2)
+     *    audit-chrome มีด่านนี้มาตั้งแต่ STEP 39 แต่สคริปต์นี้ยังไม่มี — เจอตอน STEP 42:
+     *    `--only=/admin/products` ถูก Git Bash แปลงเป็น path ของ Windows แล้วได้ exit 0
+     *    (รันจาก Git Bash ต้องใส่ MSYS_NO_PATHCONV=1)
+     */
+    if (results.length === 0) {
+      log('\n❌ ไม่ได้ตรวจหน้าใดเลย — ตัวกรองไม่ตรงกับเส้นทางไหน หรือเตรียมข้อมูลไม่สำเร็จ');
+      process.exitCode = 2;
+      return;
+    }
+
     process.exitCode = failing.length > 0 || suspect.length > 0 ? 1 : 0;
   } finally {
     if (createdSessions.length) {

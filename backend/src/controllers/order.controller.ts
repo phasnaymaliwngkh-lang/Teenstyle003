@@ -23,9 +23,16 @@ import {
 /** GET /api/checkout/summary?shippingMethod=STANDARD */
 export const getCheckoutSummaryHandler = asyncHandler(
   async (req: Request, res: Response): Promise<void> => {
-    const { shippingMethod, couponCode } = checkoutSummaryQuerySchema.parse(req.query);
+    const { shippingMethod, couponCode, pointsToRedeem } = checkoutSummaryQuerySchema.parse(
+      req.query,
+    );
 
-    const summary = await getCheckoutSummary(req.user!.id, shippingMethod, couponCode);
+    const summary = await getCheckoutSummary(
+      req.user!.id,
+      shippingMethod,
+      couponCode,
+      pointsToRedeem,
+    );
 
     sendSuccess(res, summary);
   },

@@ -10,6 +10,7 @@ import { createQueryHelpers, toSearchParams, type RawSearchParams } from "@/lib/
 import { cn } from "@/lib/utils";
 import { fetchAdminCustomersOnServer } from "@/services/customer.server";
 import { ROLE_NAMES, USER_STATUSES, type AdminCustomerListResult } from "@/types/customer";
+import { LOYALTY_TIER_CODES } from "@/types/loyalty";
 
 export const metadata: Metadata = {
   title: "จัดการลูกค้า",
@@ -49,11 +50,9 @@ const ROLE_LABEL: Record<string, string> = {
 };
 
 /**
- * ⚠️ ไม่แสดง "ระดับสมาชิก" ในหน้านี้ เพราะ `User.loyaltyTier` ไม่มีโค้ดไหนเขียนค่าเลย
- *    ทุกบัญชีจึงเป็น MEMBER ตลอดกาล — การแสดงค่านั้นคือการบอกแอดมินว่าไม่มีลูกค้าระดับสูงเลย
- *    (คลาสเดียวกับ `totalSpent` ของ STEP 25 · ดู features/account/lib/loyalty.ts)
- *    ตัวกรอง `tier` ของ API ยังอยู่ตามสัญญาใน docs/09-api-reference.md แต่ยังไม่มี UI
- *    เพราะกรองด้วยคอลัมน์ที่ไม่มีใครเขียนจะคืนผลว่างเสมอ — เปิดใช้พร้อมระบบแต้ม STEP 42
+ * ระดับสมาชิก (STEP 42) คำนวณที่ server จาก "ยอดที่ได้รับ" ตัวเดียวกับคอลัมน์ในตารางนี้
+ * — เดิมเป็นคอลัมน์ `User.loyaltyTier` ที่ไม่มีใครเขียน (ทุกคน MEMBER) จึงถูกซ่อนไว้ตอน STEP 40
+ * ตัวกรองระดับกรองที่ backend **ก่อนแบ่งหน้า** (ไม่ใช่กรองเฉพาะแถวในหน้านี้)
  */
 
 const baht = (value: number) => `฿${value.toLocaleString("th-TH")}`;
@@ -64,13 +63,13 @@ const thaiDate = (value: string) =>
 /**
  * จัดการลูกค้า /admin/customers (STEP 25)
  *
- * ⚠️ **ยอดซื้อในตารางนับจากตาราง `Order` จริง** ไม่ใช่คอลัมน์ `User.totalSpent`
- *    ซึ่งยังไม่มีใครเขียน (จะมาพร้อมระบบแต้ม STEP 42) — เอามาแสดงคือบอกร้านว่า
- *    ลูกค้าทุกคนไม่เคยซื้ออะไรเลย (ปัญหาชนิดเดียวกับ `Product.totalStock` ของ STEP 15)
+ * ⚠️ **ยอดซื้อและระดับในตารางนับจากตาราง `Order` จริง** — ไม่มีคอลัมน์ cache ให้ค้างค่าเก่า
+ *    (`User.totalSpent` ที่ไม่มีใครเขียนถูกถอดออกตอน STEP 42 · ปัญหาชนิดเดียวกับ
+ *    `Product.totalStock` ของ STEP 15)
  *
  * ⚠️ **ยังไม่มีการเรียงตามยอดซื้อโดยเจตนา** — ยอดซื้อไม่ใช่คอลัมน์ในตาราง `User`
  *    การเรียงต้องทำก่อนแบ่งหน้า ไม่ใช่เรียงเฉพาะ 20 แถวที่หยิบมา
- *    (บั๊กชนิดเดียวกับตัวกรอง "สต็อกต่ำ" ของ STEP 14 ข้อ 7) → เป็นงานของรายงาน STEP 26
+ *    (บั๊กชนิดเดียวกับตัวกรอง "สต็อกต่ำ" ของ STEP 14 ข้อ 7) — อันดับลูกค้าดูที่ /admin/analytics
  *
  * ⚠️ รายการนี้แสดง **บัญชีผู้ใช้ทุกบทบาท** เพราะหน้านี้เป็นที่เดียวที่เปลี่ยนบทบาทได้
  *    ตัวเลขสรุปด้านบนจึงแยก "ลูกค้า" กับ "ทีมงาน" ออกจากกันให้ชัด
@@ -93,6 +92,7 @@ export default async function AdminCustomersPage({
   }
 
   const canManage = session.user.permissions.includes("customer:update");
+  const canSeeReports = session.user.permissions.includes("analytics:read");
 
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6">
@@ -197,6 +197,21 @@ export default async function AdminCustomersPage({
               ))}
             </FilterRow>
 
+            <FilterRow label="ระดับสมาชิก">
+              <FilterChip href={withParam(params, "tier", null)} active={!params.get("tier")}>
+                ทุกระดับ
+              </FilterChip>
+              {LOYALTY_TIER_CODES.map((tier) => (
+                <FilterChip
+                  key={tier}
+                  href={withParam(params, "tier", tier)}
+                  active={params.get("tier") === tier}
+                >
+                  {tier}
+                </FilterChip>
+              ))}
+            </FilterRow>
+
             <FilterRow label="เรียงตาม">
               {SORTS.map((sort) => (
                 <FilterChip
@@ -254,6 +269,9 @@ export default async function AdminCustomersPage({
                         {item.stats.paidOrders} / {item.stats.totalOrders} ใบ
                       </Cell>
                       <Cell label="ยอดที่ได้รับ">{baht(item.stats.totalPaid)}</Cell>
+                      <Cell label="ระดับ · แต้ม">
+                        {item.tier.name} · {item.points.toLocaleString("th-TH")}
+                      </Cell>
                     </dl>
                   </li>
                 ))}
@@ -277,6 +295,9 @@ export default async function AdminCustomersPage({
                       </th>
                       <th scope="col" className="px-4 py-3 text-right">
                         ยอดที่ได้รับ
+                      </th>
+                      <th scope="col" className="px-4 py-3">
+                        ระดับ · แต้ม
                       </th>
                       <th scope="col" className="px-4 py-3">
                         ซื้อครั้งล่าสุด
@@ -320,6 +341,12 @@ export default async function AdminCustomersPage({
                             </span>
                           )}
                         </td>
+                        <td className="px-4 py-3">
+                          <span className="font-semibold">{item.tier.name}</span>
+                          <span className="block text-xs text-muted">
+                            {item.points.toLocaleString("th-TH")} แต้ม
+                          </span>
+                        </td>
                         <td className="px-4 py-3 text-muted">
                           {item.stats.lastOrderAt === null
                             ? "ยังไม่เคยสั่ง"
@@ -341,8 +368,17 @@ export default async function AdminCustomersPage({
           )}
 
           <p className="mt-6 text-xs text-muted">
-            อันดับลูกค้าตามยอดซื้อยังไม่มีในหน้านี้ — ต้องคิดจากคำสั่งซื้อทั้งระบบก่อนแบ่งหน้า
-            จะทำพร้อมรายงานใน STEP 26
+            หน้านี้ไม่เรียงตามยอดซื้อ — อันดับต้องคิดจากคำสั่งซื้อทั้งระบบก่อนแบ่งหน้า
+            {canSeeReports ? (
+              <>
+                {" · "}
+                <Link href="/admin/analytics" className="font-semibold text-brand underline">
+                  ดูอันดับลูกค้าในรายงานยอดขาย
+                </Link>
+              </>
+            ) : (
+              " · อันดับลูกค้าอยู่ในรายงานยอดขาย (ต้องมีสิทธิ์ดูรายงาน)"
+            )}
           </p>
         </>
       )}

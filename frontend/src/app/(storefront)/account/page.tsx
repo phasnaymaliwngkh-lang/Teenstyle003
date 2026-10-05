@@ -1,6 +1,7 @@
 import {
   Award,
   Bell,
+  Coins,
   Heart,
   Mail,
   MapPin,
@@ -13,11 +14,12 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { SignOutButton } from "@/features/auth/components/sign-out-button";
 import { requireUser } from "@/lib/dal";
-import { LOYALTY_NOT_ACTIVE_LABEL } from "@/features/account/lib/loyalty";
 import { isStaffRole } from "@/lib/permissions";
+import { fetchMyLoyaltyOnServer } from "@/services/loyalty.server";
 import { NOINDEX_NOFOLLOW } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -54,9 +56,11 @@ export default async function AccountPage() {
           <InfoCard icon={<ShieldCheck className="size-5 text-brand" aria-hidden />} label="บทบาท">
             {user.role}
           </InfoCard>
-          {/* ค่า points/loyaltyTier ไม่มีใครเขียน — ห้ามแสดงเป็นความจริง (ดู features/account/lib/loyalty.ts) */}
           <InfoCard icon={<Award className="size-5 text-brand" aria-hidden />} label="ระดับสมาชิก">
-            <span className="text-muted">{LOYALTY_NOT_ACTIVE_LABEL}</span>
+            {/* โหลดแยก — แต้มโหลดไม่ได้ต้องไม่ทำให้หน้าบัญชีพังทั้งหน้า (กฎ STEP 5 ข้อ 1) */}
+            <Suspense fallback={<span className="text-muted">กำลังโหลด…</span>}>
+              <LoyaltySummary />
+            </Suspense>
           </InfoCard>
         </section>
 
@@ -161,6 +165,21 @@ export default async function AccountPage() {
           </Link>
 
           <Link
+            href="/account/points"
+            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)] transition hover:border-brand-soft hover:shadow-[var(--shadow-lift)]"
+          >
+            <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-lilac">
+              <Coins className="size-6 text-brand" aria-hidden />
+            </span>
+            <span>
+              <span className="block font-extrabold">แต้มสะสม</span>
+              <span className="block text-sm text-muted">
+                แต้มคงเหลือ ระดับสมาชิก และประวัติการได้/ใช้แต้ม
+              </span>
+            </span>
+          </Link>
+
+          <Link
             href="/account/notifications"
             className="flex items-center gap-4 rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)] transition hover:border-brand-soft hover:shadow-[var(--shadow-lift)]"
           >
@@ -180,13 +199,37 @@ export default async function AccountPage() {
           <h2 className="text-lg font-extrabold">ยังไม่เปิดใช้งานในขั้นนี้</h2>
           <p className="mt-2 text-sm text-muted">ส่วนที่เหลือจะเพิ่มตามลำดับ STEP</p>
           <ul className="mt-5 space-y-3 text-sm">
-            <PendingItem step={42}>แลกแต้มและสิทธิประโยชน์ตามระดับสมาชิก</PendingItem>
             <PendingItem step={43}>ขอคืนสินค้า / คืนเงิน</PendingItem>
             <PendingItem step={53}>ดาวน์โหลดและลบข้อมูลส่วนตัว</PendingItem>
           </ul>
         </section>
       </div>
     </main>
+  );
+}
+
+/**
+ * ระดับและแต้มจริงจาก server (STEP 42)
+ *
+ * ⚠️ โหลดไม่ได้ → บอกว่าโหลดไม่ได้ **ห้ามแสดง "0 แต้ม"** เพราะ 0 แปลว่า "ไม่มีแต้ม"
+ *    ซึ่งเป็นการโกหกเมื่อความจริงคือ "ยังไม่รู้" (กฎเดียวกับป้ายกระดิ่งของ STEP 16 ข้อ 8)
+ */
+async function LoyaltySummary() {
+  // จับ error เฉพาะตอนดึงข้อมูล — สร้าง JSX นอก try (กฎ react-hooks/error-boundaries)
+  const loyalty = await fetchMyLoyaltyOnServer().catch(() => null);
+
+  if (loyalty === null) {
+    return (
+      <Link href="/account/points" className="text-muted underline">
+        โหลดแต้มไม่สำเร็จ — ดูที่หน้าแต้มสะสม
+      </Link>
+    );
+  }
+
+  return (
+    <Link href="/account/points" className="underline-offset-4 hover:underline">
+      {loyalty.tier.name} · {loyalty.points.toLocaleString("th-TH")} แต้ม
+    </Link>
   );
 }
 

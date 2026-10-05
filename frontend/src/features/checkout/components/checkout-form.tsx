@@ -9,6 +9,8 @@ import { useForm, useWatch } from "react-hook-form";
 
 import { checkoutFormSchema, type CheckoutFormValues } from "../lib/schema";
 
+import { PointsRedeemer, type AppliedPoints } from "./points-redeemer";
+
 import { ApiClientError } from "@/lib/api";
 import { describeApiError } from "@/lib/api-error-text";
 import { cn } from "@/lib/utils";
@@ -50,6 +52,21 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
   const [coupon, setCoupon] = useState<AppliedCoupon | null>(summary.appliedCoupon);
   const [couponMessage, setCouponMessage] = useState<string | null>(summary.couponError);
   const [couponChecking, setCouponChecking] = useState(false);
+
+  /**
+   * แต้มสะสม (STEP 42) — เก็บแค่ "แต้มที่ใช้ + ส่วนลดที่ server คิดให้"
+   * เพดานของแต้มคิดจากยอดที่เหลือหลังหักคูปอง → เปลี่ยนคูปองแล้วต้องให้ลูกค้ากดใช้ใหม่
+   * (ไม่งั้นยอดที่โชว์อาจไม่ตรงกับที่ server ยอมให้ใช้ตอนสั่งซื้อ)
+   */
+  const [points, setPoints] = useState<AppliedPoints | null>(null);
+  const [pointsNotice, setPointsNotice] = useState<string | null>(null);
+
+  function resetPoints(reason: string) {
+    if (points === null) return;
+
+    setPoints(null);
+    setPointsNotice(reason);
+  }
 
   const defaultAddress =
     summary.addresses.find((address) => address.isDefault) ?? summary.addresses[0];
@@ -98,12 +115,14 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
     summary.shippingOptions[0]!;
   const shippingFee = chosenOption.fee;
   /**
-   * ส่วนลดที่โชว์ = ส่วนลดจาก server + ส่วนลดของคูปองที่เพิ่งตรวจในหน้านี้
+   * ส่วนลดที่โชว์ = ส่วนลดคูปอง (จาก server หรือคูปองที่เพิ่งตรวจในหน้านี้) + ส่วนลดจากแต้ม
    * (คูปองส่งฟรีถูกยุบมาอยู่ในตัวเลขเดียวกัน เพราะสูตรบิลมีช่องส่วนลดช่องเดียว)
+   * ทุกตัวเลขมาจาก server — หน้าเว็บแค่บวกลบเพื่อแสดงผล
    */
-  const couponDiscount = coupon === null ? 0 : coupon.discountTotal + coupon.shippingDiscount;
-  const discountTotal = coupon === null ? summary.discountTotal : couponDiscount;
-  const total = summary.subtotal - discountTotal + shippingFee;
+  const couponDiscount =
+    coupon === null ? summary.couponDiscount : coupon.discountTotal + coupon.shippingDiscount;
+  const pointsDiscount = points?.discount ?? 0;
+  const total = summary.subtotal - couponDiscount - pointsDiscount + shippingFee;
 
   async function checkCoupon() {
     const code = couponInput.trim();
@@ -116,6 +135,7 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
 
     setCouponChecking(true);
     setCouponMessage(null);
+    resetPoints("เปลี่ยนคูปองแล้ว — กดใช้แต้มอีกครั้งเพื่อคิดเพดานใหม่");
 
     try {
       const result = await applyCoupon(code, shippingMethod);
@@ -134,6 +154,7 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
     setCouponInput("");
     setCoupon(null);
     setCouponMessage(null);
+    resetPoints("เอาคูปองออกแล้ว — กดใช้แต้มอีกครั้งเพื่อคิดเพดานใหม่");
   }
 
   async function onSubmit(values: CheckoutFormValues) {
@@ -143,6 +164,7 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
       shippingMethod: values.shippingMethod,
       idempotencyKey,
       ...(coupon !== null ? { couponCode: coupon.code } : {}),
+      ...(points !== null ? { pointsToRedeem: points.points } : {}),
       ...(values.customerNote ? { customerNote: values.customerNote } : {}),
       ...(values.addressChoice === "new"
         ? {
@@ -336,7 +358,14 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
                     type="radio"
                     value={option.code}
                     disabled={!available}
-                    {...form.register("shippingMethod")}
+                    {...form.register("shippingMethod", {
+                      // คูปองส่งฟรีลดตามค่าส่งของวิธีที่เลือก → เพดานแต้มเปลี่ยนตาม
+                      onChange: () => {
+                        if (coupon !== null) {
+                          resetPoints("เปลี่ยนวิธีจัดส่งแล้ว — กดใช้แต้มอีกครั้งเพื่อคิดเพดานใหม่");
+                        }
+                      },
+                    })}
                     className="mt-1 size-4 accent-[var(--color-brand)]"
                   />
                   <span className="min-w-0 flex-1 text-sm">
@@ -445,12 +474,32 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
             </div>
           </div>
 
+          {/* ─── แต้มสะสม (STEP 42) ─── */}
+          <PointsRedeemer
+            loyalty={summary.loyalty}
+            shippingMethod={shippingMethod}
+            couponCode={coupon?.code ?? null}
+            applied={points}
+            onApplied={(next) => {
+              setPoints(next);
+              setPointsNotice(null);
+            }}
+            disabled={submitting}
+            notice={pointsNotice}
+          />
+
           <dl className="mt-4 space-y-2 text-sm">
             <Row label="ยอดสินค้า" value={formatBaht(summary.subtotal)} />
             <Row
               label={coupon === null ? "ส่วนลด" : `ส่วนลด (${coupon.code})`}
-              value={discountTotal > 0 ? `-${formatBaht(discountTotal)}` : "—"}
+              value={couponDiscount > 0 ? `-${formatBaht(couponDiscount)}` : "—"}
             />
+            {points !== null && (
+              <Row
+                label={`ส่วนลดจากแต้ม (${points.points.toLocaleString("th-TH")} แต้ม)`}
+                value={`-${formatBaht(pointsDiscount)}`}
+              />
+            )}
             <Row
               label={`ค่าจัดส่ง (${chosenOption.name})`}
               value={shippingFee === 0 ? "ฟรี" : formatBaht(shippingFee)}
@@ -486,8 +535,8 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
 
           <p className="mt-3 text-xs text-muted">
             กดยืนยันแล้วระบบจะ <strong>จองสินค้า</strong> ไว้ให้ และสร้างคำสั่งซื้อสถานะ
-            &ldquo;รอชำระเงิน&rdquo; · ยังไม่มีการตัดเงินในขั้นนี้ — ระบบชำระเงินจริงจะเชื่อมต่อใน
-            STEP 11
+            &ldquo;รอชำระเงิน&rdquo; · ยังไม่มีการตัดเงินในขั้นนี้ — เลือกวิธีชำระเงินในหน้าถัดไป
+            {points !== null && " · แต้มที่ใช้ถูกหักทันที และได้คืนถ้าคำสั่งซื้อถูกยกเลิก"}
           </p>
         </div>
 

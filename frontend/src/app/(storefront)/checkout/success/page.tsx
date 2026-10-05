@@ -159,10 +159,20 @@ export default async function CheckoutSuccessPage({
             <dt className="text-muted">ยอดสินค้า</dt>
             <dd className="font-semibold">{formatBaht(order.subtotal)}</dd>
           </div>
-          {order.discountTotal > 0 && (
+          {order.discountTotal - order.pointsDiscount > 0 && (
             <div className="flex justify-between gap-3">
               <dt className="text-muted">ส่วนลด</dt>
-              <dd className="font-semibold">-{formatBaht(order.discountTotal)}</dd>
+              <dd className="font-semibold">
+                -{formatBaht(order.discountTotal - order.pointsDiscount)}
+              </dd>
+            </div>
+          )}
+          {order.pointsDiscount > 0 && (
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted">
+                ส่วนลดจากแต้ม ({order.pointsRedeemed.toLocaleString("th-TH")} แต้ม)
+              </dt>
+              <dd className="font-semibold">-{formatBaht(order.pointsDiscount)}</dd>
             </div>
           )}
           <div className="flex justify-between gap-3">

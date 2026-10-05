@@ -24,7 +24,9 @@ export type NotificationType =
   | 'SYSTEM'
   | 'ORDER_UPDATE'
   | 'ORDER_CANCELLED'
-  | 'REVIEW_UPDATE';
+  | 'REVIEW_UPDATE'
+  /** STEP 42 — ขึ้นระดับสมาชิก · ร้านปรับแต้มให้ (แต้มที่ได้จากคำสั่งซื้อแจ้งรวมกับ PAYMENT_SUCCESS) */
+  | 'LOYALTY_UPDATE';
 
 /** หมวดที่ใช้กรองบนหน้าเว็บ — ย่อจาก type ให้เหลือเท่าที่ลูกค้าเข้าใจ */
 export type NotificationGroup = 'ORDER' | 'PRICE' | 'REVIEW' | 'OTHER';
@@ -80,6 +82,7 @@ const GROUP_OF: Record<NotificationType, NotificationGroup> = {
   ORDER_UPDATE: 'ORDER',
   ORDER_CANCELLED: 'ORDER',
   REVIEW_UPDATE: 'REVIEW',
+  LOYALTY_UPDATE: 'OTHER',
   LOW_STOCK: 'OTHER',
   SYSTEM: 'OTHER',
 };
@@ -126,6 +129,10 @@ export function resolveNotificationLink(type: NotificationType, data: unknown): 
       const slug = readString(data, 'productSlug');
       return slug === null ? null : `/product/${slug}`;
     }
+
+    case 'LOYALTY_UPDATE':
+      // หน้าแต้มของตัวเองมีอยู่จริงเสมอสำหรับคนที่ล็อกอิน — ไม่ต้องอ่านจาก data
+      return '/account/points';
 
     case 'LOW_STOCK':
       // ของพนักงาน — ไม่โผล่ในฟีดลูกค้า แต่แมปไว้ให้ครบ ไม่ให้กลายเป็นลิงก์ผิด

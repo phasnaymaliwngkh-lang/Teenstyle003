@@ -128,6 +128,7 @@ export const ACTION_LABELS: Readonly<Record<string, string>> = {
   'support.ticket.status': 'เปลี่ยนสถานะเคสบริการลูกค้า',
   'customer.status.update': 'เปลี่ยนสถานะบัญชีผู้ใช้',
   'customer.role.update': 'เปลี่ยนบทบาทและสิทธิ์',
+  'customer.points.adjust': 'ปรับแต้มสะสมของลูกค้า',
 };
 
 /** กลุ่มของการกระทำ — ใช้ทำตัวกรองระดับหยาบ (`action` ขึ้นต้นด้วยอะไร) */

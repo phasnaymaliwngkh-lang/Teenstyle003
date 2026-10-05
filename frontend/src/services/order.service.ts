@@ -18,13 +18,21 @@ import type {
  * (ตอน dev เบราว์เซอร์ส่ง cookie ข้าม port ได้ · production ใช้หน้า server เป็นตัวอ่าน)
  */
 
+/**
+ * สรุปยอดตามตัวเลือกปัจจุบัน — หน้า checkout เรียกซ้ำตอนกด "ใช้แต้ม" (STEP 42)
+ * เพื่อให้ส่วนลดจากแต้มเป็นตัวเลขที่ server คิด ไม่ใช่หน้าเว็บคิดเอง
+ */
 export function fetchCheckoutSummary(
   shippingMethod: ShippingMethodCode,
   couponCode?: string,
+  pointsToRedeem?: number,
 ): Promise<CheckoutSummary> {
   const query = new URLSearchParams({ shippingMethod });
 
   if (couponCode) query.set("couponCode", couponCode);
+  if (pointsToRedeem !== undefined && pointsToRedeem > 0) {
+    query.set("pointsToRedeem", String(pointsToRedeem));
+  }
 
   return apiFetch<CheckoutSummary>(`/api/checkout/summary?${query.toString()}`, {
     cache: "no-store",

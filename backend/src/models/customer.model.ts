@@ -1,5 +1,6 @@
 import type { Prisma } from '@teenstyle/database';
 
+import { tierForSpend, toTierDto, type LoyaltyTierDto } from './loyalty.model.ts';
 import { toNumber } from './pricing.ts';
 
 /**
@@ -10,12 +11,12 @@ import { toNumber } from './pricing.ts';
  *   1. `MyProfileDto` / `AddressDto` — สิ่งที่เจ้าของบัญชีเห็นและแก้ได้เอง
  *   2. `AdminCustomerListItemDto` / `AdminCustomerDetailDto` — สิ่งที่พนักงานเห็น
  *
- * ฝั่งลูกค้า **ไม่มีทาง** เห็นหรือแก้ `role` · `status` · `points` · `loyaltyTier` · `totalSpent`
- * เพราะเป็นค่าที่ร้านเป็นคนกำหนด ไม่ใช่ข้อมูลที่เจ้าของบัญชีกรอกเอง
+ * ฝั่งลูกค้า **แก้ไม่ได้** ทั้ง `role` · `status` · `points` เพราะเป็นค่าที่ร้านหรือระบบเป็นคนกำหนด
+ * ไม่ใช่ข้อมูลที่เจ้าของบัญชีกรอกเอง (แต้มดูได้ที่ /api/users/me/loyalty — STEP 42)
  *
- * ⚠️ **ยอดซื้อในมุมมองพนักงานนับจากตาราง `Order` จริงทุกครั้ง ห้ามอ่านคอลัมน์ `User.totalSpent`**
- *    คอลัมน์นั้นเป็น cache ที่ยังไม่มีใครเขียน (จะมาพร้อมระบบแต้ม STEP 42)
- *    ค่าปัจจุบันคือ 0 ทุกคน — เอามาแสดงคือบอกร้านว่าลูกค้าทุกคนไม่เคยซื้ออะไรเลย
+ * ⚠️ **ยอดซื้อและระดับสมาชิกนับจากตาราง `Order` จริงทุกครั้ง** — ไม่มีคอลัมน์ cache ให้อ่าน
+ *    เดิม `User.totalSpent` / `User.loyaltyTier` เป็นคอลัมน์ที่ไม่มีใครเขียน (0 / MEMBER ทุกคน)
+ *    ถูกถอดออกตอน STEP 42 แล้วให้ระดับคำนวณจาก "ยอดที่ได้รับ" ตัวเดียวกับที่หน้านี้โชว์
  *    (ปัญหาชนิดเดียวกับ `Product.totalStock` ที่ไม่ใช่ "จำนวนที่ขายได้จริง" — ดู STEP 15)
  */
 
@@ -24,9 +25,6 @@ export type UserStatusCode = (typeof USER_STATUSES)[number];
 
 export const ROLE_NAMES = ['CUSTOMER', 'EMPLOYEE', 'ADMIN', 'SUPER_ADMIN'] as const;
 export type RoleNameCode = (typeof ROLE_NAMES)[number];
-
-export const LOYALTY_TIERS = ['MEMBER', 'SILVER', 'GOLD', 'VIP'] as const;
-export type LoyaltyTierCode = (typeof LOYALTY_TIERS)[number];
 
 /** บทบาทของพนักงาน — เรียงจากสิทธิ์น้อยไปมาก ใช้เทียบว่าใครแตะบัญชีใครได้ */
 export const ROLE_RANK: Readonly<Record<RoleNameCode, number>> = {
@@ -118,8 +116,6 @@ export const MY_PROFILE_SELECT = {
   phone: true,
   birthDate: true,
   allowPersonalization: true,
-  loyaltyTier: true,
-  points: true,
   status: true,
   lastLoginAt: true,
   createdAt: true,
@@ -142,8 +138,6 @@ export interface MyProfileDto {
   allowPersonalization: boolean;
   /** อ่านได้เพื่อแสดงบนหน้าบัญชี แต่แก้จากฝั่งลูกค้าไม่ได้ */
   role: string;
-  loyaltyTier: string;
-  points: number;
   status: string;
   lastLoginAt: string | null;
   memberSince: string;
@@ -171,8 +165,6 @@ export function toMyProfileDto(row: MyProfileRow, addressCount: number): MyProfi
     birthDate: toDateOnly(row.birthDate),
     allowPersonalization: row.allowPersonalization,
     role: row.role.name,
-    loyaltyTier: row.loyaltyTier,
-    points: row.points,
     status: row.status,
     lastLoginAt: row.lastLoginAt?.toISOString() ?? null,
     memberSince: row.createdAt.toISOString(),
@@ -191,7 +183,7 @@ export const ADMIN_CUSTOMER_SELECT = {
   phone: true,
   birthDate: true,
   status: true,
-  loyaltyTier: true,
+  /** แต้มคงเหลือ — cache ของสมุดแต้มที่เขียนคู่กันเสมอ (STEP 42) */
   points: true,
   allowPersonalization: true,
   lastLoginAt: true,
@@ -230,7 +222,9 @@ export interface AdminCustomerListItemDto {
   phone: string | null;
   role: string;
   status: string;
-  loyaltyTier: string;
+  /** ระดับสมาชิก — คำนวณจาก `stats.totalPaid` ตัวเดียวกับที่โชว์ในแถวนี้ (STEP 42) */
+  tier: LoyaltyTierDto;
+  /** แต้มคงเหลือ */
   points: number;
   lastLoginAt: string | null;
   createdAt: string;
@@ -249,7 +243,7 @@ export function toAdminCustomerListItem(
     phone: row.phone,
     role: row.role.name,
     status: row.status,
-    loyaltyTier: row.loyaltyTier,
+    tier: toTierDto(tierForSpend(stats.totalPaid)),
     points: row.points,
     lastLoginAt: row.lastLoginAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),

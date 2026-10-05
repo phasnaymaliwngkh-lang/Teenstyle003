@@ -128,8 +128,6 @@ export const authConfig: NextAuthConfig = {
         where: { id: user.id },
         select: {
           status: true,
-          loyaltyTier: true,
-          points: true,
           role: {
             select: {
               name: true,
@@ -143,8 +141,8 @@ export const authConfig: NextAuthConfig = {
       session.user.role = (record?.role.name ?? "CUSTOMER") as RoleName;
       session.user.permissions = record?.role.permissions.map((p) => p.key) ?? [];
       session.user.status = record?.status ?? "ACTIVE";
-      session.user.loyaltyTier = record?.loyaltyTier ?? "MEMBER";
-      session.user.points = record?.points ?? 0;
+      // แต้มและระดับสมาชิกไม่อยู่ใน session (STEP 42) — อ่านจาก /api/users/me/loyalty ที่เดียว
+      // เดิมใส่ไว้ทั้งที่ไม่มีใครเขียนค่า (ทุกคน MEMBER · 0 แต้ม) และระดับไม่ใช่คอลัมน์อีกแล้ว
 
       return session;
     },
