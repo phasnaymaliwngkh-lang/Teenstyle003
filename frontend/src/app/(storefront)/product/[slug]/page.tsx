@@ -4,14 +4,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 
-import {
-  SectionEmpty,
-  SectionError,
-  SectionHeader,
-  SectionSkeleton,
-} from "@/components/shared/section";
-import { ProductCard } from "@/features/products/components/product-card";
+import { SectionError } from "@/components/shared/section";
 import { ProductGallery } from "@/features/products/components/product-gallery";
+import {
+  ProductRecommendations,
+  ProductRecommendationsSkeleton,
+} from "@/features/products/components/product-recommendations";
 import { VariantPicker } from "@/features/products/components/variant-picker";
 import { ProductRatingBadge } from "@/features/reviews/components/product-rating-badge";
 import { ReviewSection } from "@/features/reviews/components/review-section";
@@ -21,7 +19,7 @@ import { ApiClientError } from "@/lib/api";
 import { getSession } from "@/lib/dal";
 import { toSearchParams, type RawSearchParams } from "@/lib/query-params";
 import { breadcrumbJsonLd, productJsonLd } from "@/lib/seo";
-import { fetchProductDetail, searchShopProducts } from "@/services/catalog.service";
+import { fetchProductDetail } from "@/services/catalog.service";
 import { fetchProductReviewsOnServer } from "@/services/review.server";
 import { fetchWishlistedIdsOnServer } from "@/services/wishlist.server";
 import type { ProductDetail } from "@/types/catalog";
@@ -128,7 +126,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
  * ⚠️ ตั้งใจ await ข้อมูลหลักที่ระดับ page (ไม่ห่อ <Suspense> และไม่มี loading.tsx)
  *    เพราะถ้า stream ออกไปก่อน Next จะส่ง HTTP 200 แล้วเปลี่ยนเป็น 404 ไม่ได้อีก
  *    (ทดลองยืนยันแล้ว: มี loading.tsx → 200, ไม่มี → 404 ตามจริง)
- *    ส่วนที่เหลือ (สินค้าที่เกี่ยวข้อง) ยัง stream พร้อม skeleton ตามปกติ
+ *    ส่วนที่เหลือ (รีวิว · สินค้าแนะนำ) ยัง stream พร้อม skeleton ตามปกติ
  */
 export default async function ProductPage({ params, searchParams }: PageProps) {
   const { slug } = await params;
@@ -202,68 +200,18 @@ export default async function ProductPage({ params, searchParams }: PageProps) {
           </div>
 
           <div className="mt-14">
-            <Suspense fallback={<RelatedSkeleton />}>
-              <RelatedSection
+            {/* ซื้อด้วยกัน · แมตช์ในลุค · สินค้าคล้ายกัน (STEP 46) */}
+            <Suspense fallback={<ProductRecommendationsSkeleton />}>
+              <ProductRecommendations
+                slug={loaded.product.slug}
                 // ใช้หมวดแม่ถ้ามี เพราะหมวดย่อย (เช่น "เสื้อยืด") อาจมีสินค้าชิ้นเดียว
                 categorySlug={loaded.product.category.parent?.slug ?? loaded.product.category.slug}
-                excludeId={loaded.product.id}
               />
             </Suspense>
           </div>
         </>
       )}
     </main>
-  );
-}
-
-/**
- * สินค้าที่เกี่ยวข้อง — หมวดเดียวกัน เรียงตามความนิยม
- * แยกเป็น section ที่ stream เอง: ช้าหรือพังก็ไม่กระทบข้อมูลสินค้าหลัก
- */
-async function RelatedSection({
-  categorySlug,
-  excludeId,
-}: {
-  categorySlug: string;
-  excludeId: string;
-}) {
-  let items: Awaited<ReturnType<typeof searchShopProducts>>["items"] = [];
-  let errorMessage: string | null = null;
-
-  try {
-    const result = await searchShopProducts(
-      new URLSearchParams({ category: categorySlug, sort: "popular", limit: "5" }),
-    );
-    // ตัดตัวมันเองออก แล้วเหลือไว้ 4 ชิ้น
-    items = result.items.filter((item) => item.id !== excludeId).slice(0, 4);
-  } catch (error) {
-    errorMessage =
-      error instanceof ApiClientError ? error.message : "โหลดสินค้าที่เกี่ยวข้องไม่สำเร็จ";
-  }
-
-  return (
-    <section>
-      <SectionHeader
-        title="สินค้าที่เกี่ยวข้อง"
-        subtitle="จากหมวดเดียวกัน เรียงตามความนิยม"
-        action={{ label: "ดูทั้งหมดในหมวดนี้", href: `/shop?category=${categorySlug}` }}
-      />
-
-      {errorMessage !== null ? (
-        <SectionError message={errorMessage} />
-      ) : items.length === 0 ? (
-        <SectionEmpty
-          message="ยังไม่มีสินค้าอื่นในหมวดนี้"
-          hint="ดูสินค้าทั้งหมดในร้านได้ที่หน้า Shop"
-        />
-      ) : (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          {items.map((item) => (
-            <ProductCard key={item.id} product={item} />
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -279,18 +227,6 @@ function ReviewsSkeleton() {
           <div className="h-32 rounded-[var(--radius-card)] bg-lilac-50" />
         </div>
       </div>
-    </section>
-  );
-}
-
-function RelatedSkeleton() {
-  return (
-    <section aria-busy="true" aria-live="polite">
-      <div className="mb-6">
-        <h2 className="text-2xl sm:text-3xl">สินค้าที่เกี่ยวข้อง</h2>
-        <p className="mt-2 text-sm text-muted">กำลังโหลดข้อมูล…</p>
-      </div>
-      <SectionSkeleton count={4} />
     </section>
   );
 }

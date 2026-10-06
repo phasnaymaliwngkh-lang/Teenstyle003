@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { SectionLoading } from "@/components/shared/section";
 import { AiStylistSection } from "@/features/home/components/ai-stylist-section";
 import { CategoriesSection } from "@/features/home/components/categories-section";
+import { ForYouSection } from "@/features/home/components/for-you-section";
 import { Hero } from "@/features/home/components/hero";
 import { LooksSection } from "@/features/home/components/looks-section";
 import { ProductSection } from "@/features/home/components/product-section";
@@ -80,17 +81,10 @@ export default function HomePage() {
           <CategoriesSection />
         </Suspense>
 
-        <Suspense fallback={<SectionLoading title="แนะนำสำหรับคุณ" />}>
-          <ProductSection
-            eyebrow="Recommended"
-            title="แนะนำสำหรับคุณ"
-            subtitle="จัดอันดับจากจำนวนคนที่กดถูกใจและการเข้าชมสินค้า — การแนะนำเฉพาะบุคคลตามประวัติของคุณจะเปิดใน STEP 46"
-            sort="popular"
-            limit={4}
-            action={{ label: "ดูทั้งหมด", href: "/shop" }}
-            emptyMessage="ยังไม่มีสินค้าให้แนะนำ"
-            emptyHint="เมื่อมีสินค้าในระบบ ส่วนนี้จะจัดอันดับให้อัตโนมัติ"
-          />
+        {/* STEP 46 — เฉพาะบุคคลเมื่อมีประวัติ · ไม่มี/ปิดไว้ = ยอดนิยม และหัวข้อบอกตามจริง */}
+        {/* หัวข้อตอนโหลดต้องเป็นกลาง — ยังไม่รู้ว่าจะเป็น "สำหรับคุณ" หรือ "ยอดนิยม" */}
+        <Suspense fallback={<SectionLoading title="สินค้าแนะนำ" />}>
+          <ForYouSection />
         </Suspense>
 
         <AiStylistSection />

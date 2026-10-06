@@ -414,6 +414,23 @@ const ROUTES = [
   { path: '/api/products/filters', budgetMs: 250, note: 'เคยนับสินค้าใหม่ทุกหมวด (30 รอบ)' },
   { path: '/api/products/product-1', budgetMs: 250, note: 'หน้าสินค้า' },
   { path: '/api/products/product-1/reviews?limit=10', budgetMs: 250, note: 'รีวิวในหน้าสินค้า' },
+  {
+    path: '/api/products/product-1/recommendations',
+    budgetMs: 300,
+    note: 'ซื้อด้วยกัน (OrderItem self-join) + ลุค + คล้ายกัน',
+  },
+  {
+    path: '/api/recommendations/for-you?limit=4',
+    budgetMs: 300,
+    note: 'หน้าแรก ไม่ล็อกอิน — ยอดนิยม (รวม Wishlist + ยอดขายทั้งตาราง)',
+  },
+  {
+    // บัญชีที่วัดมีคำสั่งซื้อ/รายการที่ถูกใจ/รีวิวจริงจากชุดข้อมูล → วัดเส้นทางเฉพาะบุคคลเต็ม ๆ
+    path: '/api/recommendations/for-you?limit=4',
+    budgetMs: 400,
+    note: 'หน้าแรก คนที่มีประวัติ — สัญญาณ + ซื้อด้วยกัน + ผู้สมัคร 400 ชิ้น',
+    staff: true,
+  },
   { path: '/api/looks/search?limit=12', budgetMs: 300, note: '/looks' },
   // ค้นหา (STEP 45) — แต่ละคำตรวจ ชื่อ · SKU · คำอธิบาย · tag · ชื่อหมวด/หมวดแม่ · ชื่อแบรนด์
   {

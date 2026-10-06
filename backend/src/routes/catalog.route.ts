@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { getCategories, getLooks, getProducts } from '../controllers/catalog.controller.ts';
+import { productRecommendationsHandler } from '../controllers/recommendation.controller.ts';
 import { listProductReviewsHandler } from '../controllers/review.controller.ts';
 import { attachUser } from '../middlewares/authenticate.ts';
 import {
@@ -42,6 +43,7 @@ productRouter.post('/availability', checkAvailabilityHandler);
  *    ถ้าเอาข้อมูลรายบุคคลไปใส่จะแคชไม่ได้อีกเลย (กฎเดียวกับ `/api/wishlist/contains` ของ STEP 22)
  */
 productRouter.get('/:slug/reviews', attachUser, listProductReviewsHandler);
+productRouter.get('/:slug/recommendations', productRecommendationsHandler); // STEP 46
 productRouter.get('/:slug', getProductHandler);
 
 export const categoryRouter = Router();

@@ -152,8 +152,8 @@ async function findBestSelling(limit: number): Promise<ProductCardDto[]> {
 /**
  * สินค้ายอดนิยม — จัดอันดับจากจำนวนคนกดถูกใจ แล้วตามด้วยจำนวนการเข้าชม
  *
- * ใช้เป็นฐานของ "แนะนำสำหรับคุณ" ในหน้าแรก
- * การแนะนำแบบเฉพาะบุคคลจริง (ดูจากประวัติของผู้ใช้แต่ละคน) จะทำใน STEP 46
+ * ใช้กับ `/api/products?sort=popular` — "แนะนำสำหรับคุณ" บนหน้าแรกย้ายไปใช้
+ * `recommendation.service.ts` แล้วตั้งแต่ STEP 46 (ซึ่งมียอดนิยมของตัวเองที่ตัดของที่ขายไม่ได้ทิ้ง)
  */
 async function findPopular(limit: number): Promise<ProductCardDto[]> {
   const rows = await getPrisma().product.findMany({

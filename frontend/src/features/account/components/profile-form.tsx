@@ -132,7 +132,10 @@ export function ProfileForm({ profile }: { profile: MyProfile }) {
         </div>
       </div>
 
-      <label className="flex items-start gap-3 rounded-[var(--radius-card)] border border-line bg-white p-4 text-sm">
+      <label
+        id="personalization"
+        className="flex scroll-mt-24 items-start gap-3 rounded-[var(--radius-card)] border border-line bg-white p-4 text-sm"
+      >
         <input
           type="checkbox"
           checked={allowPersonalization}
@@ -142,8 +145,9 @@ export function ProfileForm({ profile }: { profile: MyProfile }) {
         <span>
           <span className="font-semibold">ให้ระบบแนะนำสินค้าจากพฤติกรรมของฉัน</span>
           <span className="block text-xs text-muted">
-            ปิดได้ทุกเมื่อ — ปิดแล้วยังใช้ AI Stylist และค้นหาได้ปกติ
-            เพียงแต่คำแนะนำจะไม่อ้างอิงประวัติของคุณ
+            ปิดได้ทุกเมื่อ — ปิดแล้วระบบจะไม่อ่านประวัติการสั่งซื้อ รายการที่ถูกใจ ตะกร้า
+            และรีวิวของคุณเพื่อแนะนำสินค้า ส่วน &quot;แนะนำสำหรับคุณ&quot;
+            ในหน้าแรกจะแสดงสินค้ายอดนิยมแทน (AI Stylist และการค้นหายังใช้ได้ปกติ)
           </span>
         </span>
       </label>

@@ -295,7 +295,7 @@ model User {
   /// (เดิมมี `loyaltyTier` / `totalSpent` ที่ไม่มีใครเขียน · ถอดออกตอน STEP 42)
   points Int        @default(0)
 
-  /// STEP 46 / 53 — ผู้ใช้ปิดการแนะนำแบบ personalized ได้
+  /// ผู้ใช้ปิดการแนะนำจากพฤติกรรมได้ — ปิดแล้ว recommendation.service ไม่อ่านประวัติเลย (STEP 46)
   allowPersonalization Boolean @default(true)
 
   lastLoginAt DateTime?
@@ -525,7 +525,7 @@ model Product {
   /// คำค้นเพิ่มเติมสำหรับ search (STEP 45)
   tags String[] @default([])
 
-  /// ใช้ใน AI Recommendation (STEP 46)
+  /// ยอดเปิดดูหน้าสินค้า — เขียนเป็นชุดผ่าน view-counter.service (ไม่แตะ updatedAt) · ใช้จัดอันดับยอดนิยม (STEP 46)
   viewCount Int @default(0)
 
   publishedAt DateTime?

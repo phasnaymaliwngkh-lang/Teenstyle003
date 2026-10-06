@@ -102,7 +102,16 @@ const STYLIST_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 /**
  * ค้นหาสินค้าจริงจากฐานข้อมูลสำหรับ AI Stylist
  * กรองเฉพาะสินค้าที่สถานะ ACTIVE, ยังไม่ถูกลบ, และมีสต็อกขายได้จริง
+ *
+ * ⚠️ `relaxed: true` = ไม่พบของที่ตรงเงื่อนไข จึงคืนสินค้ายอดนิยมแทน — **ผู้เรียกต้องบอกลูกค้าตรง ๆ**
+ *    (แก้ตอน STEP 46: เดิมคืนของยอดนิยมเงียบ ๆ แล้วข้อความตอบยังเขียนว่า "คัดสรรชุดสำหรับสไตล์ X
+ *    โทนสี Y ในงบไม่เกิน Z มาให้แล้ว" ทั้งที่ของเหล่านั้นไม่ตรงเงื่อนไข = AI แต่งคุณสมบัติสินค้า · กฎกลางข้อ 3)
  */
+export interface StylistProductSearch {
+  products: ProductCardDto[];
+  relaxed: boolean;
+}
+
 export async function searchProductsForStylist(params: {
   query?: string;
   categorySlug?: string;
@@ -111,10 +120,15 @@ export async function searchProductsForStylist(params: {
   maxPrice?: number;
   minPrice?: number;
   limit?: number;
-}): Promise<ProductCardDto[]> {
+}): Promise<StylistProductSearch> {
   const prisma = getPrisma();
   const limit = Math.min(params.limit ?? 6, 12);
 
+  /**
+   * `totalStock > 0` เป็นแค่ตัวกรองหยาบ (เซตใหญ่กว่าของที่ขายได้) ให้คิวรีเบาลง —
+   * **การตัดสินว่าขายได้ใช้จำนวนที่ขายได้จริงจาก `toProductCards()` ด้านล่าง** (กฎ STEP 15 ข้อ 1)
+   * จึงดึงเผื่อไว้สามเท่าก่อนตัดของที่ถูกจองหมดออก ไม่ให้เหลือน้อยกว่าที่ขอ
+   */
   const where: Prisma.ProductWhereInput = {
     deletedAt: null,
     status: 'ACTIVE',
@@ -184,26 +198,38 @@ export async function searchProductsForStylist(params: {
     where.AND = andConditions;
   }
 
-  let rows = await prisma.product.findMany({
-    where,
-    select: PRODUCT_CARD_SELECT,
-    orderBy: [{ viewCount: 'desc' }, { createdAt: 'desc' }],
-    take: limit,
-  });
+  const available = async (rows: Parameters<typeof toProductCards>[0], take: number) =>
+    // Universal Invariant: แนะนำเฉพาะสินค้าที่ยังมีพร้อมขายจริงเท่านั้น
+    (await toProductCards(rows))
+      .filter((item) => item.stockStatus !== 'OUT_OF_STOCK')
+      .slice(0, take);
 
-  // ถ้าเงื่อนไขแน่นเกินไปจนไม่พบสินค้า ให้ผ่อนเงื่อนไขหาของที่ใกล้เคียงที่สุดในร้าน
-  if (rows.length === 0 && andConditions.length > 1) {
-    rows = await prisma.product.findMany({
+  const matched = await available(
+    await prisma.product.findMany({
+      where,
+      select: PRODUCT_CARD_SELECT,
+      orderBy: [{ viewCount: 'desc' }, { createdAt: 'desc' }],
+      take: limit * 3,
+    }),
+    limit,
+  );
+
+  if (matched.length > 0 || andConditions.length <= 1) {
+    return { products: matched, relaxed: false };
+  }
+
+  // เงื่อนไขแน่นจนไม่พบ → ยอดนิยมที่ขายได้ **และติดธงว่าไม่ได้ตรงเงื่อนไข** ให้ผู้เรียกบอกลูกค้า
+  const popular = await available(
+    await prisma.product.findMany({
       where: { deletedAt: null, status: 'ACTIVE', totalStock: { gt: 0 } },
       select: PRODUCT_CARD_SELECT,
       orderBy: [{ viewCount: 'desc' }, { createdAt: 'desc' }],
-      take: 4,
-    });
-  }
+      take: 12,
+    }),
+    4,
+  );
 
-  const cards = await toProductCards(rows);
-  // Universal Invariant: แนะนำเฉพาะสินค้าที่ยังมีพร้อมขายจริงเท่านั้น
-  return cards.filter((item) => item.stockStatus !== 'OUT_OF_STOCK');
+  return { products: popular, relaxed: popular.length > 0 };
 }
 
 /**
@@ -281,7 +307,7 @@ export async function runFallbackStylist(
   }
 
   // ค้นหาสินค้าจริงจากคลัง
-  const products = await searchProductsForStylist({
+  const { products, relaxed } = await searchProductsForStylist({
     query: message,
     style: detectedStyle,
     color: detectedColor,
@@ -291,13 +317,22 @@ export async function runFallbackStylist(
 
   let replyText = '';
 
-  if (products.length > 0) {
-    const styleLabel = detectedStyle ? `สไตล์ ${detectedStyle}` : 'ลุคที่คุณต้องการ';
-    const colorLabel = detectedColor ? ` โทนสี ${detectedColor}` : '';
-    const budgetLabel = detectedMaxBudget
-      ? ` ในงบประมาณไม่เกิน ${detectedMaxBudget.toLocaleString('th-TH')} บาท`
-      : '';
+  const styleLabel = detectedStyle ? `สไตล์ ${detectedStyle}` : 'ลุคที่คุณต้องการ';
+  const colorLabel = detectedColor ? ` โทนสี ${detectedColor}` : '';
+  const budgetLabel = detectedMaxBudget
+    ? ` ในงบประมาณไม่เกิน ${detectedMaxBudget.toLocaleString('th-TH')} บาท`
+    : '';
 
+  if (relaxed) {
+    /**
+     * ของที่ได้มาไม่ตรงเงื่อนไข — บอกตรง ๆ ห้ามเขียนว่า "คัดสรรมาตามที่ขอ" (แก้ตอน STEP 46)
+     * และไม่แต่งทริคการแมตช์จากของที่ลูกค้าไม่ได้ขอ
+     */
+    replyText =
+      `ขออภัยครับ ตอนนี้ร้านยังไม่มีสินค้าที่ตรงกับ **${styleLabel}**${colorLabel}${budgetLabel} ครบทุกเงื่อนไข\n\n` +
+      `ด้านล่างเป็น **สินค้ายอดนิยมของร้านที่ไม่ได้ตรงเงื่อนไขทั้งหมด** เผื่อเป็นไอเดียครับ — ` +
+      `ลองขยายงบ เปลี่ยนโทนสี หรือบอกโอกาสที่จะใส่ แล้วสไตลิสต์จะค้นให้ใหม่นะครับ 😊`;
+  } else if (products.length > 0) {
     replyText = `สวัสดีครับ! สไตลิสต์คัดสรรชุดสำหรับ **${styleLabel}**${colorLabel}${budgetLabel} มาให้คุณแล้วครับ ✨\n\n`;
 
     const first = products[0];
@@ -385,7 +420,7 @@ async function callOpenAIStylist(
             args = {};
           }
 
-          const foundProducts = await searchProductsForStylist({
+          const { products: foundProducts, relaxed } = await searchProductsForStylist({
             query: typeof args.query === 'string' ? args.query : undefined,
             categorySlug: typeof args.categorySlug === 'string' ? args.categorySlug : undefined,
             style: typeof args.style === 'string' ? args.style : undefined,
@@ -402,8 +437,15 @@ async function callOpenAIStylist(
           messages.push({
             role: 'tool',
             tool_call_id: toolCall.id,
-            content: JSON.stringify(
-              foundProducts.map((p) => ({
+            // บอก LLM ด้วยว่าของที่ได้ตรงเงื่อนไขหรือไม่ — ไม่งั้นมันเล่าว่าเป็นของที่ลูกค้าขอ (STEP 46)
+            content: JSON.stringify({
+              matchedAllConditions: !relaxed,
+              ...(relaxed
+                ? {
+                    note: 'ไม่พบสินค้าที่ตรงเงื่อนไข รายการนี้คือสินค้ายอดนิยมที่ไม่ตรงเงื่อนไขทั้งหมด ต้องบอกลูกค้าตรง ๆ ห้ามบอกว่าตรงกับที่ขอ',
+                  }
+                : {}),
+              products: foundProducts.map((p) => ({
                 id: p.id,
                 name: p.name,
                 category: p.category.name,
@@ -412,7 +454,7 @@ async function callOpenAIStylist(
                 salePrice: p.salePrice,
                 stockStatus: p.stockStatus,
               })),
-            ),
+            }),
           });
         }
       }

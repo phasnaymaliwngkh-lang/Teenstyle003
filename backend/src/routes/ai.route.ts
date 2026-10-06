@@ -18,7 +18,9 @@ import { strictRateLimiter } from '../middlewares/rate-limit.ts';
 import { verifyOrigin } from '../middlewares/verify-origin.ts';
 
 /**
- * AI Routes (STEP 19: AI Stylist, STEP 20: AI CS, STEP 21: Knowledge Base, STEP 46: Recs)
+ * AI Routes (STEP 19: AI Stylist, STEP 20: AI CS, STEP 21: Knowledge Base)
+ * การแนะนำสินค้า (STEP 46) อยู่ที่ `recommendation.route.ts` (/api/recommendations) ไม่ใช่ที่นี่
+ * เพราะไม่ได้เรียก LLM และไม่ต้องคุมความถี่แบบ strict
  */
 export const aiRouter = Router();
 

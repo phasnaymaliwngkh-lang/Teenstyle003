@@ -330,16 +330,21 @@ export async function getArticleBySlug(slug: string): Promise<KnowledgeArticle> 
   const prisma = getPrisma();
   const existing = await prisma.knowledgeArticle.findFirst({
     where: { slug, isPublished: true },
-    select: { id: true },
+    select: { id: true, updatedAt: true },
   });
 
   if (!existing) {
     throw ApiError.notFound(`ไม่พบบทความความรู้สำหรับ "${slug}"`);
   }
 
+  /**
+   * ⚠️ คง `updatedAt` เดิม — การอ่านไม่ใช่การแก้ (แก้ตอน STEP 46)
+   *    `@updatedAt` ของ Prisma ขยับทุกครั้งที่ update แม้แค่บวกตัวนับ แล้วรายการบทความเรียงตาม `updatedAt`
+   *    → บทความที่เพิ่งมีคนอ่านลอยขึ้นบนสุดของ /faq และ "แก้ไขล่าสุด" ในหลังบ้านไม่ใช่การแก้จริง
+   */
   const updated = await prisma.knowledgeArticle.update({
     where: { id: existing.id },
-    data: { viewCount: { increment: 1 } },
+    data: { viewCount: { increment: 1 }, updatedAt: existing.updatedAt },
     include: articleInclude,
   });
 
@@ -381,16 +386,20 @@ export async function voteArticleHelpful(
   const prisma = getPrisma();
   const existing = await prisma.knowledgeArticle.findUnique({
     where: { id: articleId },
-    select: { id: true },
+    select: { id: true, updatedAt: true },
   });
 
   if (!existing) {
     throw ApiError.notFound('ไม่พบบทความที่ต้องการโหวต');
   }
 
+  // คง updatedAt เดิม — โหวตไม่ใช่การแก้บทความ (เหตุผลเดียวกับ getArticleBySlug)
   const updated = await prisma.knowledgeArticle.update({
     where: { id: articleId },
-    data: helpful ? { helpfulCount: { increment: 1 } } : { notHelpfulCount: { increment: 1 } },
+    data: {
+      ...(helpful ? { helpfulCount: { increment: 1 } } : { notHelpfulCount: { increment: 1 } }),
+      updatedAt: existing.updatedAt,
+    },
     select: { helpfulCount: true, notHelpfulCount: true },
   });
 

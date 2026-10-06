@@ -5,6 +5,7 @@ import { disconnectDatabase } from '@teenstyle/database';
 import { createApp } from './app.ts';
 import { API_VERSION, env, listenPort } from './config/index.ts';
 import { RATE_LIMIT_STORE_IS_PER_PROCESS } from './middlewares/rate-limit.ts';
+import { flushProductViews } from './services/view-counter.service.ts';
 import { logger } from './utils/logger.ts';
 
 const app = createApp();
@@ -74,6 +75,8 @@ async function shutdown(signal: string): Promise<void> {
     await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
     });
+    // ยอดเข้าชมที่ยังรวมไว้ในหน่วยความจำ — เขียนก่อนตัดฐานข้อมูล ไม่งั้นหายทุกครั้งที่ deploy (STEP 46)
+    await flushProductViews();
     await disconnectDatabase();
     logger.info('ปิด server เรียบร้อย');
     process.exit(0);

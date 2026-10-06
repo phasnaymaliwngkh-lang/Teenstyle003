@@ -9,6 +9,7 @@ import { ApiError } from '../utils/api-error.ts';
 import type { ShopQuery } from '../validators/product.validator.ts';
 
 import { PRODUCT_CARD_SELECT, toProductCards } from './product.service.ts';
+import { recordProductView } from './view-counter.service.ts';
 
 /**
  * Shop service (STEP 6) — ค้นหา/กรอง/เรียง/แบ่งหน้า + รายละเอียดสินค้า + ตรวจสต็อก
@@ -85,7 +86,7 @@ const NO_JOIN = Prisma.empty;
  *    ซึ่งเป็นหน้าสาธารณะที่ผู้เข้าเว็บกดเองได้ (ไม่ใช่รายงานหลังบ้าน)
  *    แบบ LEFT JOIN นี้รวมยอดรอบเดียวแล้วต่อกับ Product → **79ms** (ผลลัพธ์เท่ากันเป๊ะ)
  */
-const SALES_JOIN = Prisma.sql`
+export const SALES_JOIN = Prisma.sql`
   LEFT JOIN (
     SELECT oi."productId" AS product_id, sum(oi."quantity") AS sold
       FROM "OrderItem" oi
@@ -97,7 +98,7 @@ const SALES_JOIN = Prisma.sql`
   ) sales ON sales.product_id = p.id`;
 
 /** จำนวนคนที่กดถูกใจต่อสินค้า — เหตุผลเดียวกับ SALES_JOIN (วัดแล้ว 34ms → 9.8ms) */
-const SAVES_JOIN = Prisma.sql`
+export const SAVES_JOIN = Prisma.sql`
   LEFT JOIN (
     SELECT w."productId" AS product_id, count(*) AS saves
       FROM "Wishlist" w
@@ -420,11 +421,8 @@ export async function getProductBySlug(slug: string): Promise<ProductDetailDto> 
     throw ApiError.notFound('ไม่พบสินค้าที่ต้องการ');
   }
 
-  // นับการเข้าชม — ใช้ใน "แนะนำสำหรับคุณ" (STEP 5) และ AI Recommendation (STEP 46)
-  await prisma.product.update({
-    where: { id: product.id },
-    data: { viewCount: { increment: 1 } },
-  });
+  // นับการเข้าชม (สัญญาณความนิยมของการแนะนำ) — รวมเป็นชุดแล้วเขียนทีหลัง ไม่เขียนในเส้นทางอ่าน (STEP 46)
+  recordProductView(product.id);
 
   return toProductDetail(product);
 }

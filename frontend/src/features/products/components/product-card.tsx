@@ -22,8 +22,14 @@ const STOCK_STYLE = {
 export function ProductCard({
   product,
   priority = false,
+  note,
 }: {
   product: ProductCardData;
+  /**
+   * บรรทัดเล็กใต้ราคา — ใช้บอก "ทำไมถึงแนะนำชิ้นนี้" (STEP 46)
+   * ข้อความมาจาก backend ที่เขียนจากสิ่งที่ลูกค้าทำจริง หน้าเว็บไม่แต่งเหตุผลเอง
+   */
+  note?: string;
   /**
    * รูปนี้เป็นภาพใหญ่สุดที่เห็นตอนเปิดหน้า (LCP) หรือไม่ — ใส่ให้ **การ์ดแรกเท่านั้น**
    *
@@ -92,6 +98,10 @@ export function ProductCard({
             <s className="text-xs text-muted-light">{formatBaht(product.price)}</s>
           )}
         </div>
+
+        {note !== undefined && (
+          <p className="mt-2 border-t border-line pt-2 text-xs leading-snug text-muted">{note}</p>
+        )}
       </div>
     </article>
   );
