@@ -12,6 +12,8 @@ export const LOG_TARGET_TYPES = [
   "User",
   "KnowledgeArticle",
   "AIConversation",
+  "Coupon",
+  "ReturnRequest",
 ] as const;
 
 export type LogTargetType = (typeof LOG_TARGET_TYPES)[number];
@@ -24,6 +26,8 @@ export const LOG_ACTION_GROUPS = [
   "knowledge",
   "support",
   "customer",
+  "coupon",
+  "return",
 ] as const;
 
 export type LogActionGroup = (typeof LOG_ACTION_GROUPS)[number];

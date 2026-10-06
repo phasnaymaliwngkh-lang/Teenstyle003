@@ -17,6 +17,7 @@ import {
   type RedemptionEvaluation,
 } from '../models/loyalty.model.ts';
 import { PAID_ORDER_WHERE } from '../models/order.model.ts';
+import { computePointsShare } from '../models/return.model.ts';
 import { toNumber } from '../models/pricing.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type { AdjustPointsInput } from '../validators/loyalty.validator.ts';
@@ -150,10 +151,11 @@ export async function lifetimeSpendOf(
       userId,
       ...(options.excludeOrderId !== undefined ? { id: { not: options.excludeOrderId } } : {}),
     },
-    _sum: { total: true },
+    _sum: { total: true, refundedTotal: true },
   });
 
-  return toNumber(result._sum.total);
+  // เงินที่คืนลูกค้าไปแล้วไม่ใช่ "ยอดที่จ่ายจริง" (STEP 43) — ใบที่คืนครบหลุดจาก PAID_ORDER_WHERE เอง
+  return toNumber(result._sum.total) - toNumber(result._sum.refundedTotal);
 }
 
 export async function standingOf(client: DbClient, userId: string): Promise<LoyaltyStandingDto> {
@@ -325,55 +327,129 @@ export async function releasePointsForCancelledOrder(
   tx: Prisma.TransactionClient,
   orderId: string,
 ): Promise<PointsRelease> {
+  return movePointsBack(tx, {
+    orderId,
+    keyPrefix: `order:${orderId}`,
+    // ยกเลิก = ทั้งบิลไม่เกิดขึ้น → คืน/หักส่วนที่ "ยังเหลือ" ทั้งหมด
+    give: (redeemed, alreadyRefunded) => redeemed - alreadyRefunded,
+    take: (earned, alreadyReversed) => earned - alreadyReversed,
+    describeGive: (orderNumber) => `คืนแต้มที่ใช้ เพราะคำสั่งซื้อ ${orderNumber} ถูกยกเลิก`,
+    describeTake: (orderNumber) => `หักแต้มที่ได้จากคำสั่งซื้อ ${orderNumber} เพราะถูกยกเลิก`,
+  });
+}
+
+/**
+ * แต้มของคำขอคืนสินค้าที่คืนเงินแล้ว (STEP 43) — **ตามสัดส่วนเดียวกับเงิน**
+ *
+ * คืนบางชิ้น → คืนแต้มที่ใช้ / หักแต้มที่ได้ ตามสัดส่วน "มูลค่าชิ้นที่คืน ÷ ยอดสินค้า"
+ * คืนครบทุกชิ้นแล้ว → ส่วนที่ยังเหลือทั้งหมด (สูตรอยู่ที่ `computePointsShare` ใน return.model.ts)
+ * เรียก **ในทรานแซกชันเดียวกับการบันทึกการคืนเงิน**
+ */
+export async function settlePointsForReturn(
+  tx: Prisma.TransactionClient,
+  params: {
+    orderId: string;
+    returnRequestId: string;
+    returnNumber: string;
+    goods: number;
+    subtotal: number;
+    final: boolean;
+  },
+): Promise<PointsRelease> {
+  const share = (total: number, alreadyMoved: number) =>
+    computePointsShare({
+      totalPoints: total,
+      alreadyMoved,
+      goods: params.goods,
+      subtotal: params.subtotal,
+      final: params.final,
+    });
+
+  return movePointsBack(tx, {
+    orderId: params.orderId,
+    keyPrefix: `return:${params.returnRequestId}`,
+    give: share,
+    take: share,
+    describeGive: () => `คืนแต้มที่ใช้ตามสัดส่วนของสินค้าที่คืน (${params.returnNumber})`,
+    describeTake: () => `หักแต้มที่ได้ตามสัดส่วนของสินค้าที่คืน (${params.returnNumber})`,
+  });
+}
+
+/**
+ * ตัวกลางของการคืนแต้มที่ใช้ + หักแต้มที่ได้ของคำสั่งซื้อหนึ่งใบ
+ *
+ * อ่านยอดจากสมุดแต้มของใบนั้นทุกครั้ง (ใช้ไปเท่าไร · คืนไปแล้วเท่าไร · ได้เท่าไร · หักไปแล้วเท่าไร)
+ * แล้วให้ผู้เรียกตัดสินว่าครั้งนี้ควรคืน/หักเท่าไร — ยกเลิกทั้งใบกับคืนบางชิ้นจึงใช้ตัวเดียวกัน
+ * และไม่มีทางคืนเกินที่ใช้ไป หรือหักเกินที่ได้ไป แม้จะเกิดทั้งสองเส้นทางกับใบเดียวกัน
+ *
+ * ⚠️ แต้มที่ได้อาจถูกใช้ไปแล้ว → หักได้ไม่เกินยอดคงเหลือ แล้ว **บันทึกตรง ๆ ว่าขาดเท่าไร**
+ *    ไม่ทำให้การยกเลิก/การคืนเงินล้ม (ยอดติดลบไม่ได้ตาม CHECK ของฐานข้อมูล)
+ * ⚠️ คืนก่อนหัก — ใบเดียวกันที่ทั้งใช้และได้แต้ม แต้มที่คืนมาช่วยให้หักได้ครบ
+ */
+async function movePointsBack(
+  tx: Prisma.TransactionClient,
+  params: {
+    orderId: string;
+    keyPrefix: string;
+    give: (redeemed: number, alreadyRefunded: number) => number;
+    take: (earned: number, alreadyReversed: number) => number;
+    describeGive: (orderNumber: string) => string;
+    describeTake: (orderNumber: string) => string;
+  },
+): Promise<PointsRelease> {
   const [order, rows] = await Promise.all([
-    tx.order.findUnique({ where: { id: orderId }, select: { userId: true, orderNumber: true } }),
-    tx.pointTransaction.findMany({ where: { orderId }, select: { type: true, delta: true } }),
+    tx.order.findUnique({
+      where: { id: params.orderId },
+      select: { userId: true, orderNumber: true },
+    }),
+    tx.pointTransaction.findMany({
+      where: { orderId: params.orderId },
+      select: { type: true, delta: true },
+    }),
   ]);
 
   if (order === null || rows.length === 0) return { refunded: 0, reversed: 0 };
 
   const sumOf = (type: PointTransactionTypeCode) =>
     rows.filter((row) => row.type === type).reduce((sum, row) => sum + row.delta, 0);
-  const has = (type: PointTransactionTypeCode) => rows.some((row) => row.type === type);
 
   let refunded = 0;
   let reversed = 0;
 
-  const redeemed = -sumOf('REDEEM');
+  const give = Math.max(0, params.give(-sumOf('REDEEM'), sumOf('REDEEM_REFUND')));
 
-  if (redeemed > 0 && !has('REDEEM_REFUND')) {
+  if (give > 0) {
     const result = await postPointTransaction(tx, {
       userId: order.userId,
       type: 'REDEEM_REFUND',
-      delta: redeemed,
-      description: `คืนแต้มที่ใช้ เพราะคำสั่งซื้อ ${order.orderNumber} ถูกยกเลิก`,
-      orderId,
-      idempotencyKey: `order:${orderId}:redeem-refund`,
+      delta: give,
+      description: params.describeGive(order.orderNumber),
+      orderId: params.orderId,
+      idempotencyKey: `${params.keyPrefix}:redeem-refund`,
     });
-    if (result.posted) refunded = redeemed;
+    if (result.posted) refunded = give;
   }
 
-  const earned = sumOf('EARN');
+  const wanted = Math.max(0, params.take(sumOf('EARN'), -sumOf('EARN_REVERSAL')));
 
-  if (earned > 0 && !has('EARN_REVERSAL')) {
+  if (wanted > 0) {
     // ล็อกแถวผู้ใช้ก่อนอ่านยอด — กันอีกคำสั่งซื้อหักแต้มไปตรงกลางระหว่างอ่านกับเขียน
     const locked = await tx.$queryRaw<{ points: number }[]>`
       SELECT "points" FROM "User" WHERE "id" = ${order.userId}::uuid FOR UPDATE`;
     const balance = Number(locked[0]?.points ?? 0);
-    const take = Math.min(earned, balance);
-
-    const description =
-      take === earned
-        ? `หักแต้มที่ได้จากคำสั่งซื้อ ${order.orderNumber} เพราะถูกยกเลิก`
-        : `หักแต้มที่ได้จากคำสั่งซื้อ ${order.orderNumber} เพราะถูกยกเลิก — ควรหัก ${earned.toLocaleString('th-TH')} แต้ม แต่แต้มถูกใช้ไปแล้ว จึงหักได้ ${take.toLocaleString('th-TH')} แต้ม`;
+    const take = Math.min(wanted, balance);
+    const base = params.describeTake(order.orderNumber);
 
     const result = await postPointTransaction(tx, {
       userId: order.userId,
       type: 'EARN_REVERSAL',
       delta: -take,
-      description,
-      orderId,
-      idempotencyKey: `order:${orderId}:earn-reversal`,
+      description:
+        take === wanted
+          ? base
+          : `${base} — ควรหัก ${wanted.toLocaleString('th-TH')} แต้ม แต่แต้มถูกใช้ไปแล้ว จึงหักได้ ${take.toLocaleString('th-TH')} แต้ม`,
+      orderId: params.orderId,
+      idempotencyKey: `${params.keyPrefix}:earn-reversal`,
     });
     if (result.posted) reversed = take;
   }

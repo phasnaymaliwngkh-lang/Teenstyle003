@@ -26,7 +26,9 @@ export type NotificationType =
   | 'ORDER_CANCELLED'
   | 'REVIEW_UPDATE'
   /** STEP 42 — ขึ้นระดับสมาชิก · ร้านปรับแต้มให้ (แต้มที่ได้จากคำสั่งซื้อแจ้งรวมกับ PAYMENT_SUCCESS) */
-  | 'LOYALTY_UPDATE';
+  | 'LOYALTY_UPDATE'
+  /** STEP 43 — ผลของคำขอคืนสินค้า · ร้านคืนเงินแล้ว (รวมใบที่ร้านยกเลิกหลังชำระเงิน) */
+  | 'RETURN_UPDATE';
 
 /** หมวดที่ใช้กรองบนหน้าเว็บ — ย่อจาก type ให้เหลือเท่าที่ลูกค้าเข้าใจ */
 export type NotificationGroup = 'ORDER' | 'PRICE' | 'REVIEW' | 'OTHER';
@@ -83,6 +85,7 @@ const GROUP_OF: Record<NotificationType, NotificationGroup> = {
   ORDER_CANCELLED: 'ORDER',
   REVIEW_UPDATE: 'REVIEW',
   LOYALTY_UPDATE: 'OTHER',
+  RETURN_UPDATE: 'ORDER',
   LOW_STOCK: 'OTHER',
   SYSTEM: 'OTHER',
 };
@@ -129,6 +132,14 @@ export function resolveNotificationLink(type: NotificationType, data: unknown): 
       const slug = readString(data, 'productSlug');
       return slug === null ? null : `/product/${slug}`;
     }
+
+    case 'RETURN_UPDATE':
+      // คำขอคืน → หน้าคำขอคืนของตัวเอง · คืนเงินของใบที่ถูกยกเลิก (ไม่มีคำขอ) → หน้าคำสั่งซื้อ
+      if (readString(data, 'returnNumber') !== null) return '/account/returns';
+      {
+        const orderNumber = readString(data, 'orderNumber');
+        return orderNumber === null ? null : `/account/orders/${orderNumber}`;
+      }
 
     case 'LOYALTY_UPDATE':
       // หน้าแต้มของตัวเองมีอยู่จริงเสมอสำหรับคนที่ล็อกอิน — ไม่ต้องอ่านจาก data

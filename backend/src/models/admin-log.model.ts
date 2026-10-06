@@ -33,6 +33,7 @@ export const TARGET_TYPES = [
   'KnowledgeArticle',
   'AIConversation',
   'Coupon',
+  'ReturnRequest',
 ] as const;
 
 export type TargetType = (typeof TARGET_TYPES)[number];
@@ -68,6 +69,7 @@ const TARGET_META: Readonly<Record<TargetType, TargetMeta>> = {
   },
   // คูปองแก้ได้ที่หน้ารายการ ยังไม่มีหน้ารายตัว จึงไม่มีลิงก์ (ห้ามเดาลิงก์ — กฎ STEP 27 ข้อ 6)
   Coupon: { label: 'คูปองส่วนลด', aliases: ['COUPON'], hrefPrefix: null },
+  ReturnRequest: { label: 'คำขอคืนสินค้า', aliases: [], hrefPrefix: '/admin/returns/' },
 };
 
 /** ทุกชื่อที่เคยใช้แทนชนิดนี้ — ใช้กับ `where.targetType.in` ตอนกรอง */
@@ -129,6 +131,11 @@ export const ACTION_LABELS: Readonly<Record<string, string>> = {
   'customer.status.update': 'เปลี่ยนสถานะบัญชีผู้ใช้',
   'customer.role.update': 'เปลี่ยนบทบาทและสิทธิ์',
   'customer.points.adjust': 'ปรับแต้มสะสมของลูกค้า',
+  'return.approve': 'อนุมัติคำขอคืนสินค้า',
+  'return.reject': 'ไม่รับคืนสินค้า',
+  'return.receive': 'ตรวจรับสินค้าที่ลูกค้าส่งคืน',
+  'return.refund': 'บันทึกการคืนเงินของคำขอคืน',
+  'order.refund': 'บันทึกการคืนเงินของคำสั่งซื้อที่ยกเลิก',
 };
 
 /** กลุ่มของการกระทำ — ใช้ทำตัวกรองระดับหยาบ (`action` ขึ้นต้นด้วยอะไร) */
@@ -140,6 +147,8 @@ export const ACTION_GROUPS = [
   'knowledge',
   'support',
   'customer',
+  'coupon',
+  'return',
 ] as const;
 
 export type ActionGroup = (typeof ACTION_GROUPS)[number];
@@ -152,6 +161,9 @@ export const ACTION_GROUP_LABELS: Readonly<Record<ActionGroup, string>> = {
   knowledge: 'คลังความรู้ AI',
   support: 'บริการลูกค้า',
   customer: 'บัญชีผู้ใช้',
+  // คูปองเขียน log มาตั้งแต่ STEP 41 แต่ไม่มีหมวดให้กรอง (แก้ตอน STEP 43)
+  coupon: 'คูปองส่วนลด',
+  return: 'คืนสินค้าและคืนเงิน',
 };
 
 /** คำอธิบายของ action — ค่าที่ไม่รู้จักคืนชื่อดิบ (ดีกว่าแสดงว่าง ๆ หรือเดาความหมาย) */

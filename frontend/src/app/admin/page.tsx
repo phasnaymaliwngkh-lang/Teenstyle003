@@ -112,6 +112,12 @@ export default async function AdminDashboardPage() {
             จัดการลูกค้า
           </Link>
           <Link
+            href="/admin/returns"
+            className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            คืนสินค้า / คืนเงิน
+          </Link>
+          <Link
             href="/admin/coupons"
             className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
           >

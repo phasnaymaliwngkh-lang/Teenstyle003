@@ -43,7 +43,7 @@ export const FOOTER_SECTIONS: readonly {
       { label: "AI Customer Service", href: "/customer-service", pendingStep: 20 },
       { label: "คำถามที่พบบ่อย (FAQ)", href: "/faq" },
       { label: "Shipping — การจัดส่ง", pendingStep: 44 },
-      { label: "Return Policy — การคืนสินค้า", pendingStep: 43 },
+      { label: "Return Policy — การคืนสินค้า", href: "/faq" },
     ],
   },
   {
@@ -58,6 +58,7 @@ export const FOOTER_SECTIONS: readonly {
       { label: "รีวิวของฉัน", href: "/account/reviews" },
       { label: "การแจ้งเตือน", href: "/account/notifications" },
       { label: "แต้มสะสม", href: "/account/points" },
+      { label: "คำขอคืนสินค้า", href: "/account/returns" },
     ],
   },
   {

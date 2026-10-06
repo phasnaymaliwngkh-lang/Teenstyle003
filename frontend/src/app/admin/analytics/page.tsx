@@ -226,7 +226,8 @@ export default async function AdminAnalyticsPage({
         <section className="rounded-[var(--radius-card)] border border-line bg-white p-5">
           <h2 className="text-lg">สินค้าขายดี 10 อันดับ</h2>
           <p className="mt-1 text-xs text-muted">
-            คิดจากยอดสินค้าใน `OrderItem` ของใบที่ได้รับเงินแล้ว
+            คิดจากยอดสินค้าใน `OrderItem` ของใบที่ได้รับเงินแล้ว · ยังไม่หักชิ้นที่ลูกค้าคืนบางชิ้น
+            (ยอดขายด้านบนหักเงินที่คืนแล้ว)
           </p>
 
           {errorOf(products) !== null ? (
@@ -357,13 +358,17 @@ export default async function AdminAnalyticsPage({
                   <Info className="mt-0.5 size-4 shrink-0 text-brand" aria-hidden />
                   <p className="text-xs text-ink-soft">
                     สองยอดนี้<span className="font-bold">ไม่เท่ากันเป็นเรื่องปกติ</span> —
-                    ต่างกันที่ค่าจัดส่งที่เก็บเพิ่มและส่วนลดท้ายบิล
+                    ต่างกันที่ค่าจัดส่งที่เก็บเพิ่มและส่วนลดท้ายบิล · ยอดขายบนการ์ดด้านบน =
+                    ยอดตามบิล − เงินที่คืนลูกค้า
                   </p>
                 </div>
 
                 <dl className="mt-4 space-y-2 text-sm">
-                  <Row label="ยอดตามบิล (เงินที่ได้รับ)">
+                  <Row label="ยอดตามบิล (ก่อนหักเงินที่คืน)">
                     {baht(breakdownData.reconciliation.orderRevenue)}
+                  </Row>
+                  <Row label="− เงินที่คืนลูกค้าแล้ว (คืนบางชิ้น)">
+                    {baht(breakdownData.reconciliation.refunds)}
                   </Row>
                   <Row label="ยอดเฉพาะสินค้า">
                     {baht(breakdownData.reconciliation.productRevenue)}

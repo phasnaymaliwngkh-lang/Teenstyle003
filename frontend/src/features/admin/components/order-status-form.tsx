@@ -46,7 +46,8 @@ export function OrderStatusForm({ order }: { order: AdminOrder }) {
       <p className="rounded-[var(--radius-card)] border border-line bg-lilac-50 p-4 text-sm text-muted">
         คำสั่งซื้อสถานะ <strong>{orderStatusLabel(order.status)}</strong>{" "}
         เปลี่ยนสถานะต่อจากหน้านี้ไม่ได้แล้ว
-        {order.status === "DELIVERED" && " — การคืนสินค้า/คืนเงินจะทำผ่านระบบของ STEP 43"}
+        {order.status === "DELIVERED" &&
+          " — การคืนสินค้า/คืนเงินทำผ่านคำขอคืนสินค้าของลูกค้า (เมนูคืนสินค้า)"}
       </p>
     );
   }

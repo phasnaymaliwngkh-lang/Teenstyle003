@@ -83,6 +83,19 @@ function paidOrdersSql(start: Date, end: Date): Prisma.Sql {
   `;
 }
 
+/**
+ * เงินที่ร้านได้รับจริงของแต่ละใบ = ยอดบิล − เงินที่คืนลูกค้าไปแล้ว (STEP 43)
+ *
+ * ใบที่คืนเงินครบมีสถานะ REFUNDED จึงหลุดจาก `paidOrdersSql` อยู่แล้ว (กฎเดิมของ STEP 26)
+ * แต่ใบที่คืน **บางชิ้น** ยังอยู่ — ถ้าบวก `total` ตรง ๆ ยอดขายจะรวมเงินที่คืนไปแล้ว
+ * ⚠️ ยอดตามสินค้า/หมวด (`OrderItem.lineTotal`) **ยังไม่หักชิ้นที่คืน** — หน้าเว็บบอกไว้ตรง ๆ
+ */
+const NET_PAID_SQL = Prisma.sql`(o."total" - o."refundedTotal")`;
+
+function netPaid(sum: { total: unknown; refundedTotal: unknown }): number {
+  return toNumber(sum.total) - toNumber(sum.refundedTotal);
+}
+
 const PAID_WHERE: Prisma.OrderWhereInput = {
   deletedAt: null,
   paymentStatus: 'PAID',
@@ -130,12 +143,12 @@ export async function getSalesSummary(query: AnalyticsRangeQuery): Promise<Sales
     await Promise.all([
       prisma.order.aggregate({
         where: paidWhereIn(start, end),
-        _sum: { total: true },
+        _sum: { total: true, refundedTotal: true },
         _count: { _all: true },
       }),
       prisma.order.aggregate({
         where: paidWhereIn(prevStart, prevEnd),
-        _sum: { total: true },
+        _sum: { total: true, refundedTotal: true },
         _count: { _all: true },
       }),
       countPayingCustomers(start, end),
@@ -154,7 +167,7 @@ export async function getSalesSummary(query: AnalyticsRangeQuery): Promise<Sales
       }),
       prisma.$queryRaw<SeriesRow[]>`
         SELECT ${bucketLabelSql(Prisma.sql`o."paidAt"`, query.granularity)} AS bucket,
-               COALESCE(sum(o."total"), 0)::text AS revenue,
+               COALESCE(sum(${NET_PAID_SQL}), 0)::text AS revenue,
                count(*)::int AS orders
         FROM "Order" o
         WHERE ${paidOrdersSql(start, end)}
@@ -163,8 +176,8 @@ export async function getSalesSummary(query: AnalyticsRangeQuery): Promise<Sales
       `,
     ]);
 
-  const revenue = toNumber(current._sum.total);
-  const prevRevenue = toNumber(previous._sum.total);
+  const revenue = netPaid(current._sum);
+  const prevRevenue = netPaid(previous._sum);
   const orders = current._count._all;
   const prevOrders = previous._count._all;
 
@@ -310,8 +323,8 @@ interface CustomerRow {
 
 function customerOrderBy(sort: CustomerRankingQuery['sort']): Prisma.Sql {
   return sort === 'orders'
-    ? Prisma.sql`count(*) DESC, sum(o."total") DESC`
-    : Prisma.sql`sum(o."total") DESC, count(*) DESC`;
+    ? Prisma.sql`count(*) DESC, sum(${NET_PAID_SQL}) DESC`
+    : Prisma.sql`sum(${NET_PAID_SQL}) DESC, count(*) DESC`;
 }
 
 /**
@@ -332,7 +345,7 @@ export async function getCustomerRanking(query: CustomerRankingQuery): Promise<C
     prisma.$queryRaw<CustomerRow[]>`
       SELECT o."userId" AS "userId",
              count(*)::int AS orders,
-             sum(o."total")::text AS revenue,
+             sum(${NET_PAID_SQL})::text AS revenue,
              min(o."paidAt") AS "firstOrderAt",
              max(o."paidAt") AS "lastOrderAt",
              (count(*) OVER ())::int AS "totalRows"
@@ -451,7 +464,7 @@ export async function getSalesBreakdown(query: AnalyticsRangeQuery): Promise<Sal
     prisma.$queryRaw<BreakdownRow[]>`
       SELECT pay."provider"::text AS key,
              count(DISTINCT pay."orderId")::int AS orders,
-             COALESCE(sum(pay."amount"), 0)::text AS revenue
+             COALESCE(sum(pay."amount" - COALESCE(pay."refundAmount", 0)), 0)::text AS revenue
       FROM "Payment" pay
       JOIN "Order" o ON o."id" = pay."orderId"
       WHERE pay."status" = 'PAID' AND ${paidOrdersSql(start, end)}
@@ -461,7 +474,7 @@ export async function getSalesBreakdown(query: AnalyticsRangeQuery): Promise<Sal
     prisma.$queryRaw<BreakdownRow[]>`
       SELECT o."shippingMethod"::text AS key,
              count(*)::int AS orders,
-             COALESCE(sum(o."total"), 0)::text AS revenue
+             COALESCE(sum(${NET_PAID_SQL}), 0)::text AS revenue
       FROM "Order" o
       WHERE ${paidOrdersSql(start, end)}
       GROUP BY o."shippingMethod"
@@ -485,17 +498,21 @@ export async function getSalesBreakdown(query: AnalyticsRangeQuery): Promise<Sal
     /**
      * ⚠️ `Order.total` = ยอดสินค้า − ส่วนลด + ค่าจัดส่ง
      *    จึง **ไม่มีทางเท่ากับผลรวม `OrderItem.lineTotal`** และนั่นถูกต้องแล้ว
-     *    ส่งทั้งสี่ค่าไปให้หน้าเว็บอธิบายผู้ใช้ ไม่ใช่ตัวเลขที่ต้องไล่ "แก้ให้ตรงกัน"
+     *    ส่งทั้งห้าค่าไปให้หน้าเว็บอธิบายผู้ใช้ ไม่ใช่ตัวเลขที่ต้องไล่ "แก้ให้ตรงกัน"
+     *    `orderRevenue` เป็นยอดตามบิล **ก่อน** หักเงินที่คืน (STEP 43) และ `refunds` คือส่วนที่คืนไป
+     *    → ยอดขายบน KPI = orderRevenue − refunds
      */
     prisma.$queryRaw<
       Array<{
         orderRevenue: string;
         shippingFees: string;
         discounts: string;
+        refunds: string;
         productRevenue: string;
       }>
     >`
       SELECT COALESCE(sum(o."total"), 0)::text AS "orderRevenue",
+             COALESCE(sum(o."refundedTotal"), 0)::text AS "refunds",
              COALESCE(sum(o."shippingFee"), 0)::text AS "shippingFees",
              COALESCE(sum(o."discountTotal"), 0)::text AS "discounts",
              COALESCE((
@@ -529,6 +546,7 @@ export async function getSalesBreakdown(query: AnalyticsRangeQuery): Promise<Sal
       productRevenue: toNumber(reconciliation[0]?.productRevenue ?? 0),
       shippingFees: toNumber(reconciliation[0]?.shippingFees ?? 0),
       discounts: toNumber(reconciliation[0]?.discounts ?? 0),
+      refunds: toNumber(reconciliation[0]?.refunds ?? 0),
     },
   };
 }
@@ -615,6 +633,10 @@ export async function exportAnalyticsReport(query: AnalyticsExportQuery): Promis
     });
     overview.addRow({ label: 'ค่าจัดส่งที่เก็บได้', value: breakdown.reconciliation.shippingFees });
     overview.addRow({ label: 'ส่วนลดท้ายบิล', value: breakdown.reconciliation.discounts });
+    overview.addRow({
+      label: 'เงินที่คืนลูกค้าแล้ว (คืนบางชิ้น)',
+      value: breakdown.reconciliation.refunds,
+    });
     styleWorksheet(overview);
 
     const productSheet = workbook.addWorksheet('สินค้าขายดี 50 อันดับ');

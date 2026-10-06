@@ -2,6 +2,7 @@ import { getPrisma, Prisma } from '@teenstyle/database';
 
 import { toOrder, type OrderDto } from '../models/order.model.ts';
 import { releaseCouponForCancelledOrder } from './coupon.service.ts';
+import { refundStateForOrder, type OrderRefundStateDto } from './return.service.ts';
 import { toNumber } from '../models/pricing.ts';
 import { writeAdminLog } from '../models/admin-log.model.ts';
 import { ApiError } from '../utils/api-error.ts';
@@ -37,7 +38,8 @@ import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
  *      ก่อนหน้านั้นห้ามตั้ง PAID (จะเป็นการบอกว่าได้เงินแล้วโดยไม่จริง)
  *   5. **ส่งของต้องมีเลขพัสดุจริง** — เปลี่ยนเป็น SHIPPING ต้องระบุ carrier + trackingNumber
  *      ระบบจะสร้างแถว Shipment ให้ ไม่มีการสร้างเลขพัสดุสมมติ
- *   6. การคืนเงิน (REFUNDED) ไม่อยู่ใน STEP นี้ — ต้องทำผ่านระบบคืนเงิน (STEP 43)
+ *   6. **ตั้ง REFUNDED จากฟอร์มนี้ไม่ได้** — คำสั่งซื้อเป็น REFUNDED เมื่อบันทึกการคืนเงินครบทุกชิ้น
+ *      ผ่านระบบคืนสินค้า ([return.service.ts](./return.service.ts) · STEP 43) เท่านั้น
  */
 
 const ORDER_SELECT = {
@@ -47,6 +49,11 @@ const ORDER_SELECT = {
   paymentStatus: true,
   subtotal: true,
   discountTotal: true,
+  // แต้มและการคืนเงินของใบนี้ (STEP 42/43) — ให้หลังบ้านเห็นยอดเดียวกับที่ลูกค้าเห็น
+  pointsRedeemed: true,
+  pointsDiscount: true,
+  pointTransactions: { select: { type: true, delta: true } },
+  refundedTotal: true,
   shippingFee: true,
   total: true,
   shippingMethod: true,
@@ -279,7 +286,13 @@ export async function listAdminOrders(query: {
   };
 }
 
-export async function getAdminOrder(orderNumber: string): Promise<AdminOrderDto> {
+/** รายละเอียดคำสั่งซื้อรายใบ — มีสถานะการคืนเงินด้วย (ไม่ใส่ในหน้ารายการเพราะต้องคิวรีเพิ่มต่อใบ) */
+export interface AdminOrderDetailDto extends AdminOrderDto {
+  /** เงินที่คืนแล้ว · ต้องคืนอีกไหม · บันทึกการคืนเงินทุกครั้ง (STEP 43) */
+  refundState: OrderRefundStateDto;
+}
+
+export async function getAdminOrder(orderNumber: string): Promise<AdminOrderDetailDto> {
   const order = await getPrisma().order.findFirst({
     where: { orderNumber, deletedAt: null },
     select: ORDER_SELECT,
@@ -289,7 +302,7 @@ export async function getAdminOrder(orderNumber: string): Promise<AdminOrderDto>
     throw ApiError.notFound('ไม่พบคำสั่งซื้อนี้');
   }
 
-  return toAdminOrder(order);
+  return { ...toAdminOrder(order), refundState: await refundStateForOrder(order.id) };
 }
 
 /** timestamp ที่ต้องบันทึกเมื่อเข้าสถานะใหม่ */
@@ -322,7 +335,7 @@ export async function updateOrderStatus(
   actor: { id: string; ip?: string | undefined; userAgent?: string | undefined },
   orderNumber: string,
   input: UpdateOrderStatusInput,
-): Promise<AdminOrderDto> {
+): Promise<AdminOrderDetailDto> {
   const prisma = getPrisma();
 
   const current = await prisma.order.findFirst({

@@ -81,7 +81,9 @@ export async function findUserIdsBySpendRange(
   maxExclusive: number | null,
 ): Promise<string[]> {
   const upper =
-    maxExclusive === null ? Prisma.empty : Prisma.sql`AND SUM(o."total") < ${maxExclusive}`;
+    maxExclusive === null
+      ? Prisma.empty
+      : Prisma.sql`AND SUM(o."total" - o."refundedTotal") < ${maxExclusive}`;
 
   const rows = await getPrisma().$queryRaw<{ userId: string }[]>`
     SELECT o."userId"
@@ -90,7 +92,7 @@ export async function findUserIdsBySpendRange(
        AND o."paymentStatus" = 'PAID'
        AND o."status" NOT IN ('CANCELLED', 'REFUNDED')
      GROUP BY o."userId"
-    HAVING SUM(o."total") >= ${min} ${upper}`;
+    HAVING SUM(o."total" - o."refundedTotal") >= ${min} ${upper}`;
 
   return rows.map((row) => row.userId);
 }
@@ -150,7 +152,7 @@ async function statsFor(userIds: string[]): Promise<Map<string, CustomerOrderSta
       by: ['userId'],
       where: { ...scope, ...PAID_WHERE },
       _count: { _all: true },
-      _sum: { total: true },
+      _sum: { total: true, refundedTotal: true },
     }),
     prisma.order.groupBy({
       by: ['userId'],
@@ -174,7 +176,8 @@ async function statsFor(userIds: string[]): Promise<Map<string, CustomerOrderSta
     const entry = result.get(row.userId);
     if (!entry) continue;
     entry.paidOrders = row._count._all;
-    entry.totalPaid = toNumber(row._sum.total);
+    // เงินที่คืนลูกค้าไปแล้วไม่ใช่ยอดที่ได้รับ (STEP 43) — ระดับสมาชิกคิดจากตัวเลขเดียวกันนี้
+    entry.totalPaid = toNumber(row._sum.total) - toNumber(row._sum.refundedTotal);
   }
 
   for (const row of cod) {

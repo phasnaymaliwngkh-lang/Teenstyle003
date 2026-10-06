@@ -3,9 +3,11 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
 
 import { SectionError } from "@/components/shared/section";
 import { OrderTimeline } from "@/features/orders/components/order-timeline";
+import { ReturnRequestCard } from "@/features/returns/components/return-request-card";
 import {
   formatDateTime,
   orderStatusLabel,
@@ -19,6 +21,7 @@ import { getSession } from "@/lib/dal";
 import { cn } from "@/lib/utils";
 import { fetchPaymentStateOnServer } from "@/services/payment.server";
 import { fetchReviewEligibilityOnServer } from "@/services/review.server";
+import { fetchReturnEligibilityOnServer } from "@/services/returns.server";
 import type { Order, PaymentState, ReviewEligibility } from "@/types/catalog";
 import { formatBaht } from "@/utils/format";
 
@@ -119,6 +122,13 @@ export default async function OrderTrackingPage({ params }: PageProps) {
       <div className="mt-6">
         <PaymentPanel state={state} />
       </div>
+
+      {/* คืนสินค้า (STEP 43) — โหลดแยก ไม่ใช้ตัดสิน 404 และพังได้โดยหน้าคำสั่งซื้อยังเปิดได้ */}
+      {(order.status === "DELIVERED" || order.status === "REFUNDED") && (
+        <Suspense fallback={null}>
+          <ReturnSection orderNumber={order.orderNumber} />
+        </Suspense>
+      )}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
@@ -275,6 +285,9 @@ export default async function OrderTrackingPage({ params }: PageProps) {
                   {formatBaht(order.total)}
                 </dd>
               </div>
+              {order.refundedTotal > 0 && (
+                <Row label="ร้านคืนเงินแล้ว" value={`-${formatBaht(order.refundedTotal)}`} />
+              )}
             </dl>
 
             <PointsNote order={order} />
@@ -309,6 +322,59 @@ export default async function OrderTrackingPage({ params }: PageProps) {
         </div>
       </div>
     </main>
+  );
+}
+
+/**
+ * ขอคืนสินค้า + คำขอคืนของใบนี้ (STEP 43)
+ *
+ * ⚠️ โหลดไม่ได้ → บอกตรง ๆ และชี้ไปหน้าคำขอคืน — ไม่ซ่อนเงียบ ๆ จนลูกค้าคิดว่าคืนไม่ได้
+ */
+async function ReturnSection({ orderNumber }: { orderNumber: string }) {
+  const eligibility = await fetchReturnEligibilityOnServer(orderNumber).catch(() => null);
+
+  if (eligibility === null) {
+    return (
+      <p className="mt-6 text-sm text-muted">
+        โหลดข้อมูลการคืนสินค้าไม่สำเร็จ —{" "}
+        <Link href="/account/returns" className="font-semibold text-brand-dark underline">
+          ดูคำขอคืนของฉัน
+        </Link>
+      </p>
+    );
+  }
+
+  return (
+    <section aria-labelledby="return-heading" className="mt-6 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-card)] border border-line bg-white p-5">
+        <div className="min-w-0">
+          <h2 id="return-heading" className="text-lg">
+            คืนสินค้า
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            {eligibility.eligible
+              ? `สินค้ามีตำหนิหรือได้ของผิด แจ้งคืนได้ภายใน ${eligibility.windowDays} วันหลังได้รับ${
+                  eligibility.deadline !== null
+                    ? ` (ถึง ${formatDateTime(eligibility.deadline)})`
+                    : ""
+                }`
+              : eligibility.message}
+          </p>
+        </div>
+        {eligibility.eligible && (
+          <Link
+            href={`/account/orders/${encodeURIComponent(orderNumber)}/return`}
+            className="flex min-h-11 shrink-0 items-center rounded-[var(--radius-pill)] border border-brand px-5 text-sm font-bold text-brand-dark transition hover:bg-lilac-50"
+          >
+            ขอคืนสินค้า
+          </Link>
+        )}
+      </div>
+
+      {eligibility.requests.map((request) => (
+        <ReturnRequestCard key={request.id} request={request} showOrderLink={false} />
+      ))}
+    </section>
   );
 }
 

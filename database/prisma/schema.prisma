@@ -119,6 +119,36 @@ enum PaymentProvider {
   COD
 }
 
+/// สถานะของคำขอคืนสินค้า (STEP 43)
+///
+/// REQUESTED → APPROVED → RECEIVED → REFUNDED
+/// REQUESTED / APPROVED → REJECTED (ร้านไม่รับคืน — ต้องมีเหตุผล) · CANCELLED (ลูกค้ายกเลิกเอง)
+enum ReturnStatus {
+  REQUESTED
+  APPROVED
+  RECEIVED
+  REFUNDED
+  REJECTED
+  CANCELLED
+}
+
+/// เหตุผลที่ขอคืนได้ — ตรงกับนโยบายร้าน (รับคืนเฉพาะความผิดของร้าน · ดู config/returns.ts)
+enum ReturnReason {
+  DEFECTIVE
+  WRONG_ITEM
+}
+
+/// วิธีที่ร้านคืนเงิน (STEP 43)
+///
+/// ⚠️ ระบบ **ไม่ได้สั่งคืนเงินเอง** — ยังไม่ได้ต่อ Stripe Refund API เพราะไม่มีบัญชีทดสอบให้ยืนยันกับของจริง
+/// พนักงานคืนเงินในระบบปลายทางก่อน แล้วบันทึกเลขอ้างอิงที่นี่ (ดู docs/16-returns.md)
+enum RefundMethod {
+  /// คืนผ่าน Stripe Dashboard — เลขอ้างอิงคือ refund id (re_…)
+  STRIPE_DASHBOARD
+  /// โอนเงินคืนเข้าบัญชีลูกค้า — เลขอ้างอิงคือเลขที่รายการโอน
+  BANK_TRANSFER
+}
+
 enum ShippingMethod {
   STANDARD
   EXPRESS
@@ -167,6 +197,8 @@ enum NotificationType {
   REVIEW_UPDATE
   /// เพิ่มใน STEP 42 — ขึ้นระดับสมาชิก · ร้านปรับแต้มให้
   LOYALTY_UPDATE
+  /// เพิ่มใน STEP 43 — ผลของคำขอคืนสินค้า · ร้านคืนเงินแล้ว
+  RETURN_UPDATE
 }
 
 enum NotificationChannel {
@@ -287,6 +319,8 @@ model User {
   inventoryMovements InventoryMovement[]
   pointTransactions  PointTransaction[]  @relation("PointTransactionOwner")
   pointAdjustments   PointTransaction[]  @relation("PointTransactionActor")
+  returnRequests     ReturnRequest[]
+  refundsRecorded    Refund[]            @relation("RefundActor")
 
   @@index([roleId])
   @@index([status])
@@ -773,6 +807,10 @@ model Order {
   /// ช่องนี้มีไว้ให้แยกได้ว่าส่วนลดก้อนไหนมาจากแต้ม (CHECK: ไม่เกิน discountTotal)
   pointsDiscount Decimal @default(0) @db.Decimal(12, 2)
 
+  /// เงินที่คืนลูกค้าไปแล้วรวม (STEP 43) — cache ของ SUM(Refund.amount) เขียนในทรานแซกชันเดียวกับ Refund
+  /// "ยอดที่ร้านได้รับจริง" ของใบนี้ = total − refundedTotal (CHECK: ไม่ติดลบและไม่เกิน total)
+  refundedTotal Decimal @default(0) @db.Decimal(12, 2)
+
   /// เก็บทั้ง relation (อ้างอิงกลับได้) และ snapshot (ประวัติไม่เปลี่ยนตามการแก้ที่อยู่)
   shippingAddressId String?  @db.Uuid
   shippingAddress   Address? @relation(fields: [shippingAddressId], references: [id])
@@ -806,6 +844,8 @@ model Order {
   shipments         Shipment[]
   reviews           Review[]
   pointTransactions PointTransaction[]
+  returnRequests    ReturnRequest[]
+  refunds           Refund[]
 
   @@index([userId, createdAt])
   @@index([status])
@@ -844,6 +884,8 @@ model OrderItem {
   lineTotal Decimal @db.Decimal(12, 2)
 
   createdAt DateTime @default(now())
+
+  returnItems ReturnItem[]
 
   @@index([orderId])
   @@index([productId])
@@ -1028,6 +1070,97 @@ model Wishlist {
   @@unique([userId, productId])
   @@index([userId, createdAt])
   @@index([productId])
+}
+
+// ============================================================================
+// RETURN / REFUND  (STEP 43)
+// ============================================================================
+
+/// คำขอคืนสินค้า — ลูกค้ายื่นจากคำสั่งซื้อที่ได้รับของแล้ว ภายใน RETURN_WINDOW_DAYS
+///
+/// ⚠️ คำสั่งซื้อหนึ่งใบมีคำขอที่ "ยังไม่จบ" ได้ครั้งละหนึ่งคำขอ — บังคับด้วย partial unique index
+///    ในฐานข้อมูล (ไม่ใช่แค่ตรวจในโค้ด) เพราะสองคำขอพร้อมกันจะขอคืนชิ้นเดียวกันซ้ำได้
+model ReturnRequest {
+  id           String @id @default(uuid(7)) @db.Uuid
+  /// เลขที่ลูกค้าใช้อ้างอิงกับร้าน เช่น TS-20261006-0001-R1
+  returnNumber String @unique
+
+  orderId String @db.Uuid
+  order   Order  @relation(fields: [orderId], references: [id])
+  userId  String @db.Uuid
+  user    User   @relation(fields: [userId], references: [id])
+
+  status    ReturnStatus @default(REQUESTED)
+  reason    ReturnReason
+  /// รายละเอียดที่ลูกค้าเล่า (ตำหนิอยู่ตรงไหน · ได้ของผิดอย่างไร)
+  detail    String
+  /// ข้อความจากร้าน — **ลูกค้าเห็น** (เหตุผลที่ไม่รับคืน · คำแนะนำการส่งของกลับ)
+  staffNote String?
+
+  /// กันกดส่งคำขอซ้ำ (แพตเทิร์นเดียวกับ Order.idempotencyKey)
+  idempotencyKey String @unique
+
+  /// ไทม์ไลน์ — เวลาที่เกิดขึ้นจริงเท่านั้น (กฎ STEP 12 ข้อ 1)
+  approvedAt  DateTime?
+  rejectedAt  DateTime?
+  receivedAt  DateTime?
+  refundedAt  DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items  ReturnItem[]
+  refund Refund?
+
+  @@index([userId, createdAt])
+  @@index([orderId])
+  @@index([status, createdAt])
+}
+
+model ReturnItem {
+  id              String        @id @default(uuid(7)) @db.Uuid
+  returnRequestId String        @db.Uuid
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+  orderItemId     String        @db.Uuid
+  orderItem       OrderItem     @relation(fields: [orderItemId], references: [id])
+
+  quantity  Int
+  /// ตัดสินตอนตรวจรับของ: ขายต่อได้ → รับเข้าคลัง (movement RETURN) · ชำรุด → ไม่คืนเข้าคลัง
+  restocked Boolean @default(false)
+
+  @@unique([returnRequestId, orderItemId])
+  @@index([orderItemId])
+}
+
+/// การคืนเงินที่ร้าน **ทำไปแล้วจริง** (append-only)
+///
+/// ⚠️ ระบบไม่ได้โอนเงินเอง — แถวนี้คือบันทึกว่าพนักงานคืนเงินแล้วด้วยวิธีไหน เลขอ้างอิงอะไร
+///    ยอดเงินคำนวณที่ server เสมอ (พนักงานกรอกยอดเองไม่ได้)
+model Refund {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  orderId         String         @db.Uuid
+  order           Order          @relation(fields: [orderId], references: [id])
+  /// null = คืนเงินของคำสั่งซื้อที่ร้านยกเลิกหลังชำระเงิน (ไม่มีการส่งของคืน)
+  returnRequestId String?        @unique @db.Uuid
+  returnRequest   ReturnRequest? @relation(fields: [returnRequestId], references: [id])
+
+  amount    Decimal      @db.Decimal(12, 2)
+  method    RefundMethod
+  reference String
+  note      String?
+
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("RefundActor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  /// กันบันทึกซ้ำจากการกดปุ่มสองครั้ง
+  idempotencyKey String @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([createdAt])
 }
 
 // ============================================================================

@@ -330,6 +330,71 @@ export function notifyPointsAdjusted(params: {
   });
 }
 
+/**
+ * ความคืบหน้าของคำขอคืนสินค้า (STEP 43)
+ *
+ * แจ้งทุกครั้งที่ร้านเป็นคนเปลี่ยนสถานะ — ลูกค้าต้องรู้ว่าต้องส่งของกลับไหม ร้านไม่รับเพราะอะไร
+ * และเงินกลับเข้ามาเท่าไรเมื่อไร · ยกเลิกคำขอเองไม่ต้องแจ้ง (ลูกค้าทำเอง รู้อยู่แล้ว)
+ */
+export function notifyReturnUpdate(params: {
+  userId: string;
+  returnId: string;
+  returnNumber: string;
+  orderNumber: string;
+  event: 'APPROVED' | 'REJECTED' | 'RECEIVED' | 'REFUNDED';
+  staffNote: string | null;
+  refundAmount?: number;
+}): Promise<boolean> {
+  const note = params.staffNote !== null ? ` — ${params.staffNote}` : '';
+  const copy: Record<typeof params.event, { title: string; body: string }> = {
+    APPROVED: {
+      title: `ร้านรับคำขอคืน ${params.returnNumber} แล้ว`,
+      body: `ส่งสินค้ากลับมาที่ร้านได้เลย${note}`,
+    },
+    REJECTED: {
+      title: `ร้านไม่รับคืนตามคำขอ ${params.returnNumber}`,
+      body: `เหตุผลจากร้าน${note || ' — ติดต่อฝ่ายบริการลูกค้าได้ถ้าต้องการรายละเอียดเพิ่ม'}`,
+    },
+    RECEIVED: {
+      title: `ร้านได้รับสินค้าที่ส่งคืนแล้ว (${params.returnNumber})`,
+      body: 'กำลังดำเนินการคืนเงิน — จะแจ้งอีกครั้งเมื่อคืนเงินเรียบร้อย',
+    },
+    REFUNDED: {
+      title: `คืนเงิน ${(params.refundAmount ?? 0).toLocaleString('th-TH')} บาทแล้ว (${params.returnNumber})`,
+      body: 'ดูวิธีที่ร้านคืนเงินและเลขอ้างอิงได้ในหน้าคำขอคืนสินค้า',
+    },
+  };
+
+  return notifyOnce({
+    userId: params.userId,
+    type: 'RETURN_UPDATE',
+    title: copy[params.event].title,
+    body: copy[params.event].body,
+    data: {
+      returnId: params.returnId,
+      returnNumber: params.returnNumber,
+      orderNumber: params.orderNumber,
+      event: `RETURN_${params.event}`,
+    },
+    dedupe: { returnId: params.returnId, event: `RETURN_${params.event}` },
+  });
+}
+
+/** คืนเงินคำสั่งซื้อที่ร้านยกเลิกหลังชำระเงินแล้ว (STEP 43) */
+export function notifyOrderRefunded(
+  order: OrderNotificationTarget,
+  amount: number,
+): Promise<boolean> {
+  return notifyOnce({
+    userId: order.userId,
+    type: 'RETURN_UPDATE',
+    title: `คืนเงิน ${amount.toLocaleString('th-TH')} บาทแล้ว (${order.orderNumber})`,
+    body: 'ร้านคืนเงินของคำสั่งซื้อที่ถูกยกเลิกเรียบร้อย ตามช่องทางที่คุณชำระ — ยอดที่คืนแสดงในหน้าคำสั่งซื้อ',
+    data: { orderId: order.orderId, orderNumber: order.orderNumber, event: 'ORDER_REFUNDED' },
+    dedupe: { orderId: order.orderId, event: 'ORDER_REFUNDED' },
+  });
+}
+
 /** อ่านตัวเลขจาก `data` ของแถวเดิมอย่างปลอดภัย */
 function readNumber(data: unknown, key: string): number | null {
   if (typeof data !== 'object' || data === null) return null;

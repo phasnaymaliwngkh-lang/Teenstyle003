@@ -123,7 +123,7 @@ const UPLOAD_ROUTES = new Set([
 ]);
 
 /** กลุ่มที่เอกสารประกาศว่า "ยังไม่มี" — ต้องไม่มีอยู่จริง */
-const PLANNED_PREFIXES = ['/api/brands', '/api/returns', '/api/shipments'];
+const PLANNED_PREFIXES = ['/api/brands', '/api/shipments'];
 
 // ─── เอกสาร ────────────────────────────────────────────────────────────────
 

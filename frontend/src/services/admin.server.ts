@@ -2,7 +2,7 @@ import "server-only";
 
 import { apiFetchAsUser } from "@/lib/api-server";
 import type {
-  AdminOrder,
+  AdminOrderDetail,
   AdminOrderListResult,
   AdminOverview,
   AdminProduct,
@@ -35,8 +35,8 @@ export function fetchAdminOrdersOnServer(params: URLSearchParams): Promise<Admin
   });
 }
 
-export function fetchAdminOrderOnServer(orderNumber: string): Promise<AdminOrder> {
-  return apiFetchAsUser<AdminOrder>(`/api/admin/orders/${encodeURIComponent(orderNumber)}`, {
+export function fetchAdminOrderOnServer(orderNumber: string): Promise<AdminOrderDetail> {
+  return apiFetchAsUser<AdminOrderDetail>(`/api/admin/orders/${encodeURIComponent(orderNumber)}`, {
     cache: "no-store",
   });
 }

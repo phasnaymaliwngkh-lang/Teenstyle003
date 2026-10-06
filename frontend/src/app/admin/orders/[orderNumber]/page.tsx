@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { SectionError } from "@/components/shared/section";
+import { OrderRefundPanel } from "@/features/admin/components/order-refund-panel";
 import { OrderStatusForm } from "@/features/admin/components/order-status-form";
 import { OrderTimeline } from "@/features/orders/components/order-timeline";
 import {
@@ -18,7 +19,7 @@ import { ApiClientError } from "@/lib/api";
 import { requirePermission } from "@/lib/dal";
 import { cn } from "@/lib/utils";
 import { fetchAdminOrderOnServer } from "@/services/admin.server";
-import type { AdminOrder } from "@/types/admin";
+import type { AdminOrderDetail } from "@/types/admin";
 import { formatBaht } from "@/utils/format";
 
 type PageProps = { params: Promise<{ orderNumber: string }> };
@@ -34,11 +35,11 @@ export const metadata: Metadata = {
  * ⚠️ await ข้อมูลที่ระดับ page (ไม่ห่อ Suspense) เพื่อให้เลขที่ไม่มีจริงคืน 404 ได้ — ดู CLAUDE.md
  */
 export default async function AdminOrderDetailPage({ params }: PageProps) {
-  await requirePermission("order:read");
+  const session = await requirePermission("order:read");
 
   const { orderNumber } = await params;
 
-  let order: AdminOrder | null = null;
+  let order: AdminOrderDetail | null = null;
   let errorMessage: string | null = null;
 
   try {
@@ -140,11 +141,27 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
 
             <dl className="mt-4 space-y-1.5 border-t border-line pt-3 text-sm">
               <Row label="ยอดสินค้า" value={formatBaht(order.subtotal)} />
+              {/* เดิมไม่มีบรรทัดส่วนลด ยอดสินค้า + ค่าส่ง จึงไม่เท่ากับ "รวม" ตั้งแต่มีคูปอง (แก้ตอน STEP 43) */}
+              {order.discountTotal - order.pointsDiscount > 0 && (
+                <Row
+                  label="ส่วนลดคูปอง"
+                  value={`-${formatBaht(order.discountTotal - order.pointsDiscount)}`}
+                />
+              )}
+              {order.pointsDiscount > 0 && (
+                <Row
+                  label={`ส่วนลดจากแต้ม (${order.pointsRedeemed.toLocaleString("th-TH")} แต้ม)`}
+                  value={`-${formatBaht(order.pointsDiscount)}`}
+                />
+              )}
               <Row
                 label="ค่าจัดส่ง"
                 value={order.shippingFee === 0 ? "ฟรี" : formatBaht(order.shippingFee)}
               />
               <Row label="รวม" value={formatBaht(order.total)} strong />
+              {order.refundedTotal > 0 && (
+                <Row label="คืนเงินแล้ว" value={`-${formatBaht(order.refundedTotal)}`} />
+              )}
             </dl>
           </section>
 
@@ -237,6 +254,55 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
               </ul>
             )}
           </section>
+
+          {/* ─── คืนเงิน (STEP 43) ─── */}
+          {(order.refundState.awaitingRefund || order.refundState.refunds.length > 0) && (
+            <section
+              className={cn(
+                "rounded-[var(--radius-card)] border p-5",
+                order.refundState.awaitingRefund
+                  ? "border-warning/30 bg-warning/5"
+                  : "border-line bg-white",
+              )}
+            >
+              <h2 className="text-base">การคืนเงิน</h2>
+
+              {order.refundState.refunds.length > 0 && (
+                <ul className="mt-2 space-y-2 text-sm">
+                  {order.refundState.refunds.map((refund) => (
+                    <li key={refund.id}>
+                      <span className="font-semibold">
+                        {formatBaht(refund.amount)} · {refund.methodLabel}
+                      </span>
+                      <span className="block text-xs break-all text-muted">
+                        อ้างอิง {refund.reference} · {formatDateTime(refund.createdAt)}
+                        {refund.returnNumber !== null && ` · คำขอ ${refund.returnNumber}`}
+                        {` · โดย ${refund.createdBy === null ? "(บัญชีถูกลบแล้ว)" : (refund.createdBy.name ?? refund.createdBy.email)}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {order.refundState.awaitingRefund && (
+                <div className="mt-3">
+                  <p className="text-sm font-semibold text-warning">
+                    ร้านยกเลิกใบนี้หลังลูกค้าชำระเงินแล้ว — ต้องคืนเงิน{" "}
+                    {formatBaht(order.refundState.refundableAmount)}
+                  </p>
+                  {session.user.permissions.includes("order:refund") ? (
+                    <div className="mt-3">
+                      <OrderRefundPanel orderNumber={order.orderNumber} state={order.refundState} />
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-xs text-muted">
+                      ต้องให้ผู้ดูแลที่มีสิทธิ์คืนเงิน (order:refund) บันทึกการคืนเงิน
+                    </p>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
 
           {order.adminNote !== null && (
             <section className="rounded-[var(--radius-card)] border border-warning/30 bg-warning/5 p-5">

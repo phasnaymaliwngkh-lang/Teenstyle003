@@ -81,6 +81,14 @@ import {
   adjustCustomerPointsHandler,
   adminListPointTransactionsHandler,
 } from '../controllers/loyalty.controller.ts';
+import {
+  adminDecideReturnHandler,
+  adminGetReturnHandler,
+  adminListReturnsHandler,
+  adminReceiveReturnHandler,
+  adminRefundCancelledOrderHandler,
+  adminRefundReturnHandler,
+} from '../controllers/return.controller.ts';
 import { ApiError } from '../utils/api-error.ts';
 
 export const adminRouter = Router();
@@ -101,6 +109,39 @@ adminRouter.patch(
   '/orders/:orderNumber/status',
   requirePermission('order:update'),
   updateOrderStatusHandler,
+);
+/**
+ * คืนเงินคำสั่งซื้อที่ร้านยกเลิกหลังชำระเงินแล้ว (STEP 43) — `order:refund` (ADMIN ขึ้นไป)
+ * เป็นการ **บันทึก** ว่าคืนเงินแล้วจริง (วิธี + เลขอ้างอิง) — ระบบไม่ได้โอนเงินเอง
+ */
+adminRouter.post(
+  '/orders/:orderNumber/refund',
+  requirePermission('order:refund'),
+  adminRefundCancelledOrderHandler,
+);
+
+/**
+ * คำขอคืนสินค้า (STEP 43)
+ *   - ดูคิว                    → `order:read`   (EMPLOYEE มี)
+ *   - อนุมัติ / ไม่รับคืน / ตรวจรับของ → `order:update` (งานหน้าร้านและคลัง — EMPLOYEE มี)
+ *   - บันทึกการคืนเงิน         → `order:refund` (ADMIN ขึ้นไป — เงินออกจากร้าน)
+ */
+adminRouter.get('/returns', requirePermission('order:read'), adminListReturnsHandler);
+adminRouter.get('/returns/:returnId', requirePermission('order:read'), adminGetReturnHandler);
+adminRouter.patch(
+  '/returns/:returnId/status',
+  requirePermission('order:update'),
+  adminDecideReturnHandler,
+);
+adminRouter.post(
+  '/returns/:returnId/receive',
+  requirePermission('order:update'),
+  adminReceiveReturnHandler,
+);
+adminRouter.post(
+  '/returns/:returnId/refund',
+  requirePermission('order:refund'),
+  adminRefundReturnHandler,
 );
 
 /**

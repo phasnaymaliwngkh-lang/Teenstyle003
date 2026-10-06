@@ -60,6 +60,7 @@ const ORDER_FOR_PAYMENT_SELECT = {
   pointsRedeemed: true,
   pointsDiscount: true,
   pointTransactions: { select: { type: true, delta: true } },
+  refundedTotal: true,
   shippingFee: true,
   total: true,
   shippingMethod: true,

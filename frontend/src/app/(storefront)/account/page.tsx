@@ -6,6 +6,7 @@ import {
   Mail,
   MapPin,
   Package,
+  PackageOpen,
   ShieldCheck,
   ShoppingBag,
   Sparkles,
@@ -165,6 +166,19 @@ export default async function AccountPage() {
           </Link>
 
           <Link
+            href="/account/returns"
+            className="flex items-center gap-4 rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)] transition hover:border-brand-soft hover:shadow-[var(--shadow-lift)]"
+          >
+            <span className="grid size-12 shrink-0 place-items-center rounded-[14px] bg-lilac">
+              <PackageOpen className="size-6 text-brand" aria-hidden />
+            </span>
+            <span>
+              <span className="block font-extrabold">คำขอคืนสินค้า</span>
+              <span className="block text-sm text-muted">ติดตามการคืนสินค้าและการคืนเงิน</span>
+            </span>
+          </Link>
+
+          <Link
             href="/account/points"
             className="flex items-center gap-4 rounded-[var(--radius-card)] border border-line bg-white p-5 shadow-[var(--shadow-soft)] transition hover:border-brand-soft hover:shadow-[var(--shadow-lift)]"
           >
@@ -199,7 +213,6 @@ export default async function AccountPage() {
           <h2 className="text-lg font-extrabold">ยังไม่เปิดใช้งานในขั้นนี้</h2>
           <p className="mt-2 text-sm text-muted">ส่วนที่เหลือจะเพิ่มตามลำดับ STEP</p>
           <ul className="mt-5 space-y-3 text-sm">
-            <PendingItem step={43}>ขอคืนสินค้า / คืนเงิน</PendingItem>
             <PendingItem step={53}>ดาวน์โหลดและลบข้อมูลส่วนตัว</PendingItem>
           </ul>
         </section>

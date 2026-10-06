@@ -47,9 +47,11 @@ export const ROUTES = [
   { path: '/account/addresses', as: 'customer' },
   { path: '/account/orders', as: 'customer' },
   { path: '/account/orders/{orderNumber}', as: 'customer' },
+  { path: '/account/orders/{orderNumber}/return', as: 'customer' },
   { path: '/account/reviews', as: 'customer' },
   { path: '/account/notifications', as: 'customer' },
   { path: '/account/points', as: 'customer' },
+  { path: '/account/returns', as: 'customer' },
   { path: '/wishlist', as: 'customer' },
   { path: '/cart', as: 'customer', note: 'ตะกร้าที่มีของจริง — แถวสินค้าคือจุดที่แน่นที่สุด' },
   { path: '/checkout', as: 'customer' },
@@ -70,6 +72,8 @@ export const ROUTES = [
   { path: '/admin/barcodes/labels?variantId={variantId}', as: 'admin' },
   { path: '/admin/import-export', as: 'admin' },
   { path: '/admin/coupons', as: 'admin' },
+  { path: '/admin/returns', as: 'admin' },
+  { path: '/admin/returns/{returnId}', as: 'admin' },
   { path: '/admin/reviews', as: 'admin' },
   { path: '/admin/customers', as: 'admin' },
   { path: '/admin/customers/{customerId}', as: 'admin' },
@@ -128,6 +132,7 @@ async function resolvePlaceholders(prisma, apiBase, adminToken) {
   const [inventory] = (await asAdmin('/api/admin/inventory?limit=1')).items ?? [];
   const [order] = (await asAdmin('/api/admin/orders?limit=1')).items ?? [];
   const [customer] = (await asAdmin('/api/admin/customers?limit=1&role=CUSTOMER')).items ?? [];
+  const [returnRequest] = (await asAdmin('/api/admin/returns?limit=1')).items ?? [];
 
   const publicProduct = await prisma.product.findFirst({
     where: { status: 'ACTIVE', deletedAt: null },
@@ -144,6 +149,7 @@ async function resolvePlaceholders(prisma, apiBase, adminToken) {
     sku: inventory?.sku ?? '',
     orderNumber: order?.orderNumber ?? '',
     customerId: customer?.id ?? '',
+    returnId: returnRequest?.id ?? '',
   };
 }
 

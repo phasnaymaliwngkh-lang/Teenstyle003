@@ -7,6 +7,7 @@ import {
   Coins,
   Loader2,
   Package,
+  RotateCcw,
   Star,
   Tag,
   Truck,
@@ -35,6 +36,7 @@ const LOOK: Record<NotificationType, { icon: typeof Bell; tone: string }> = {
   PROMOTION: { icon: Tag, tone: "text-brand" },
   REVIEW_UPDATE: { icon: Star, tone: "text-warning" },
   LOYALTY_UPDATE: { icon: Coins, tone: "text-brand" },
+  RETURN_UPDATE: { icon: RotateCcw, tone: "text-brand" },
   LOW_STOCK: { icon: Bell, tone: "text-warning" },
   SYSTEM: { icon: Bell, tone: "text-muted" },
 };

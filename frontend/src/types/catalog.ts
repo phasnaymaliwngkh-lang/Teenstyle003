@@ -448,6 +448,8 @@ export interface Order {
   pointsEarned: number;
   shippingFee: number;
   total: number;
+  /** เงินที่ร้านคืนให้แล้ว (STEP 43) — 0 = ยังไม่มีการคืนเงิน */
+  refundedTotal: number;
   shippingMethod: ShippingMethodCode;
   shippingMethodName: string;
   shippingEtaText: string;
@@ -896,7 +898,9 @@ export type NotificationType =
   | "ORDER_CANCELLED"
   | "REVIEW_UPDATE"
   /** STEP 42 — ขึ้นระดับสมาชิก · ร้านปรับแต้มให้ */
-  | "LOYALTY_UPDATE";
+  | "LOYALTY_UPDATE"
+  /** STEP 43 — ผลของคำขอคืนสินค้า · ร้านคืนเงินแล้ว */
+  | "RETURN_UPDATE";
 
 export type NotificationGroup = "ORDER" | "PRICE" | "REVIEW" | "OTHER";
 

@@ -1,4 +1,5 @@
 import type { Order } from "./catalog";
+import type { OrderRefundState } from "./returns";
 
 /**
  * Type ของหลังบ้าน (STEP 13–14) — ต้องตรงกับ DTO ฝั่ง backend
@@ -51,6 +52,11 @@ export interface AdminOrder extends Order {
   }[];
   /** สถานะที่เปลี่ยนต่อได้จริงจากสถานะปัจจุบัน (server ตัดสิน) */
   allowedNextStatuses: string[];
+}
+
+/** รายละเอียดคำสั่งซื้อรายใบ — มีสถานะการคืนเงินด้วย (STEP 43) */
+export interface AdminOrderDetail extends AdminOrder {
+  refundState: OrderRefundState;
 }
 
 export interface AdminOrderListResult {

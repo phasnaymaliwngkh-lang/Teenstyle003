@@ -147,6 +147,8 @@ export interface OrderDto {
   pointsEarned: number;
   shippingFee: number;
   total: number;
+  /** เงินที่ร้านคืนให้แล้ว (STEP 43) — 0 = ยังไม่มีการคืนเงิน */
+  refundedTotal: number;
   shippingMethod: ShippingMethodCode;
   shippingMethodName: string;
   shippingEtaText: string;
@@ -176,6 +178,8 @@ export interface OrderRow {
   pointsRedeemed?: number;
   pointsDiscount?: unknown;
   pointTransactions?: { type: string; delta: number }[];
+  /** STEP 43 — ไม่บังคับ เพื่อให้ผู้เรียกเก่ายังใช้ได้ */
+  refundedTotal?: unknown;
   shippingFee: unknown;
   total: unknown;
   shippingMethod: string;
@@ -258,21 +262,31 @@ function buildTimeline(order: OrderRow): OrderTimelineStep[] {
     { status: 'DELIVERED', label: 'ได้รับสินค้า', at: order.deliveredAt ?? null },
   ];
 
-  if (refunded !== null) {
-    steps.push({ status: 'REFUNDED', label: 'คืนเงินแล้ว', at: refunded });
-  } else if (cancelled !== null) {
-    // ยกเลิกแล้ว: ตัดขั้นที่ยังไม่เกิดออก แล้วปิดท้ายด้วยการยกเลิก
-    const happened = steps.filter((step) => step.at !== null);
-
-    return [...happened, { status: 'CANCELLED', label: 'ยกเลิกคำสั่งซื้อ', at: cancelled }].map(
-      (step, index, all) => ({
-        status: step.status,
-        label: step.label,
-        at: step.at?.toISOString() ?? null,
-        done: true,
-        current: index === all.length - 1,
-      }),
+  /**
+   * จบแบบยกเลิก/คืนเงิน: ตัดขั้นที่ยังไม่เกิดออก แล้วปิดท้ายด้วยสิ่งที่เกิดจริงตามลำดับ
+   * - ร้านยกเลิกหลังชำระเงิน แล้วคืนเงิน (STEP 43) → ... · ยกเลิก · คืนเงินแล้ว
+   * - ลูกค้าคืนสินค้าครบทุกชิ้น → ... · ได้รับสินค้า · คืนเงินแล้ว
+   * (เดิมใบที่มี `refundedAt` ข้ามกรณียกเลิกไปเลย จนไทม์ไลน์ไม่มีขั้น "ยกเลิก" และโชว์ขั้นที่ไม่มีวันเกิด)
+   */
+  if (cancelled !== null || refunded !== null) {
+    const happened: { status: string; label: string; at: Date | null }[] = steps.filter(
+      (step) => step.at !== null,
     );
+
+    if (cancelled !== null) {
+      happened.push({ status: 'CANCELLED', label: 'ยกเลิกคำสั่งซื้อ', at: cancelled });
+    }
+    if (refunded !== null) {
+      happened.push({ status: 'REFUNDED', label: 'คืนเงินแล้ว', at: refunded });
+    }
+
+    return happened.map((step, index, all) => ({
+      status: step.status,
+      label: step.label,
+      at: step.at?.toISOString() ?? null,
+      done: true,
+      current: index === all.length - 1,
+    }));
   }
 
   const lastDoneIndex = steps.reduce((last, step, index) => (step.at !== null ? index : last), 0);
@@ -318,6 +332,7 @@ export function toOrder(order: OrderRow): OrderDto {
       .reduce((sum, row) => sum + row.delta, 0),
     shippingFee: toNumber(order.shippingFee),
     total: toNumber(order.total),
+    refundedTotal: toNumber(order.refundedTotal),
     shippingMethod: method,
     shippingMethodName: option.name,
     shippingEtaText: option.etaText,

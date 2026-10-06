@@ -63,6 +63,14 @@ export interface AdminOverviewDto {
   generatedAt: string;
 }
 
+/**
+ * เงินที่ร้านได้รับจริง = ยอดบิล − เงินที่คืนไปแล้ว (STEP 43)
+ * ใบที่คืนครบหลุดจาก `PAID_WHERE` เองเพราะสถานะเป็น REFUNDED · ใบที่คืนบางชิ้นยังอยู่ แต่ต้องหักส่วนที่คืน
+ */
+function netPaid(sum: { total: unknown; refundedTotal: unknown }): number {
+  return toNumber(sum.total) - toNumber(sum.refundedTotal);
+}
+
 export async function getOverview(): Promise<AdminOverviewDto> {
   const prisma = getPrisma();
 
@@ -84,14 +92,19 @@ export async function getOverview(): Promise<AdminOverviewDto> {
     newCustomers,
     topItems,
   ] = await Promise.all([
-    prisma.order.aggregate({ where: PAID_WHERE, _sum: { total: true }, _count: { _all: true } }),
+    // ยอดขาย = เงินที่ได้รับจริง หักเงินที่คืนลูกค้าไปแล้ว (STEP 43 · ดู `netPaid`)
+    prisma.order.aggregate({
+      where: PAID_WHERE,
+      _sum: { total: true, refundedTotal: true },
+      _count: { _all: true },
+    }),
     prisma.order.aggregate({
       where: { ...PAID_WHERE, paidAt: { gte: since(7) } },
-      _sum: { total: true },
+      _sum: { total: true, refundedTotal: true },
     }),
     prisma.order.aggregate({
       where: { ...PAID_WHERE, paidAt: { gte: since(30) } },
-      _sum: { total: true },
+      _sum: { total: true, refundedTotal: true },
     }),
     // COD ที่ยืนยันแล้วแต่ยังไม่ได้เงิน — แยกจากยอดขายเสมอ
     prisma.order.aggregate({
@@ -167,7 +180,7 @@ export async function getOverview(): Promise<AdminOverviewDto> {
   const nameById = new Map(topProductRows.map((row) => [row.id, row]));
 
   const paidCount = revenueAll._count._all;
-  const revenueTotal = toNumber(revenueAll._sum.total);
+  const revenueTotal = netPaid(revenueAll._sum);
 
   const statusCounts = ordersByStatus.map((row) => ({
     status: String(row.status),
@@ -179,8 +192,8 @@ export async function getOverview(): Promise<AdminOverviewDto> {
   return {
     revenue: {
       total: revenueTotal,
-      last7Days: toNumber(revenue7._sum.total),
-      last30Days: toNumber(revenue30._sum.total),
+      last7Days: netPaid(revenue7._sum),
+      last30Days: netPaid(revenue30._sum),
       paidOrders: paidCount,
       pendingCodAmount: toNumber(codPending._sum.total),
       averageOrderValue: paidCount > 0 ? Math.round(revenueTotal / paidCount) : 0,

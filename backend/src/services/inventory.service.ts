@@ -189,6 +189,75 @@ export async function restockForOrder(
 }
 
 /**
+ * รับสินค้าที่ลูกค้าส่งคืนกลับเข้าคลัง (STEP 43) — เฉพาะชิ้นที่ตรวจแล้วว่าขายต่อได้
+ *
+ * ต่างจาก `restockForOrder` ตรงที่คืนได้ **บางชิ้น** ของรายการ (ลูกค้าซื้อ 3 คืน 1)
+ * กันซ้ำด้วย idempotencyKey ต่อชิ้นของคำขอ · เขียน movement `RETURN` + cache `totalStock`
+ * ในทรานแซกชันเดียวกับผู้เรียก (กฎ STEP 15 ข้อ 1: จำนวนในคลังเปลี่ยนต้องมี movement คู่กันเสมอ)
+ *
+ * @returns false = เคยรับเข้าคลังไปแล้ว (เรียกซ้ำ) จึงไม่ได้ทำอะไร
+ */
+export async function restockReturnedItem(
+  tx: Prisma.TransactionClient,
+  params: {
+    variantId: string;
+    quantity: number;
+    returnRequestId: string;
+    idempotencyKey: string;
+    reason: string;
+    actorUserId: string | null;
+  },
+): Promise<boolean> {
+  const already = await tx.inventoryMovement.findUnique({
+    where: { idempotencyKey: params.idempotencyKey },
+    select: { id: true },
+  });
+
+  if (already) return false;
+
+  const updated = await tx.$queryRaw<{ after: number }[]>`
+    UPDATE "Inventory"
+       SET "quantity" = "quantity" + ${params.quantity}, "updatedAt" = now()
+     WHERE "variantId" = ${params.variantId}::uuid
+    RETURNING "quantity" AS "after"`;
+
+  if (updated.length === 0) {
+    throw ApiError.conflict('ไม่พบข้อมูลคลังของสินค้าชิ้นนี้ — รับเข้าคลังไม่ได้');
+  }
+
+  const after = Number(updated[0]!.after);
+
+  await tx.inventoryMovement.create({
+    data: {
+      variantId: params.variantId,
+      type: 'RETURN',
+      quantity: params.quantity,
+      quantityBefore: after - params.quantity,
+      quantityAfter: after,
+      reason: params.reason,
+      referenceType: 'RETURN_REQUEST',
+      referenceId: params.returnRequestId,
+      idempotencyKey: params.idempotencyKey,
+      userId: params.actorUserId,
+    },
+  });
+
+  const variant = await tx.productVariant.findUnique({
+    where: { id: params.variantId },
+    select: { productId: true },
+  });
+
+  if (variant) {
+    await tx.product.update({
+      where: { id: variant.productId },
+      data: { totalStock: { increment: params.quantity } },
+    });
+  }
+
+  return true;
+}
+
+/**
  * คืนของที่จองไว้เข้าคลัง (เรียกเมื่อยกเลิกคำสั่งซื้อ หรือคำสั่งซื้อหมดอายุ)
  *
  * ปลอดภัยต่อการเรียกซ้ำ: ใช้ `GREATEST(... , 0)` จึงไม่ทำให้ค่าติดลบ

@@ -103,5 +103,7 @@ export interface SalesBreakdown {
     productRevenue: number;
     shippingFees: number;
     discounts: number;
+    /** เงินที่คืนลูกค้าไปแล้วของใบในช่วงนี้ (STEP 43) — ยอดขายบน KPI = orderRevenue − refunds */
+    refunds: number;
   };
 }
