@@ -61,6 +61,12 @@ export const createOrderSchema = z
      * มูลค่าเป็นบาท · แต้มคงเหลือ · เพดานของบิล คิดที่ server จากฐานข้อมูลทั้งหมด
      */
     pointsToRedeem: pointsToRedeemSchema.optional(),
+    /**
+     * ยอดรวมที่หน้าเว็บ **แสดงอยู่** ตอนกดยืนยัน (STEP 44) — ใช้ **เทียบ** อย่างเดียว ไม่ใช้คิดเงิน
+     * ไม่ตรงกับที่ server คิดได้ (ค่าส่ง/ราคา/ส่วนลดเพิ่งเปลี่ยน) → 409 ไม่เก็บยอดใหม่เงียบ ๆ
+     * ไม่บังคับ เพื่อให้ผู้เรียกเดิมยังใช้ได้ — หน้า checkout ส่งมาเสมอ
+     */
+    expectedTotal: z.number({ message: 'ยอดรวมต้องเป็นตัวเลข' }).min(0).max(100_000_000).optional(),
   })
   .refine((value) => value.addressId !== undefined || value.newAddress !== undefined, {
     message: 'ต้องเลือกที่อยู่จัดส่ง หรือกรอกที่อยู่ใหม่',

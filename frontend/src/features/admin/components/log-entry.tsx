@@ -28,6 +28,7 @@ const GROUP_STYLE: Record<LogActionGroup, string> = {
   customer: "border-danger/30 bg-danger/5 text-danger",
   coupon: "border-brand-soft bg-lilac text-brand-dark",
   return: "border-warning/30 bg-warning/5 text-warning",
+  shipping: "border-success/30 bg-success/5 text-success",
 };
 
 /** ค่าที่บันทึกไว้เป็นการทำทีเดียวหลายรายการ ไม่ใช่ id ของของชิ้นใดชิ้นหนึ่ง */

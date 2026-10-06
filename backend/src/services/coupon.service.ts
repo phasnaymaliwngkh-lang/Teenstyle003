@@ -1,6 +1,7 @@
 import { getPrisma, type Prisma } from '@teenstyle/database';
 
-import { calculateShippingFee, type ShippingMethodCode } from '../config/shipping.ts';
+import type { ShippingMethodCode } from '../config/shipping.ts';
+import { calculateShippingFee } from '../models/shipping.model.ts';
 import { writeAdminLog, type AdminLogActor } from '../models/admin-log.model.ts';
 import {
   evaluateCoupon,
@@ -17,6 +18,8 @@ import type {
   CreateCouponInput,
   UpdateCouponInput,
 } from '../validators/coupon.validator.ts';
+
+import { loadShippingOptions } from './shipping.service.ts';
 
 /**
  * คูปองส่วนลด (STEP 41)
@@ -180,10 +183,17 @@ export async function checkCouponForCart(
   const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
   const userUsedCount = await countUserUsage(prisma, coupon.id, userId);
 
+  // ค่าส่งชุดเดียวกับที่หน้า checkout และการสร้างคำสั่งซื้อใช้ (ตาราง ShippingRate · STEP 44)
+  const shipping = (await loadShippingOptions(prisma)).find(
+    (option) => option.code === shippingMethod,
+  );
+
+  if (shipping === undefined) throw ApiError.conflict('ไม่พบวิธีจัดส่งที่เลือก');
+
   const evaluation = evaluateCoupon({
     coupon: toCouponRow(coupon),
     lines,
-    shippingFee: calculateShippingFee(shippingMethod, subtotal),
+    shippingFee: calculateShippingFee(shipping, subtotal),
     userUsedCount,
     now: new Date(),
   });

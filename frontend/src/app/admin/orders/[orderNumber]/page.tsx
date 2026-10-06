@@ -7,13 +7,14 @@ import { notFound } from "next/navigation";
 import { SectionError } from "@/components/shared/section";
 import { OrderRefundPanel } from "@/features/admin/components/order-refund-panel";
 import { OrderStatusForm } from "@/features/admin/components/order-status-form";
+import { ReshipForm } from "@/features/admin/components/reship-form";
 import { OrderTimeline } from "@/features/orders/components/order-timeline";
+import { ShipmentList } from "@/features/orders/components/shipment-list";
 import {
   formatDateTime,
   orderStatusLabel,
   orderStatusTone,
   paymentStatusLabel,
-  shipmentStatusLabel,
 } from "@/features/orders/lib/labels";
 import { ApiClientError } from "@/lib/api";
 import { requirePermission } from "@/lib/dal";
@@ -59,6 +60,9 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
     );
   }
 
+  const canReadShipment = session.user.permissions.includes("shipment:read");
+  const canUpdateShipment = session.user.permissions.includes("shipment:update");
+
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-8 sm:px-6">
       <Link
@@ -97,6 +101,9 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="space-y-6">
           <OrderStatusForm order={order} />
+
+          {/* ส่งพัสดุใหม่หลังถูกตีกลับ (STEP 44) — server บอกว่าทำได้ไหม · ด่านจริงอยู่ที่ backend */}
+          {order.canReship && canUpdateShipment && <ReshipForm orderNumber={order.orderNumber} />}
 
           <section className="rounded-[var(--radius-card)] border border-line bg-white p-5">
             <h2 className="flex items-center gap-2 text-lg">
@@ -171,22 +178,7 @@ export default async function AdminOrderDetailPage({ params }: PageProps) {
               <OrderTimeline steps={order.timeline} />
             </div>
 
-            {order.shipments.length > 0 && (
-              <ul className="mt-4 space-y-2 border-t border-line pt-3 text-sm">
-                {order.shipments.map((shipment) => (
-                  <li key={shipment.id}>
-                    <span className="font-bold">
-                      {shipment.carrier} · {shipmentStatusLabel(shipment.status)}
-                    </span>
-                    {shipment.trackingNumber !== null && (
-                      <span className="block font-mono text-xs text-muted">
-                        {shipment.trackingNumber}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
+            <ShipmentList shipments={order.shipments} adminLinks={canReadShipment} />
           </section>
         </div>
 

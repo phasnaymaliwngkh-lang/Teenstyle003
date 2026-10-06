@@ -215,6 +215,71 @@ export function notifyOrderShipped(
   });
 }
 
+/**
+ * พัสดุมีปัญหา (STEP 44) — ขนส่งส่งไม่สำเร็จ หรือพัสดุถูกตีกลับมาที่ร้าน
+ *
+ * ลูกค้ารู้สึกได้จริง (ของไม่มาตามนัด) จึงต้องแจ้ง พร้อมเหตุผลที่ร้านเขียนไว้ (บังคับกรอก)
+ * ⚠️ ส่งไม่สำเร็จเกิดซ้ำได้หลายรอบกับพัสดุชิ้นเดียว — กันซ้ำด้วยรหัสของแถวประวัติ ไม่ใช่รหัสพัสดุ
+ */
+export function notifyShipmentProblem(
+  order: OrderNotificationTarget,
+  problem: { eventId: string; status: 'FAILED' | 'RETURNED'; note: string },
+): Promise<boolean> {
+  const failed = problem.status === 'FAILED';
+
+  return notifyOnce({
+    userId: order.userId,
+    type: 'SHIPPING',
+    title: failed
+      ? `พัสดุของคำสั่งซื้อ ${order.orderNumber} ส่งไม่สำเร็จ`
+      : `พัสดุของคำสั่งซื้อ ${order.orderNumber} ถูกตีกลับมาที่ร้าน`,
+    body: failed
+      ? `${problem.note} — ขนส่งจะนำส่งใหม่หรือติดต่อคุณ`
+      : `${problem.note} — ร้านจะส่งให้ใหม่หรือติดต่อคุณ`,
+    data: {
+      orderId: order.orderId,
+      orderNumber: order.orderNumber,
+      event: `SHIPMENT_${problem.status}`,
+      shipmentEventId: problem.eventId,
+    },
+    dedupe: { shipmentEventId: problem.eventId },
+  });
+}
+
+/**
+ * ส่งพัสดุชิ้นใหม่หลังถูกตีกลับ หรือร้านแก้เลขพัสดุที่กรอกผิด (STEP 44)
+ * — ลูกค้าถือเลขเก่าอยู่ ถ้าไม่แจ้งจะตามพัสดุผิดชิ้น
+ * ⚠️ เลขพัสดุมาจากที่ร้านกรอกจริงเท่านั้น (กฎ STEP 12 ข้อ 3)
+ */
+export function notifyTrackingChanged(
+  order: OrderNotificationTarget,
+  shipment: {
+    shipmentId: string;
+    carrier: string;
+    trackingNumber: string;
+    reason: 'RESENT' | 'CORRECTED';
+  },
+): Promise<boolean> {
+  return notifyOnce({
+    userId: order.userId,
+    type: 'SHIPPING',
+    title:
+      shipment.reason === 'RESENT'
+        ? `ร้านส่งพัสดุของคำสั่งซื้อ ${order.orderNumber} ให้ใหม่แล้ว`
+        : `เลขพัสดุของคำสั่งซื้อ ${order.orderNumber} ถูกแก้ไข`,
+    body: `ส่งโดย ${shipment.carrier} เลขพัสดุ ${shipment.trackingNumber}`,
+    data: {
+      orderId: order.orderId,
+      orderNumber: order.orderNumber,
+      event: `SHIPMENT_${shipment.reason}`,
+      shipmentId: shipment.shipmentId,
+      carrier: shipment.carrier,
+      trackingNumber: shipment.trackingNumber,
+    },
+    dedupe: { shipmentId: shipment.shipmentId, trackingNumber: shipment.trackingNumber },
+  });
+}
+
 /** ได้รับสินค้าแล้ว — เป็นจุดที่ชวนรีวิวได้ตามกฎของ STEP 23 (รีวิวได้เมื่อได้รับของ) */
 export function notifyOrderDelivered(order: OrderNotificationTarget): Promise<boolean> {
   return notifyOnce({

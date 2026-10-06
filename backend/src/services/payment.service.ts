@@ -64,6 +64,7 @@ const ORDER_FOR_PAYMENT_SELECT = {
   shippingFee: true,
   total: true,
   shippingMethod: true,
+  shippingEtaText: true,
   addressSnapshot: true,
   customerNote: true,
   createdAt: true,

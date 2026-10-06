@@ -1,13 +1,20 @@
 import { RotateCcw, Sparkles, Truck } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { Suspense } from "react";
+
+import { fetchShippingOptions } from "@/services/shipping.service";
+import { formatBaht } from "@/utils/format";
 
 /**
  * Hero ของหน้าแรก (STEP 5)
  *
  * ตัวเลข/ข้อความในแถบความน่าเชื่อถือใช้เฉพาะ "ข้อเท็จจริงของร้าน" ที่เป็นจริง
- * (เงื่อนไขส่งฟรีตรงกับคูปอง FREESHIP690 และนโยบายคืนสินค้า 7 วันที่ตั้งไว้)
  * ไม่ใส่ตัวเลขรีวิว/ยอดขายปลอม เพราะระบบยังไม่มีข้อมูลจริง
+ *
+ * ⚠️ แก้ตอน STEP 44: เดิมพิมพ์ "ส่งฟรี เมื่อสั่งครบ 690.-" ไว้ในซอร์ส ซึ่งคือเงื่อนไขของ **คูปอง** FREESHIP690
+ *    (ต้องกรอกรหัส มีวันหมดอายุ) ไม่ใช่ส่งฟรีอัตโนมัติ — ลูกค้าที่สั่ง 700 บาทโดยไม่ใส่รหัสโดนค่าส่ง
+ *    ตอนนี้อ่านยอดส่งฟรีจริงจากอัตราที่ร้านตั้ง (`/api/shipping/options`)
  */
 export function Hero() {
   return (
@@ -51,9 +58,15 @@ export function Hero() {
           </div>
 
           <ul className="mt-10 grid gap-4 border-t border-line pt-6 sm:grid-cols-3">
-            <TrustItem icon={<Truck className="size-4" aria-hidden />} label="ส่งฟรี">
-              เมื่อสั่งครบ 690.-
-            </TrustItem>
+            <Suspense
+              fallback={
+                <TrustItem icon={<Truck className="size-4" aria-hidden />} label="การจัดส่ง">
+                  กำลังโหลดค่าส่ง…
+                </TrustItem>
+              }
+            >
+              <ShippingTrustItem />
+            </Suspense>
             <TrustItem icon={<RotateCcw className="size-4" aria-hidden />} label="คืนได้ 7 วัน">
               ตามเงื่อนไขของร้าน
             </TrustItem>
@@ -87,6 +100,29 @@ export function Hero() {
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * เงื่อนไขส่งฟรีจริงของร้าน — โหลดไม่ได้หรือไม่มีโปร ต้อง **ไม่อ้างว่าส่งฟรี**
+ * (บอกข้อเท็จจริงที่ยังจริงอยู่แทน: ค่าส่งโชว์ก่อนกดสั่งเสมอ)
+ */
+async function ShippingTrustItem() {
+  const shipping = await fetchShippingOptions().catch(() => null);
+  const icon = <Truck className="size-4" aria-hidden />;
+
+  if (shipping === null || shipping.freeShippingFrom === null) {
+    return (
+      <TrustItem icon={icon} label="ค่าส่งชัดเจน">
+        เห็นค่าส่งจริงก่อนกดสั่งซื้อทุกครั้ง
+      </TrustItem>
+    );
+  }
+
+  return (
+    <TrustItem icon={icon} label="ส่งฟรี">
+      เมื่อยอดสินค้าครบ {formatBaht(shipping.freeShippingFrom)}
+    </TrustItem>
   );
 }
 

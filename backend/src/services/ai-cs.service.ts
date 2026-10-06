@@ -3,7 +3,6 @@ import OpenAI from 'openai';
 
 import { env } from '../config/env.ts';
 import { COD_MAX_TOTAL, paymentMethods } from '../config/payment.ts';
-import { SHIPPING_OPTIONS } from '../config/shipping.ts';
 import {
   availableContactChannels,
   RETURN_WINDOW_DAYS,
@@ -13,8 +12,11 @@ import {
   STORE_SHIPPING_DAYS,
 } from '../config/store.ts';
 import { findOrderNumberIn, ORDER_NUMBER_EXAMPLE } from '../models/order.model.ts';
+import { describeShippingRates } from '../models/shipping.model.ts';
 import { ApiError } from '../utils/api-error.ts';
 import { logger } from '../utils/logger.ts';
+
+import { activeShippingOptions } from './shipping.service.ts';
 
 export interface CsOwner {
   userId?: string;
@@ -125,20 +127,14 @@ const CS_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
  *    (เดิมพิมพ์ COD 5,000 · เวลาตัดรอบ 12:00 · เวลาทำการ จ–อา 09:00–21:00 ไว้เองทั้งหมด
  *     แล้วขัดกับบทความในคลังความรู้ที่พิมพ์คนละค่า — ลูกค้าถามสองทางได้คนละคำตอบ)
  */
-export function getStorePolicyContent(topic: string): string {
+export async function getStorePolicyContent(topic: string): Promise<string> {
   switch (topic) {
     case 'shipping': {
-      const optionsText = SHIPPING_OPTIONS.map((o) => {
-        const fee =
-          o.baseFee === 0 ? 'ไม่มีค่าใช้จ่าย' : `${o.baseFee.toLocaleString('th-TH')} บาท`;
-        const free =
-          o.freeOverSubtotal !== null
-            ? ` — ส่งฟรีเมื่อยอดสินค้าครบ ${o.freeOverSubtotal.toLocaleString('th-TH')} บาท`
-            : '';
-        const area = o.onlyProvinces !== null ? ` (เฉพาะ ${o.onlyProvinces.join(', ')})` : '';
-
-        return `• **${o.name}**: ค่าส่ง ${fee}${free} · ระยะเวลา ${o.etaText}${area}`;
-      }).join('\n');
+      /**
+       * อัตราจากตาราง ShippingRate ชุดเดียวกับที่หน้า checkout คิดเงิน (STEP 44)
+       * และข้อความเดียวกับบทความคลังความรู้ (`describeShippingRates`) — ถามสองทางได้คำตอบเดียวกัน
+       */
+      const optionsText = describeShippingRates(await activeShippingOptions());
 
       return `📦 **นโยบายและช่องทางการจัดส่งของ TEENSTYLE**\n${optionsText}\n\n*หมายเหตุ: ร้านจัดส่งวัน${STORE_SHIPPING_DAYS} ตัดรอบเวลา ${STORE_CUTOFF_TIME}*`;
     }
@@ -425,7 +421,7 @@ export async function runFallbackCs(
     lowerMsg.includes('delivery')
   ) {
     return {
-      replyText: getStorePolicyContent('shipping'),
+      replyText: await getStorePolicyContent('shipping'),
       isEscalation: false,
       model: 'fallback-rules',
     };
@@ -444,7 +440,7 @@ export async function runFallbackCs(
     lowerMsg.includes('exchange')
   ) {
     return {
-      replyText: getStorePolicyContent('return_exchange'),
+      replyText: await getStorePolicyContent('return_exchange'),
       isEscalation: false,
       model: 'fallback-rules',
     };
@@ -463,7 +459,7 @@ export async function runFallbackCs(
     lowerMsg.includes('payment')
   ) {
     return {
-      replyText: getStorePolicyContent('payment'),
+      replyText: await getStorePolicyContent('payment'),
       isEscalation: false,
       model: 'fallback-rules',
     };
@@ -586,7 +582,7 @@ export async function sendCsMessage(
               referencedOrderNumber = res.orderNumber;
             }
           } else if (fnName === 'get_store_policy') {
-            toolOutput = getStorePolicyContent(
+            toolOutput = await getStorePolicyContent(
               typeof args.topic === 'string' ? args.topic : 'store_info',
             );
           } else if (fnName === 'request_human_handoff') {

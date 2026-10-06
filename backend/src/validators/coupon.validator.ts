@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { SHIPPING_METHODS } from '../config/shipping.ts';
+
 /**
  * ตรวจ input ของคูปอง (STEP 41)
  *
@@ -22,8 +24,12 @@ export const couponCodeSchema = z
 
 export const applyCouponSchema = z.object({
   code: couponCodeSchema,
-  /** วิธีจัดส่งที่เลือกอยู่ — ใช้คิดค่าจัดส่งที่คูปองส่งฟรีจะยกเว้น */
-  shippingMethod: z.enum(['STANDARD', 'EXPRESS', 'SAME_DAY']).optional(),
+  /**
+   * วิธีจัดส่งที่เลือกอยู่ — ใช้คิดค่าจัดส่งที่คูปองส่งฟรีจะยกเว้น
+   * ⚠️ แก้ตอน STEP 44: เดิมพิมพ์รายการเองแค่ 3 วิธี (ไม่มี PICKUP) — ลูกค้าที่เลือก "รับที่ร้าน"
+   *    แล้วกดใช้คูปองได้ 422 ทุกครั้ง · ใช้รายการจาก config/shipping.ts ที่เดียว
+   */
+  shippingMethod: z.enum(SHIPPING_METHODS).optional(),
 });
 
 const discountTypeSchema = z.enum(['PERCENTAGE', 'FIXED_AMOUNT', 'FREE_SHIPPING'], {

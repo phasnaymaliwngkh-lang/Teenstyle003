@@ -12,11 +12,19 @@ import {
   type KnowledgeCategory,
   type KnowledgeCategoryMeta,
 } from '../models/knowledge-base.model.ts';
+import {
+  policyTokenList,
+  renderPolicyTokens,
+  unknownPolicyTokens,
+  type PolicyContext,
+} from '../models/policy-tokens.ts';
 import type {
   CreateKnowledgeArticleInput,
   KnowledgeSearchQuery,
   UpdateKnowledgeArticleInput,
 } from '../validators/knowledge-base.validator.ts';
+
+import { loadShippingOptions } from './shipping.service.ts';
 
 /**
  * คลังความรู้ที่ AI ใช้ตอบลูกค้า (STEP 21) — เก็บใน PostgreSQL
@@ -61,6 +69,69 @@ function toArticleDto(row: ArticleRow): KnowledgeArticle {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+/**
+ * ค่าจริงที่ใช้แทนตัวแปรนโยบายในบทความ (STEP 44) — อ่านใหม่ทุกคำขอ
+ * ร้านแก้ค่าส่งแล้วบทความ (และคำตอบของ AI ที่อ้างบทความ) เปลี่ยนตามทันที ไม่มีสำเนาที่ค้างค่าเก่า
+ */
+async function policyContext(): Promise<PolicyContext> {
+  return { shippingOptions: await loadShippingOptions() };
+}
+
+/** บทความในมุมของคนอ่าน — แทนตัวแปรทุกช่องที่เป็นข้อความ (หน้าแก้ของแอดมินใช้ฉบับดิบ) */
+function renderArticle(article: KnowledgeArticle, context: PolicyContext): KnowledgeArticle {
+  const render = (text: string) => renderPolicyTokens(text, context);
+
+  return {
+    ...article,
+    title: render(article.title),
+    summary: render(article.summary),
+    content: render(article.content),
+    faqPairs: article.faqPairs.map((faq) => ({
+      ...faq,
+      question: render(faq.question),
+      answer: render(faq.answer),
+    })),
+  };
+}
+
+/**
+ * ตัวแปรที่พิมพ์ผิดต้องถูกปฏิเสธตอนบันทึก — ไม่งั้นลูกค้าเห็น `{{shiping.rate}}` ดิบ ๆ
+ * และ AI ได้ข้อความนั้นไปตอบ (422 พร้อมบอกช่องที่ผิด)
+ */
+function assertKnownTokens(input: {
+  title?: string | undefined;
+  summary?: string | undefined;
+  content?: string | undefined;
+  faqPairs?: { question: string; answer: string }[] | undefined;
+}): void {
+  const fields: [string, string | undefined][] = [
+    ['title', input.title],
+    ['summary', input.summary],
+    ['content', input.content],
+    ...(input.faqPairs ?? []).flatMap((faq, index): [string, string][] => [
+      [`faqPairs.${index}.question`, faq.question],
+      [`faqPairs.${index}.answer`, faq.answer],
+    ]),
+  ];
+
+  const details = fields.flatMap(([field, text]) => {
+    const unknown = text === undefined ? [] : unknownPolicyTokens(text);
+
+    return unknown.length === 0
+      ? []
+      : [
+          {
+            field,
+            message: `ไม่รู้จักตัวแปร ${unknown.join(', ')} — ตรวจตัวสะกดกับรายการตัวแปรที่ใช้ได้`,
+          },
+        ];
+  });
+
+  if (details.length > 0) {
+    throw ApiError.validation('มีตัวแปรนโยบายที่ระบบไม่รู้จัก', details);
+  }
 }
 
 /**
@@ -132,6 +203,17 @@ export interface SearchArticlesResult {
 export async function searchArticles(
   params: Partial<KnowledgeSearchQuery> & { publishedOnly?: boolean },
 ): Promise<SearchArticlesResult> {
+  return findArticles(params, await policyContext());
+}
+
+/**
+ * @param context ค่าที่ใช้แทนตัวแปรนโยบาย — `null` = คืนฉบับดิบ (หน้าแก้ของแอดมิน)
+ *                ให้คะแนนความเกี่ยวข้องกับ **ฉบับที่แทนค่าแล้ว** เพราะลูกค้าค้นด้วยสิ่งที่เขาเห็น
+ */
+async function findArticles(
+  params: Partial<KnowledgeSearchQuery> & { publishedOnly?: boolean },
+  context: PolicyContext | null,
+): Promise<SearchArticlesResult> {
   await ensureSeeded();
 
   const prisma = getPrisma();
@@ -149,13 +231,16 @@ export async function searchArticles(
     orderBy: { updatedAt: 'desc' },
   });
 
-  let filtered = rows.map(toArticleDto);
+  const toDto = (row: ArticleRow) =>
+    context === null ? toArticleDto(row) : renderArticle(toArticleDto(row), context);
+
+  let filtered = rows.map(toDto);
 
   // แท็กเทียบแบบไม่สนตัวพิมพ์และยอมให้ตรงบางส่วน (Prisma `hasSome` เทียบตรงตัวเท่านั้น)
   if (params.tag) {
     const targetTag = params.tag.toLowerCase();
     const loose = rows
-      .map(toArticleDto)
+      .map(toDto)
       .filter((a) =>
         a.tags.some((t) => t.toLowerCase() === targetTag || t.toLowerCase().includes(targetTag)),
       );
@@ -258,7 +343,7 @@ export async function getArticleBySlug(slug: string): Promise<KnowledgeArticle> 
     include: articleInclude,
   });
 
-  return toArticleDto(updated);
+  return renderArticle(toArticleDto(updated), await policyContext());
 }
 
 /**
@@ -460,10 +545,18 @@ export interface KnowledgeActor {
 /**
  * ดึงรายการบทความสำหรับแอดมิน (รวมฉบับร่าง)
  */
+export interface AdminArticlesResult extends SearchArticlesResult {
+  /** ตัวแปรนโยบายที่ใช้ในบทความได้ (STEP 44) — หน้าแก้บทความแสดงเป็นคำอธิบาย */
+  policyTokens: { token: string; description: string }[];
+}
+
 export async function adminListArticles(
   params: Partial<KnowledgeSearchQuery>,
-): Promise<SearchArticlesResult> {
-  return searchArticles({ ...params, publishedOnly: false });
+): Promise<AdminArticlesResult> {
+  // ฉบับดิบ — แอดมินต้องเห็นและแก้ตัวแปร `{{…}}` ได้ ไม่ใช่ตัวเลขที่ถูกแทนแล้ว
+  const result = await findArticles({ ...params, publishedOnly: false }, null);
+
+  return { ...result, policyTokens: policyTokenList() };
 }
 
 /**
@@ -484,6 +577,7 @@ export async function adminCreateArticle(
   input: CreateKnowledgeArticleInput,
   actor: KnowledgeActor = {},
 ): Promise<KnowledgeArticle> {
+  assertKnownTokens(input);
   await ensureSeeded();
 
   const prisma = getPrisma();
@@ -538,6 +632,7 @@ export async function adminUpdateArticle(
   input: UpdateKnowledgeArticleInput,
   actor: KnowledgeActor = {},
 ): Promise<KnowledgeArticle> {
+  assertKnownTokens(input);
   await ensureSeeded();
 
   const prisma = getPrisma();

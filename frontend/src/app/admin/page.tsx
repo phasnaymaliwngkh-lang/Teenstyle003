@@ -112,6 +112,18 @@ export default async function AdminDashboardPage() {
             จัดการลูกค้า
           </Link>
           <Link
+            href="/admin/shipments"
+            className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            พัสดุ / การจัดส่ง
+          </Link>
+          <Link
+            href="/admin/shipping"
+            className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            อัตราค่าจัดส่ง
+          </Link>
+          <Link
             href="/admin/returns"
             className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
           >

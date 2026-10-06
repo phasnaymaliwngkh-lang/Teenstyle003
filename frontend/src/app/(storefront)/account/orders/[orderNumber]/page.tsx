@@ -7,13 +7,13 @@ import { Suspense } from "react";
 
 import { SectionError } from "@/components/shared/section";
 import { OrderTimeline } from "@/features/orders/components/order-timeline";
+import { ShipmentList } from "@/features/orders/components/shipment-list";
 import { ReturnRequestCard } from "@/features/returns/components/return-request-card";
 import {
   formatDateTime,
   orderStatusLabel,
   orderStatusTone,
   paymentStatusLabel,
-  shipmentStatusLabel,
 } from "@/features/orders/lib/labels";
 import { PaymentPanel } from "@/features/payment/components/payment-panel";
 import { ApiClientError } from "@/lib/api";
@@ -142,46 +142,7 @@ export default async function OrderTrackingPage({ params }: PageProps) {
               <OrderTimeline steps={order.timeline} />
             </div>
 
-            {order.shipments.length > 0 ? (
-              <ul className="mt-5 space-y-3 border-t border-line pt-4">
-                {order.shipments.map((shipment) => (
-                  <li key={shipment.id} className="text-sm">
-                    <p className="font-bold">
-                      {shipment.carrier} · {shipmentStatusLabel(shipment.status)}
-                    </p>
-                    {shipment.trackingNumber !== null && (
-                      <p className="text-muted">
-                        เลขพัสดุ{" "}
-                        {shipment.trackingUrl !== null ? (
-                          <a
-                            href={shipment.trackingUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="font-mono font-bold text-brand underline"
-                          >
-                            {shipment.trackingNumber}
-                          </a>
-                        ) : (
-                          <span className="font-mono font-bold text-ink">
-                            {shipment.trackingNumber}
-                          </span>
-                        )}
-                      </p>
-                    )}
-                    {shipment.estimatedDelivery !== null && (
-                      <p className="text-xs text-muted">
-                        กำหนดส่งถึง {formatDateTime(shipment.estimatedDelivery)}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="mt-5 border-t border-line pt-4 text-sm text-muted">
-                ยังไม่มีข้อมูลพัสดุ — ร้านจะออกเลขพัสดุให้เมื่อส่งของออก
-                (ระบบจัดการการจัดส่งของร้านจะเปิดใช้ใน STEP 44)
-              </p>
-            )}
+            <ShipmentList shipments={order.shipments} />
           </section>
 
           <section className="rounded-[var(--radius-card)] border border-line bg-white p-5">

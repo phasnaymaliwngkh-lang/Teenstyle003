@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { COD_MAX_TOTAL, paymentMethods } from '../src/config/payment.ts';
-import { SHIPPING_OPTIONS } from '../src/config/shipping.ts';
 import {
   RETURN_WINDOW_DAYS,
   STORE_AGENT_HOURS,
@@ -9,6 +8,7 @@ import {
 } from '../src/config/store.ts';
 import { INITIAL_KNOWLEDGE_ARTICLES } from '../src/models/knowledge-base.model.ts';
 import { getStorePolicyContent } from '../src/services/ai-cs.service.ts';
+import { activeShippingOptions } from '../src/services/shipping.service.ts';
 import {
   adminCreateArticle,
   adminDeleteArticle,
@@ -143,8 +143,13 @@ describe('STEP 21: AI Knowledge Base Service', () => {
       return found!;
     };
 
-    it('บทความจัดส่งพูดถึงวิธีจัดส่งครบทุกแบบ พร้อมค่าส่งและ ETA ตรงกับ SHIPPING_OPTIONS', async () => {
+    /**
+     * ค่าส่งอยู่ในตาราง ShippingRate ที่ร้านแก้ได้แล้ว (STEP 44) — บทความต้องตรงกับ **ข้อมูลตอนนี้**
+     * ไม่ใช่ค่าที่พิมพ์ไว้ในเทสต์ (กฎ STEP 40 ข้อ 2: assertion อ้างแหล่งความจริง)
+     */
+    it('บทความจัดส่งพูดถึงวิธีจัดส่งที่เปิดใช้ครบทุกแบบ พร้อมค่าส่งและ ETA ตรงกับตาราง ShippingRate', async () => {
       const article = await findArticle('shipping-rates-and-delivery-time');
+      const SHIPPING_OPTIONS = await activeShippingOptions();
       const text = `${article.summary}\n${article.content}\n${article.faqPairs
         .map((f) => `${f.question} ${f.answer}`)
         .join('\n')}`;
@@ -167,8 +172,9 @@ describe('STEP 21: AI Knowledge Base Service', () => {
       }
     });
 
-    it('ทุกจำนวนเงินที่ปรากฏในบทความจัดส่งต้องเป็นค่าที่มีอยู่จริงใน SHIPPING_OPTIONS', async () => {
+    it('ทุกจำนวนเงินที่ปรากฏในบทความจัดส่งต้องเป็นค่าที่มีอยู่จริงในตาราง ShippingRate', async () => {
       const article = await findArticle('shipping-rates-and-delivery-time');
+      const SHIPPING_OPTIONS = await activeShippingOptions();
       const text = `${article.summary}\n${article.content}\n${article.faqPairs
         .map((f) => f.answer)
         .join('\n')}`;
@@ -190,7 +196,7 @@ describe('STEP 21: AI Knowledge Base Service', () => {
       for (const amount of mentioned) {
         expect(
           allowed.has(amount),
-          `บทความระบุ ${amount.toLocaleString('th-TH')} บาท ซึ่งไม่มีอยู่ใน config/shipping.ts`,
+          `บทความระบุ ${amount.toLocaleString('th-TH')} บาท ซึ่งไม่มีอยู่ในตาราง ShippingRate`,
         ).toBe(true);
       }
     });
@@ -214,7 +220,7 @@ describe('STEP 21: AI Knowledge Base Service', () => {
 
     it('เงื่อนไขเปลี่ยน/คืนสินค้าใช้จำนวนวันชุดเดียวกับ Policy Engine ของ AI Customer Service', async () => {
       const article = await findArticle('return-and-exchange-policy');
-      const policy = getStorePolicyContent('return_exchange');
+      const policy = await getStorePolicyContent('return_exchange');
 
       expect(article.content).toContain(`${RETURN_WINDOW_DAYS} วัน`);
       expect(policy).toContain(`${RETURN_WINDOW_DAYS} วัน`);
@@ -222,7 +228,7 @@ describe('STEP 21: AI Knowledge Base Service', () => {
 
     it('ข้อมูลติดต่อและเวลาทำการตรงกันทั้งบทความและ Policy Engine · ไม่มีช่องทางที่ยังไม่เปิด', async () => {
       const article = await findArticle('contact-support-and-office-hours');
-      const policy = getStorePolicyContent('store_info');
+      const policy = await getStorePolicyContent('store_info');
 
       expect(article.content).toContain(STORE_AGENT_HOURS);
       expect(policy).toContain(STORE_AGENT_HOURS);

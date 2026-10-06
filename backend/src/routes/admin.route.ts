@@ -7,6 +7,15 @@ import {
   updateOrderStatusHandler,
 } from '../controllers/admin.controller.ts';
 import {
+  adminCreateShipmentHandler,
+  adminGetShipmentHandler,
+  adminListShipmentsHandler,
+  adminListShippingRatesHandler,
+  adminUpdateShipmentHandler,
+  adminUpdateShipmentStatusHandler,
+  adminUpdateShippingRateHandler,
+} from '../controllers/shipping.controller.ts';
+import {
   addVariantHandler,
   createProductHandler,
   deleteProductHandler,
@@ -118,6 +127,44 @@ adminRouter.post(
   '/orders/:orderNumber/refund',
   requirePermission('order:refund'),
   adminRefundCancelledOrderHandler,
+);
+
+/**
+ * การจัดส่ง (STEP 44)
+ *   - ดูอัตราค่าส่ง / ดูพัสดุ          → `shipment:read`   (EMPLOYEE มี — ต้องตอบลูกค้าเรื่องพัสดุ)
+ *   - เปลี่ยนสถานะ / แก้เลข / ส่งใหม่   → `shipment:update` (งานหน้าร้านที่แพ็กและส่งของ — EMPLOYEE มี)
+ *   - แก้อัตราค่าส่ง                   → `settings:manage` (ADMIN ขึ้นไป — คือเงินที่เก็บจากลูกค้าทุกคน)
+ */
+adminRouter.get(
+  '/shipping/rates',
+  requirePermission('shipment:read'),
+  adminListShippingRatesHandler,
+);
+adminRouter.patch(
+  '/shipping/rates/:method',
+  requirePermission('settings:manage'),
+  adminUpdateShippingRateHandler,
+);
+adminRouter.get('/shipments', requirePermission('shipment:read'), adminListShipmentsHandler);
+adminRouter.get(
+  '/shipments/:shipmentId',
+  requirePermission('shipment:read'),
+  adminGetShipmentHandler,
+);
+adminRouter.patch(
+  '/shipments/:shipmentId/status',
+  requirePermission('shipment:update'),
+  adminUpdateShipmentStatusHandler,
+);
+adminRouter.patch(
+  '/shipments/:shipmentId',
+  requirePermission('shipment:update'),
+  adminUpdateShipmentHandler,
+);
+adminRouter.post(
+  '/orders/:orderNumber/shipments',
+  requirePermission('shipment:update'),
+  adminCreateShipmentHandler,
 );
 
 /**

@@ -217,7 +217,9 @@ export default async function CheckoutSuccessPage({
           </h2>
           <p className="mt-2 text-sm text-ink-soft">
             <span className="block font-semibold text-ink">{order.shippingMethodName}</span>
-            <span className="block">{order.shippingEtaText}</span>
+            {order.shippingEtaText !== null && (
+              <span className="block">{order.shippingEtaText}</span>
+            )}
           </p>
           {order.customerNote && (
             <p className="mt-2 text-xs text-muted">ข้อความถึงร้าน: {order.customerNote}</p>

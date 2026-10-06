@@ -422,15 +422,27 @@ export interface OrderTimelineStep {
   current: boolean;
 }
 
+/** ประวัติสถานะของพัสดุ (STEP 44) — เรียงตามลำดับเกิด */
+export interface ShipmentEvent {
+  status: string;
+  statusLabel: string;
+  /** ข้อความที่ร้านเขียนถึงลูกค้า เช่น เหตุผลที่ส่งไม่สำเร็จ */
+  note: string | null;
+  at: string;
+}
+
 export interface OrderShipment {
   id: string;
   carrier: string;
   trackingNumber: string | null;
   trackingUrl: string | null;
   status: string;
+  statusLabel: string;
   estimatedDelivery: string | null;
   shippedAt: string | null;
   deliveredAt: string | null;
+  returnedAt: string | null;
+  events: ShipmentEvent[];
 }
 
 export interface Order {
@@ -452,7 +464,8 @@ export interface Order {
   refundedTotal: number;
   shippingMethod: ShippingMethodCode;
   shippingMethodName: string;
-  shippingEtaText: string;
+  /** ระยะเวลาที่บอกตอนสั่ง (snapshot · STEP 44) */
+  shippingEtaText: string | null;
   address: OrderAddress;
   customerNote: string | null;
   items: OrderItem[];
@@ -497,6 +510,8 @@ export interface CreateOrderInput {
   couponCode?: string;
   /** ส่งได้แค่ **จำนวนแต้ม** — มูลค่าส่วนลดคิดที่ server ใหม่ทุกครั้ง (STEP 42) */
   pointsToRedeem?: number;
+  /** ยอดที่หน้าเว็บแสดงอยู่ — server ใช้เทียบเท่านั้น ไม่ตรงได้ 409 (STEP 44) */
+  expectedTotal?: number;
 }
 
 /* ─── STEP 11: Payment ────────────────────────────────────────────────────── */
@@ -726,6 +741,14 @@ export interface KnowledgeSearchResult {
   page: number;
   limit: number;
   totalPages: number;
+}
+
+/**
+ * รายการของแอดมิน = บทความ **ฉบับดิบ** (มีตัวแปร `{{…}}`) + รายการตัวแปรที่ใช้ได้ (STEP 44)
+ * หน้าร้านได้ฉบับที่แทนค่าจริงแล้ว — ค่าส่งในบทความจึงตรงกับที่ระบบเก็บเงินเสมอ
+ */
+export interface AdminKnowledgeSearchResult extends KnowledgeSearchResult {
+  policyTokens: { token: string; description: string }[];
 }
 
 export interface KnowledgeAskResponse {

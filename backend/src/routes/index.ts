@@ -15,6 +15,7 @@ import { checkoutRouter, orderRouter } from './order.route.ts';
 import { paymentRouter } from './payment.route.ts';
 import { returnRouter } from './return.route.ts';
 import { reviewRouter } from './review.route.ts';
+import { shippingRouter } from './shipping.route.ts';
 import { userRouter } from './user.route.ts';
 import { wishlistRouter } from './wishlist.route.ts';
 
@@ -83,6 +84,12 @@ const API_GROUPS: readonly ApiGroup[] = [
     note: 'ช่องทางชำระเงินที่เปิดใช้จริง และ webhook ของ Stripe (COD พร้อมใช้ · Stripe รอตั้งค่า key)',
   },
   {
+    path: '/shipping',
+    router: shippingRouter,
+    step: 44,
+    note: 'วิธีจัดส่งที่เปิดใช้ ค่าส่ง และเงื่อนไขส่งฟรี — ตัวเลขชุดเดียวกับที่หน้า checkout คิดเงิน (เปิดให้ทุกคน)',
+  },
+  {
     path: '/returns',
     router: returnRouter,
     step: 43,
@@ -127,7 +134,6 @@ const PLANNED_GROUPS = [
     step: 48,
     note: 'รายการแบรนด์แยกกลุ่ม — ตอนนี้กรองแบรนด์ผ่าน /api/products ได้แล้ว',
   },
-  { path: '/api/shipments', step: 44, note: 'จัดการใบจัดส่งและผู้ให้บริการขนส่ง' },
 ] as const;
 
 /** endpoint ที่เป็นของ Next.js ไม่ใช่ Express — ต้องบอกไว้ ไม่งั้นดูเหมือน API นี้ไม่มีระบบล็อกอิน */

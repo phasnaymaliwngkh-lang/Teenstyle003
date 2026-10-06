@@ -5,6 +5,7 @@ import {
   getStorePolicyContent,
   runFallbackCs,
 } from '../src/services/ai-cs.service.ts';
+import { activeShippingOptions } from '../src/services/shipping.service.ts';
 import { ORDER_NUMBER_EXAMPLE } from '../src/models/order.model.ts';
 import {
   adminSupportReplySchema,
@@ -100,16 +101,20 @@ describe('AI Customer Service (STEP 20)', () => {
   });
 
   describe('Single Source of Truth Store Policies', () => {
-    it('นโยบายการจัดส่งดึงจาก SHIPPING_OPTIONS จริงของระบบ', () => {
-      const content = getStorePolicyContent('shipping');
-      expect(content).toContain('ส่งธรรมดา');
-      expect(content).toContain('ส่งด่วน');
-      expect(content).toContain('50 บาท');
-      expect(content).toContain('120 บาท');
+    it('นโยบายการจัดส่งอ่านอัตราจริงจากตาราง ShippingRate (STEP 44)', async () => {
+      const content = await getStorePolicyContent('shipping');
+      const options = await activeShippingOptions();
+
+      expect(options.length).toBeGreaterThan(0);
+      for (const option of options) {
+        expect(content).toContain(option.name);
+        if (option.baseFee > 0)
+          expect(content).toContain(`${option.baseFee.toLocaleString('th-TH')} บาท`);
+      }
     });
 
-    it('นโยบายการชำระเงินมีข้อกำหนด COD สูงสุด 5,000 บาท', () => {
-      const content = getStorePolicyContent('payment');
+    it('นโยบายการชำระเงินมีข้อกำหนด COD สูงสุด 5,000 บาท', async () => {
+      const content = await getStorePolicyContent('payment');
       expect(content).toContain('5,000 บาท');
       expect(content).toContain('COD');
     });

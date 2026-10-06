@@ -52,6 +52,8 @@ export interface AdminOrder extends Order {
   }[];
   /** สถานะที่เปลี่ยนต่อได้จริงจากสถานะปัจจุบัน (server ตัดสิน) */
   allowedNextStatuses: string[];
+  /** ส่งพัสดุชิ้นใหม่ได้ไหม — ได้เมื่อพัสดุล่าสุดตีกลับถึงร้านแล้ว (STEP 44) */
+  canReship: boolean;
 }
 
 /** รายละเอียดคำสั่งซื้อรายใบ — มีสถานะการคืนเงินด้วย (STEP 43) */

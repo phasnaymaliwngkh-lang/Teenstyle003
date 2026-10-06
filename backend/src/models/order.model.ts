@@ -1,8 +1,9 @@
 import type { Prisma } from '@teenstyle/database';
 
-import { findShippingOption, type ShippingMethodCode } from '../config/shipping.ts';
+import { SHIPPING_METHOD_NAME, type ShippingMethodCode } from '../config/shipping.ts';
 
 import { toNumber } from './pricing.ts';
+import { SHIPMENT_STATUS_LABEL, type ShipmentStatusCode } from './shipping.model.ts';
 
 /**
  * DTO ของคำสั่งซื้อ (STEP 10)
@@ -117,17 +118,52 @@ export interface OrderTimelineStep {
   current: boolean;
 }
 
-/** ข้อมูลการจัดส่งจริงจากตาราง Shipment (STEP 44 จะให้ admin สร้าง) */
+/** ประวัติสถานะของพัสดุ (STEP 44) — เรียงตามลำดับเกิด */
+export interface ShipmentEventDto {
+  status: string;
+  statusLabel: string;
+  /** ข้อความที่ร้านเขียนถึงลูกค้า เช่น เหตุผลที่ส่งไม่สำเร็จ */
+  note: string | null;
+  at: string;
+}
+
+/** ข้อมูลการจัดส่งจริงจากตาราง Shipment — ร้านสร้างตอนส่งของ และอัปเดตที่ /admin/shipments (STEP 44) */
 export interface OrderShipmentDto {
   id: string;
   carrier: string;
   trackingNumber: string | null;
   trackingUrl: string | null;
   status: string;
+  statusLabel: string;
   estimatedDelivery: string | null;
   shippedAt: string | null;
   deliveredAt: string | null;
+  returnedAt: string | null;
+  events: ShipmentEventDto[];
 }
+
+/**
+ * select ของพัสดุที่ทุก DTO คำสั่งซื้อใช้ — ใหม่สุดก่อน (ส่งใหม่หลังถูกตีกลับได้หลายชิ้น)
+ * ⚠️ ประวัติเรียงด้วย `sequence` ไม่ใช่ createdAt (บทเรียน STEP 42)
+ */
+export const ORDER_SHIPMENTS_SELECT = {
+  orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+  select: {
+    id: true,
+    carrier: true,
+    trackingNumber: true,
+    trackingUrl: true,
+    status: true,
+    estimatedDelivery: true,
+    shippedAt: true,
+    deliveredAt: true,
+    returnedAt: true,
+    events: {
+      orderBy: { sequence: 'asc' },
+      select: { status: true, note: true, createdAt: true },
+    },
+  },
+} satisfies Prisma.Order$shipmentsArgs;
 
 export interface OrderDto {
   id: string;
@@ -151,7 +187,8 @@ export interface OrderDto {
   refundedTotal: number;
   shippingMethod: ShippingMethodCode;
   shippingMethodName: string;
-  shippingEtaText: string;
+  /** ระยะเวลาที่บอกลูกค้าตอนสั่ง (snapshot · STEP 44) — null ได้เฉพาะแถวที่ไม่ได้ select คอลัมน์นี้ */
+  shippingEtaText: string | null;
   address: OrderAddressSnapshot;
   customerNote: string | null;
   items: OrderItemDto[];
@@ -183,6 +220,8 @@ export interface OrderRow {
   shippingFee: unknown;
   total: unknown;
   shippingMethod: string;
+  /** STEP 44 — ไม่บังคับ เพื่อให้ผู้เรียกเก่ายังใช้ได้ */
+  shippingEtaText?: string | null;
   addressSnapshot: unknown;
   customerNote: string | null;
   createdAt: Date;
@@ -204,6 +243,8 @@ export interface OrderRow {
     estimatedDelivery: Date | null;
     shippedAt: Date | null;
     deliveredAt: Date | null;
+    returnedAt?: Date | null;
+    events?: { status: string; note: string | null; createdAt: Date }[];
   }[];
   items: {
     id: string;
@@ -245,7 +286,7 @@ function readAddress(value: unknown): OrderAddressSnapshot {
  *
  * ⚠️ ใช้ timestamp ที่บันทึกไว้จริงในฐานข้อมูลเท่านั้น — ขั้นที่ยังไม่เกิดจะเป็น `at: null`
  *    **ห้ามเดาเวลา** ว่าจะส่งถึงเมื่อไร (เวลาส่งถึงที่คาดการณ์อยู่ใน Shipment.estimatedDelivery
- *    ซึ่งร้านเป็นผู้กรอกใน STEP 44)
+ *    ซึ่งร้านกรอกเองตอนส่งของ หรือแก้ภายหลังที่ /admin/shipments — STEP 44)
  *
  * ออเดอร์ที่ถูกยกเลิก/คืนเงิน จะแสดงเส้นทางที่เกิดขึ้นจริง ไม่โชว์ขั้นที่ไม่มีทางเกิดอีก
  */
@@ -302,7 +343,6 @@ function buildTimeline(order: OrderRow): OrderTimelineStep[] {
 
 export function toOrder(order: OrderRow): OrderDto {
   const method = order.shippingMethod as ShippingMethodCode;
-  const option = findShippingOption(method);
 
   const items: OrderItemDto[] = order.items.map((item) => ({
     id: item.id,
@@ -334,8 +374,8 @@ export function toOrder(order: OrderRow): OrderDto {
     total: toNumber(order.total),
     refundedTotal: toNumber(order.refundedTotal),
     shippingMethod: method,
-    shippingMethodName: option.name,
-    shippingEtaText: option.etaText,
+    shippingMethodName: SHIPPING_METHOD_NAME[method],
+    shippingEtaText: order.shippingEtaText ?? null,
     address: readAddress(order.addressSnapshot),
     customerNote: order.customerNote,
     items,
@@ -351,9 +391,22 @@ export function toOrder(order: OrderRow): OrderDto {
       trackingNumber: shipment.trackingNumber,
       trackingUrl: shipment.trackingUrl,
       status: shipment.status,
+      statusLabel: shipmentStatusLabel(shipment.status),
       estimatedDelivery: shipment.estimatedDelivery?.toISOString() ?? null,
       shippedAt: shipment.shippedAt?.toISOString() ?? null,
       deliveredAt: shipment.deliveredAt?.toISOString() ?? null,
+      returnedAt: shipment.returnedAt?.toISOString() ?? null,
+      events: (shipment.events ?? []).map((event) => ({
+        status: event.status,
+        statusLabel: shipmentStatusLabel(event.status),
+        note: event.note,
+        at: event.createdAt.toISOString(),
+      })),
     })),
   };
+}
+
+/** ชื่อสถานะพัสดุ — ค่าที่ไม่รู้จักคืนชื่อดิบ (ไม่เดาความหมาย) */
+export function shipmentStatusLabel(status: string): string {
+  return SHIPMENT_STATUS_LABEL[status as ShipmentStatusCode] ?? status;
 }

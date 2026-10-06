@@ -1,5 +1,4 @@
 import { COD_MAX_TOTAL, paymentMethods } from '../config/payment.ts';
-import { findShippingOption, SHIPPING_OPTIONS } from '../config/shipping.ts';
 import {
   availableContactChannels,
   RETURN_WINDOW_DAYS,
@@ -16,7 +15,7 @@ export type KnowledgeCategory =
  *
  * ⚠️ **ห้ามพิมพ์ค่าจัดส่ง ยอดส่งฟรี หรือช่องทางชำระเงินเป็นตัวเลขดิบลงในบทความ**
  *    บทความในคลังความรู้คือสิ่งที่ AI หยิบไปตอบลูกค้าในฐานะ "นโยบายของร้าน"
- *    ถ้าตัวเลขในบทความไม่ตรงกับ `config/shipping.ts` / `config/payment.ts`
+ *    ถ้าตัวเลขในบทความไม่ตรงกับตาราง `ShippingRate` / `config/payment.ts`
  *    AI จะสัญญากับลูกค้าคนละอย่างกับที่ระบบเก็บเงินจริง ซึ่งคือการโกหกลูกค้าเรื่องเงิน
  *    (ละเมิดกฎกลางข้อ 3 "AI ห้ามแต่ง Policy" และ STEP 10 ข้อ 6 "ค่าจัดส่งมาจากที่เดียว")
  *
@@ -27,26 +26,12 @@ export type KnowledgeCategory =
 
 const formatBaht = (amount: number): string => amount.toLocaleString('th-TH');
 
-const STANDARD_SHIPPING = findShippingOption('STANDARD');
-
-/** ยอดที่ทำให้ส่งฟรีของวิธีจัดส่งมาตรฐาน (null = ไม่มีโปรส่งฟรี) */
-export const FREE_SHIPPING_THRESHOLD: number = STANDARD_SHIPPING.freeOverSubtotal ?? 0;
-
-/** ตารางอัตราค่าจัดส่ง — ประกอบจาก SHIPPING_OPTIONS ทุกครั้ง */
-const SHIPPING_RATE_LINES = SHIPPING_OPTIONS.map((option) => {
-  const fee = option.baseFee === 0 ? 'ไม่มีค่าใช้จ่าย' : `${formatBaht(option.baseFee)} บาท`;
-  const free =
-    option.freeOverSubtotal !== null
-      ? ` — ฟรีเมื่อยอดสินค้าครบ ${formatBaht(option.freeOverSubtotal)} บาท`
-      : '';
-  const area =
-    option.onlyProvinces !== null ? ` (ให้บริการเฉพาะ ${option.onlyProvinces.join(', ')})` : '';
-
-  return `- **${option.name}** — ${fee}${free} · ระยะเวลา ${option.etaText}${area}\n  ${option.description}`;
-}).join('\n');
-
-/** สรุประยะเวลาจัดส่งแบบบรรทัดเดียว ใช้ในคำตอบ FAQ */
-const SHIPPING_ETA_SUMMARY = SHIPPING_OPTIONS.map((o) => `${o.name} ${o.etaText}`).join(' · ');
+/**
+ * ⚠️ **ค่าส่งไม่อยู่ในไฟล์นี้แล้ว** (STEP 44) — ร้านแก้อัตราได้จากหลังบ้าน (ตาราง ShippingRate)
+ *    บทความจัดส่งจึงเก็บ **ตัวแปร** `{{shipping.rates}}` · `{{shipping.free}}` · `{{shipping.eta}}` ·
+ *    `{{shipping.methods}}` ซึ่ง backend แทนค่าจริงทุกครั้งที่มีคนอ่าน (ดู models/policy-tokens.ts)
+ *    ถ้าประกอบตัวเลขลงข้อความตอน seed เหมือนเดิม การแก้ค่าส่งครั้งแรกจะทำให้บทความโกหกทันที
+ */
 
 /** ช่องทางติดต่อ — แสดงเฉพาะช่องทางที่ร้านเปิดใช้จริง (ช่องทางที่ยังไม่มีจะหายไปเอง) */
 const CONTACT_CHANNEL_LINES = availableContactChannels()
@@ -157,17 +142,19 @@ export const INITIAL_KNOWLEDGE_ARTICLES: KnowledgeArticle[] = [
     slug: 'shipping-rates-and-delivery-time',
     title: 'นโยบายการจัดส่งสินค้า ค่าบริการ และระยะเวลาจัดส่ง',
     category: 'SHIPPING',
-    summary: `ส่งฟรีทั่วประเทศเมื่อยอดสั่งซื้อครบ ${formatBaht(FREE_SHIPPING_THRESHOLD)} บาท มีทั้งส่งธรรมดา ส่งด่วน ส่งวันเดียวกัน และรับเองที่ร้าน — ค่าส่งจริงคำนวณตอนชำระเงินตามวิธีที่เลือก`,
+    summary:
+      '{{shipping.free}} · วิธีจัดส่งที่เลือกได้: {{shipping.methods}} — ค่าส่งจริงคำนวณตอนชำระเงินตามวิธีที่เลือก',
     content: `
 ### บริการจัดส่งสินค้าของ TEENSTYLE
 TEENSTYLE ให้บริการจัดส่งสินค้าครอบคลุมทั่วประเทศไทย โดยร่วมมือกับบริษัทขนส่งชั้นนำ เพื่อให้สินค้าส่งถึงมือคุณอย่างรวดเร็วและปลอดภัยที่สุด
 
 #### 1. อัตราค่าจัดส่งและระยะเวลา
-${SHIPPING_RATE_LINES}
+{{shipping.rates}}
 
 #### 2. การติดตามสถานะพัสดุ
 เมื่อร้านส่งมอบพัสดุให้ขนส่งแล้ว ระบบจะบันทึกเลขพัสดุ (Tracking Number) ไว้ในคำสั่งซื้อของคุณ ตรวจสอบได้ที่หน้า **บัญชีของฉัน > คำสั่งซื้อ**
 ระหว่างที่ยังไม่มีเลขพัสดุ ระบบจะแสดงว่า "ยังไม่มีข้อมูลพัสดุ" ตามจริง — ร้านไม่ออกเลขพัสดุล่วงหน้า
+ถ้าขนส่งส่งไม่สำเร็จหรือพัสดุถูกตีกลับมาที่ร้าน หน้าคำสั่งซื้อจะแสดงสถานะและเหตุผลที่ร้านบันทึกไว้ แล้วร้านจะส่งให้ใหม่หรือติดต่อคุณ
 
 > อัตราด้านบนดึงมาจากค่าจัดส่งชุดเดียวกับที่ระบบใช้คิดเงินตอนชำระเงิน จึงตรงกับยอดที่คุณจะจ่ายจริงเสมอ
     `.trim(),
@@ -176,12 +163,12 @@ ${SHIPPING_RATE_LINES}
       {
         id: 'faq-ship-1',
         question: 'ยอดสั่งซื้อเท่าไรถึงจะได้จัดส่งฟรี?',
-        answer: `ยอดสินค้าตั้งแต่ ${formatBaht(FREE_SHIPPING_THRESHOLD)} บาทขึ้นไป จะได้ส่งฟรีทั่วประเทศเมื่อเลือกวิธีจัดส่งแบบ "${STANDARD_SHIPPING.name}" โดยไม่ต้องใส่โค้ดครับ (วิธีจัดส่งแบบอื่นคิดค่าส่งตามอัตราของวิธีนั้น)`,
+        answer: '{{shipping.free}}',
       },
       {
         id: 'faq-ship-2',
         question: 'สั่งของแล้วกี่วันถึงจะได้รับสินค้า?',
-        answer: `ขึ้นอยู่กับวิธีจัดส่งที่เลือกครับ: ${SHIPPING_ETA_SUMMARY}`,
+        answer: 'ขึ้นอยู่กับวิธีจัดส่งที่เลือกครับ: {{shipping.eta}}',
       },
     ],
     isPublished: true,

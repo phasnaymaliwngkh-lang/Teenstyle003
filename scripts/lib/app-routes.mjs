@@ -74,6 +74,9 @@ export const ROUTES = [
   { path: '/admin/coupons', as: 'admin' },
   { path: '/admin/returns', as: 'admin' },
   { path: '/admin/returns/{returnId}', as: 'admin' },
+  { path: '/admin/shipping', as: 'admin' },
+  { path: '/admin/shipments', as: 'admin' },
+  { path: '/admin/shipments/{shipmentId}', as: 'admin' },
   { path: '/admin/reviews', as: 'admin' },
   { path: '/admin/customers', as: 'admin' },
   { path: '/admin/customers/{customerId}', as: 'admin' },
@@ -133,6 +136,7 @@ async function resolvePlaceholders(prisma, apiBase, adminToken) {
   const [order] = (await asAdmin('/api/admin/orders?limit=1')).items ?? [];
   const [customer] = (await asAdmin('/api/admin/customers?limit=1&role=CUSTOMER')).items ?? [];
   const [returnRequest] = (await asAdmin('/api/admin/returns?limit=1')).items ?? [];
+  const [shipment] = (await asAdmin('/api/admin/shipments?limit=1')).items ?? [];
 
   const publicProduct = await prisma.product.findFirst({
     where: { status: 'ACTIVE', deletedAt: null },
@@ -150,6 +154,7 @@ async function resolvePlaceholders(prisma, apiBase, adminToken) {
     orderNumber: order?.orderNumber ?? '',
     customerId: customer?.id ?? '',
     returnId: returnRequest?.id ?? '',
+    shipmentId: shipment?.id ?? '',
   };
 }
 

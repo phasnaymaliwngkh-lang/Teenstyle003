@@ -62,6 +62,8 @@ const GUEST_REACHABLE: Record<string, Extract<ApiRouteAuth, 'public' | 'optional
 
   // ช่องทางชำระเงินต้องรู้ได้ก่อนล็อกอิน · webhook มาจาก Stripe ไม่ใช่ผู้ใช้
   'GET /api/payments/methods': 'public',
+  // ค่าส่งและเงื่อนไขส่งฟรีเป็นนโยบายที่ต้องรู้ก่อนตัดสินใจซื้อ (STEP 44 · หน้าแรกอ่านจากที่นี่)
+  'GET /api/shipping/options': 'public',
   'POST /api/payments/webhook/stripe': 'public',
 
   // ตะกร้าของ guest อ้างอิงด้วย cookie `cart-token`
@@ -123,7 +125,7 @@ const UPLOAD_ROUTES = new Set([
 ]);
 
 /** กลุ่มที่เอกสารประกาศว่า "ยังไม่มี" — ต้องไม่มีอยู่จริง */
-const PLANNED_PREFIXES = ['/api/brands', '/api/shipments'];
+const PLANNED_PREFIXES = ['/api/brands'];
 
 // ─── เอกสาร ────────────────────────────────────────────────────────────────
 

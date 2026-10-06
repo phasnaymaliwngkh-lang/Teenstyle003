@@ -4,8 +4,8 @@
 > Full Stack Fashion E-Commerce สำหรับวัยรุ่น — Next.js + Express + PostgreSQL + Prisma + OpenAI
 
 โปรเจกต์นี้เดินตาม **Master Prompt STEP 1–55** ทำทีละ STEP แล้วหยุดรอคำสั่งถัดไป
-สถานะปัจจุบัน: **STEP 1–43 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
-หน้าร้าน → ตะกร้า → checkout (คูปอง + ใช้แต้ม) → ชำระเงิน (COD จริง · Stripe รอใส่ key) → ติดตามคำสั่งซื้อ → รีวิวสินค้า → แจ้งเตือนในบัญชี → **ขอคืนสินค้า/คืนเงิน (STEP 43)**
+สถานะปัจจุบัน: **STEP 1–44 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
+หน้าร้าน → ตะกร้า → checkout (คูปอง + ใช้แต้ม) → ชำระเงิน (COD จริง · Stripe รอใส่ key) → ติดตามคำสั่งซื้อ → รีวิวสินค้า → แจ้งเตือนในบัญชี → **ขอคืนสินค้า/คืนเงิน (STEP 43)** → **ค่าส่งที่ร้านแก้เองได้ + จัดการพัสดุ (STEP 44)**
 → **บัญชีของฉัน: ข้อมูลส่วนตัว + สมุดที่อยู่ + แต้มสะสม/ระดับสมาชิก (STEP 42)**
 → **หลังบ้าน: ภาพรวมร้าน + รายงานยอดขาย + จัดการคำสั่งซื้อ + จัดการสินค้า + คลังสินค้า + แจ้งเตือนสต็อก + บาร์โค้ด/QR + นำเข้า/ส่งออก (CSV, Excel) + ตรวจรีวิว + จัดการลูกค้า + ประวัติการแก้ไข (Audit)**
 → **AI: AI Stylist (STEP 19) · AI Customer Service + Human Handoff (STEP 20) · AI Knowledge Base / FAQ (STEP 21)**
@@ -42,7 +42,7 @@ npm run dev              # db:sync + backend :4000 + frontend :3000
 npm run build            # db:sync → tsc backend → next build
 npm run typecheck        # tsc ทั้ง 3 workspace — ต้องผ่านก่อน commit
 npm run lint             # eslint backend + frontend
-npm test                 # vitest ของ backend + frontend (898 เคส)
+npm test                 # vitest ของ backend + frontend (932 เคส)
 npm run test:coverage    # วัดว่าโค้ดส่วนไหนยังไม่มีเทสต์แตะเลย (ไม่ใช่เป้าให้ไล่ถึง 100%)
 
 npm run db:sync          # prisma generate + build database (รันหลังแก้ schema ทุกครั้ง)
@@ -163,6 +163,8 @@ app/
 │   ├── analytics/          รายงานยอดขาย + ส่งออก CSV/Excel (STEP 26)
 │   ├── coupons/            จัดการคูปอง (STEP 41)
 │   ├── returns/ returns/[returnId]/   คิวคืนสินค้า + บันทึกคืนเงิน (STEP 43)
+│   ├── shipping/            อัตราค่าจัดส่ง (STEP 44)
+│   ├── shipments/ shipments/[shipmentId]/   พัสดุ: ส่งไม่สำเร็จ ตีกลับ ส่งใหม่ (STEP 44)
 │   └── logs/               ประวัติการแก้ไขหลังบ้าน (STEP 27)
 ├── signin/ after-signin/   อยู่นอกกลุ่ม — ไม่มี navbar (หน้าโฟกัสเดียว)
 └── api/auth/[...nextauth]/
@@ -534,8 +536,8 @@ GET  /api/checkout/summary   POST /api/orders   GET /api/orders/:orderNumber
    ยิงซ้ำด้วยคีย์เดิม → คืนออเดอร์เดิม (200 ไม่ใช่ 201) ไม่จองสต็อกเพิ่ม
 5. **snapshot ทุกอย่างที่ลูกค้าเห็น** ลง `OrderItem` (ชื่อ/SKU/สี/ไซซ์/รูป/ราคา) และ `Order.addressSnapshot`
    ประวัติต้องไม่เปลี่ยนเมื่อสินค้าหรือที่อยู่ถูกแก้ภายหลัง
-6. **ค่าจัดส่งมาจาก [config/shipping.ts](backend/src/config/shipping.ts) ที่เดียว** — ทั้งตัวเลขที่โชว์และที่คิดเงิน
-   ใช้ `calculateShippingFee` ตัวเดียวกัน (STEP 44 จะย้ายไปเป็นข้อมูลใน DB ให้ admin แก้)
+6. **ค่าจัดส่งมาจากตาราง `ShippingRate` ที่เดียว** (ร้านแก้ได้ที่ /admin/shipping ตั้งแต่ STEP 44) — ทั้งตัวเลขที่โชว์
+   และที่คิดเงินใช้ `calculateShippingFee` ใน [models/shipping.model.ts](backend/src/models/shipping.model.ts) ตัวเดียวกัน
    กฎจำกัดพื้นที่ (`onlyProvinces`) ถูกส่งไปให้ฟอร์มตรวจสด ๆ **และ server ตรวจซ้ำตอนสั่งซื้อ**
 7. **ออเดอร์ของคนอื่นดูไม่ได้** — `getOrderByNumber` กรอง `userId` เสมอ (ไม่เจอ = 404)
 8. หน้า `/checkout` ยังไม่ล็อกอิน → เด้งไป
@@ -586,7 +588,7 @@ GET /api/orders?status=&page=&limit=
 
 1. **ไทม์ไลน์สร้างจาก timestamp ที่บันทึกไว้จริง** (`paidAt`, `processedAt`, `packedAt`, `shippedAt`,
    `deliveredAt`, `cancelledAt`, `refundedAt`) — ขั้นที่ยังไม่เกิดต้องเป็น `at: null`
-   **ห้ามเดาเวลาที่จะส่งถึง** (เวลาคาดการณ์อยู่ใน `Shipment.estimatedDelivery` ที่ร้านกรอกเอง — STEP 44)
+   **ห้ามเดาเวลาที่จะส่งถึง** (เวลาคาดการณ์อยู่ใน `Shipment.estimatedDelivery` ที่ร้านกรอกเอง ตอนส่งของหรือที่ /admin/shipments)
 2. **ออเดอร์ที่ยกเลิก/คืนเงิน** แสดงเฉพาะขั้นที่เกิดขึ้นจริง + ปิดท้ายด้วยการยกเลิก
    ไม่โชว์ "ได้รับสินค้า" ที่ไม่มีทางเกิดอีก
 3. **ยังไม่มีใบจัดส่ง → `shipments: []` และ `trackingNumber: null`** · UI บอกว่ายังไม่มีข้อมูลพัสดุ
@@ -614,6 +616,7 @@ GET /api/admin/overview · GET /api/admin/orders · PATCH /api/admin/orders/:n/s
 PENDING_PAYMENT → CANCELLED
 PAID → PROCESSING → PACKING → SHIPPING → DELIVERED
 PAID / PROCESSING / PACKING → CANCELLED
+SHIPPING → CANCELLED   (เฉพาะเมื่อพัสดุล่าสุดตีกลับถึงร้านแล้ว — STEP 44)
 DELIVERED / CANCELLED / REFUNDED → (จบ)
 ```
 
@@ -1882,6 +1885,44 @@ STEP 4 จดไว้ว่า "navbar อ่าน session ทำให้ท�
 `199.7 + 0.1 + 0.2 = 199.99999999999997` → `Math.floor(x / 10)` ได้ 19 แทน 20
 ทุกการคิดแต้มจากเงินต้องแปลงเป็นสตางค์จำนวนเต็มก่อน (`Math.round(baht * 100)`) — มีเทสต์ที่ยืนยันว่ากับดักยังอยู่จริง
 
+## Shipping Management (STEP 44 — ใช้งานได้จริงแล้ว)
+
+**รายละเอียดทั้งหมดอยู่ที่ [docs/17-shipping.md](docs/17-shipping.md)**
+`/admin/shipping` อัตราค่าส่ง · `/admin/shipments` พัสดุ · กฎล้วนอยู่ที่
+[models/shipping.model.ts](backend/src/models/shipping.model.ts) · อัตราอ่านผ่าน
+[services/shipping.service.ts](backend/src/services/shipping.service.ts) · พัสดุอยู่ที่
+[services/shipment.service.ts](backend/src/services/shipment.service.ts)
+
+### กฎที่ห้ามละเมิด
+
+1. **ค่าส่งอยู่ในตาราง `ShippingRate` ที่เดียว** — checkout · การสร้างคำสั่งซื้อ (อ่านในทรานแซกชัน) · คูปองส่งฟรี ·
+   บทความ · AI · หน้าแรก · **ห้ามพิมพ์ค่าส่งหรือยอดส่งฟรีลงซอร์สหรือข้อความใด ๆ อีก**
+   (หน้าแรกเคยโฆษณา "ส่งฟรีเมื่อครบ 690" ซึ่งเป็นเงื่อนไขของคูปองที่ต้องกรอกรหัส)
+   · ชื่อวิธีแก้ไม่ได้ (`SHIPPING_METHOD_NAME` — ประวัติคำสั่งซื้ออ้างถึง) · ระยะเวลาเก็บ snapshot ที่ `Order.shippingEtaText`
+2. **บทความคลังความรู้เก็บตัวแปร `{{shipping.rates}}` ฯลฯ ไม่ใช่ตัวเลข** — แทนค่าทุกครั้งที่มีคนอ่าน
+   ([models/policy-tokens.ts](backend/src/models/policy-tokens.ts)) · หน้าแก้ของแอดมินเห็นฉบับดิบ ·
+   ตัวแปรที่พิมพ์ผิดถูกปฏิเสธตอนบันทึก · **ค่าใดที่แก้ได้ตอน runtime และไปอยู่ในบทความ ต้องเป็นตัวแปรแบบนี้**
+3. **ยอดที่ลูกค้าเห็นต้องเท่ากับยอดที่เก็บ** — หน้า checkout ส่ง `expectedTotal` · server ใช้ **เทียบอย่างเดียว**
+   ไม่ตรง (เทียบเป็นสตางค์) → 409 + `details[].field = 'expectedTotal'` · ไม่สร้างคำสั่งซื้อ ไม่จองของ
+4. **ปิดวิธีจัดส่งสุดท้ายที่เปิดอยู่ไม่ได้** (ล็อกทุกแถวก่อนนับ) · คำอธิบายห้ามมีจำนวนเงิน ·
+   จังหวัดรับเฉพาะชื่อใน `THAI_PROVINCES` (การเทียบเป็นข้อความตรงตัว) · แก้ = `settings:manage` · ดู = `shipment:read`
+5. **"ส่งถึงแล้ว" มีทางเดียวคือสถานะคำสั่งซื้อ DELIVERED** (ได้เงิน COD + แต้ม) — หน้าพัสดุเปลี่ยนได้แค่
+   อยู่ระหว่างขนส่ง · ส่งไม่สำเร็จ · ตีกลับ (`SHIPMENT_TRANSITIONS`) · สองอย่างหลังต้องมีข้อความถึงลูกค้า
+6. **ใบที่จัดส่งแล้วทำอะไรได้ขึ้นกับพัสดุล่าสุด** (`shippingOrderActions` ที่เดียว) — ยังอยู่กับขนส่ง: ส่งถึงได้
+   ยกเลิกไม่ได้ · ตีกลับถึงร้านแล้ว: ส่งใหม่ หรือยกเลิก (รับของเข้าคลัง · คืนแต้ม · คืนโควตาคูปอง)
+7. **ประวัติพัสดุคือ `ShipmentEvent` (append-only เรียงด้วย `sequence`)** — `Shipment.status` เป็น cache ของแถวล่าสุด
+   เขียนในทรานแซกชันเดียวกัน · แก้ได้เฉพาะพัสดุชิ้นล่าสุดของใบที่ยังจัดส่งอยู่
+8. **ล็อกแถวคำสั่งซื้อ (`FOR UPDATE`) ก่อนตัดสิน** ทั้งการเปลี่ยนสถานะคำสั่งซื้อและพัสดุ —
+   แค่ "อ่านสถานะซ้ำในทรานแซกชัน" ไม่กันสองคนกดพร้อมกัน (READ COMMITTED อ่านค่าเดิมได้ทั้งคู่)
+9. **ลิงก์ติดตามรับเฉพาะ `https://`** (`trackingUrlSchema`) — ถูกแสดงเป็นลิงก์ในหน้าของลูกค้า
+10. **ยกเลิกคำสั่งซื้อทุกกรณีต้องคืนโควตาคูปอง** — แก้ตอน STEP 44: ร้านยกเลิกใบที่จ่ายแล้วเคยไม่คืน
+
+### ⚠️ เทสต์ที่แก้อัตราค่าส่งต้องคืนค่าเดิมทุกช่อง
+
+`shipping-order.test.ts` แก้แถวจริงของ `ShippingRate` (ไม่มีทางอื่นที่จะพิสูจน์ว่าทุกที่เปลี่ยนตาม)
+→ จดค่าเดิมใน `beforeAll` แล้วคืนใน `afterAll` · ทำได้เพราะ `fileParallelism: false`
+ถ้าวันหนึ่งเปิดให้ไฟล์เทสต์รันพร้อมกัน เทสต์นี้จะทำให้ไฟล์อื่นที่คาดค่าส่ง 50 บาทล้มแบบสุ่ม
+
 ## Return / Refund (STEP 43 — ใช้งานได้จริงแล้ว)
 
 **รายละเอียดทั้งหมดอยู่ที่ [docs/16-returns.md](docs/16-returns.md)**
@@ -2036,8 +2077,8 @@ status ของเอกสารตรงกับที่คาด · **ก�
 
 ## Testing (STEP 37 — เทสต์คอมโพเนนต์จริงแล้ว และวัด coverage แล้ว)
 
-**รายละเอียดทั้งหมดอยู่ที่ [docs/11-testing.md](docs/11-testing.md)** · `npm test` = **898 เคส** (ตอนปิด STEP 43)
-(backend 754 + frontend 144) · `npm run test:coverage` วัดว่าส่วนไหนยังไม่มีเทสต์แตะเลย
+**รายละเอียดทั้งหมดอยู่ที่ [docs/11-testing.md](docs/11-testing.md)** · `npm test` = **932 เคส** (ตอนปิด STEP 44)
+(backend 782 + frontend 150) · `npm run test:coverage` วัดว่าส่วนไหนยังไม่มีเทสต์แตะเลย
 
 frontend แยกเป็น 2 project ใน [vitest.config.mts](frontend/vitest.config.mts) เพราะสภาพแวดล้อมต่างกันจริง
 

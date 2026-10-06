@@ -321,6 +321,7 @@ model User {
   pointAdjustments   PointTransaction[]  @relation("PointTransactionActor")
   returnRequests     ReturnRequest[]
   refundsRecorded    Refund[]            @relation("RefundActor")
+  shipmentEvents     ShipmentEvent[]     @relation("ShipmentEventActor")
 
   @@index([roleId])
   @@index([status])
@@ -816,9 +817,12 @@ model Order {
   shippingAddress   Address? @relation(fields: [shippingAddressId], references: [id])
   addressSnapshot   Json
 
-  shippingMethod ShippingMethod @default(STANDARD)
+  shippingMethod  ShippingMethod @default(STANDARD)
+  /// ระยะเวลาจัดส่งที่บอกลูกค้าตอนสั่ง (STEP 44) — snapshot เพราะร้านแก้ข้อความนี้ได้ภายหลัง
+  /// ประวัติต้องบอกสิ่งที่ลูกค้าเห็นตอนกดสั่ง ไม่ใช่ข้อความปัจจุบัน (กฎ STEP 10 ข้อ 5)
+  shippingEtaText String?
   /// cache ของ trackingNumber จาก Shipment ล่าสุด — อัปเดตพร้อมกันใน transaction เดียว
-  trackingNumber String?
+  trackingNumber  String?
 
   customerNote String?
   adminNote    String?
@@ -945,13 +949,63 @@ model Shipment {
   estimatedDelivery DateTime?
   shippedAt         DateTime?
   deliveredAt       DateTime?
+  /// พัสดุถูกตีกลับถึงร้านแล้ว (STEP 44) — จุดเดียวที่ร้านส่งใหม่หรือยกเลิกคำสั่งซื้อที่ส่งออกไปแล้วได้
+  returnedAt        DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// ประวัติสถานะทุกครั้ง (STEP 44) — `status` ด้านบนคือ cache ของแถวล่าสุด เขียนในทรานแซกชันเดียวกัน
+  events ShipmentEvent[]
+
   @@index([orderId])
   @@index([status])
   @@index([trackingNumber])
+}
+
+/// ประวัติสถานะของพัสดุ (STEP 44) — append-only
+/// ส่งไม่สำเร็จแล้วส่งใหม่ได้หลายรอบ คอลัมน์เวลาเดียวต่อสถานะจึงเก็บความจริงไม่พอ
+model ShipmentEvent {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  shipmentId String   @db.Uuid
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  /// เรียงตามลำดับเกิดด้วยคอลัมน์นี้ ไม่ใช่ createdAt (บทเรียน STEP 42: แถวในทรานแซกชันเดียวกันได้เวลาเท่ากันเป๊ะ)
+  sequence   Int      @default(autoincrement())
+
+  status ShipmentStatus
+  /// ข้อความที่ลูกค้าเห็น เช่น เหตุผลที่ส่งไม่สำเร็จ — null = ไม่มีอะไรต้องอธิบาย
+  note   String?
+
+  /// ผู้บันทึก — null = ระบบ หรือบัญชีถูกลบแล้ว
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("ShipmentEventActor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([shipmentId, sequence])
+}
+
+/// อัตราค่าจัดส่งที่ร้านแก้เองได้ (STEP 44) — **แหล่งความจริงเดียว** ของค่าส่ง
+/// แทนตัวเลขที่เคยฝังใน config/shipping.ts · หนึ่งแถวต่อหนึ่งวิธีจัดส่ง
+/// ชื่อวิธีจัดส่งไม่อยู่ในตารางนี้โดยเจตนา — ความหมายของ enum คงที่ (ประวัติคำสั่งซื้ออ้างถึง)
+model ShippingRate {
+  id     String         @id @default(uuid(7)) @db.Uuid
+  method ShippingMethod @unique
+
+  description      String
+  /// ค่าส่งปกติ (บาท)
+  baseFee          Decimal  @db.Decimal(12, 2)
+  /// ยอดสินค้าที่ทำให้ส่งฟรี — null = ไม่มีโปรส่งฟรี
+  freeOverSubtotal Decimal? @db.Decimal(12, 2)
+  /// ระยะเวลาที่บอกลูกค้า เช่น "2–4 วันทำการ"
+  etaText          String
+  /// จำกัดเฉพาะจังหวัดเหล่านี้ — ว่าง = ทั่วประเทศ
+  onlyProvinces    String[] @default([])
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================================================

@@ -1,14 +1,10 @@
 import { getPrisma, Prisma } from '@teenstyle/database';
 
-import {
-  calculateShippingFee,
-  isShippingAvailable,
-  SHIPPING_OPTIONS,
-  type ShippingMethodCode,
-} from '../config/shipping.ts';
+import type { ShippingMethodCode } from '../config/shipping.ts';
 import { toCart, type CartItemDto } from '../models/cart.model.ts';
 import {
   buildOrderNumber,
+  ORDER_SHIPMENTS_SELECT,
   orderNumberPrefixFor,
   toOrder,
   type OrderDto,
@@ -22,12 +18,18 @@ import {
   type LoyaltyTierDto,
 } from '../models/loyalty.model.ts';
 import { resolveVariantPrice } from '../models/pricing.ts';
+import {
+  calculateShippingFee,
+  isShippingAvailable,
+  type ShippingOption,
+} from '../models/shipping.model.ts';
 import { checkCouponForCart, couponCartLinesOf, redeemCouponForOrder } from './coupon.service.ts';
 import { evaluateRedemptionFor, lifetimeSpendOf, redeemPointsForOrder } from './loyalty.service.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type { CreateOrderInput, NewAddressInput } from '../validators/order.validator.ts';
 
 import { notifyOrderCreated, notifySafely } from './notification.service.ts';
+import { activeShippingOptions, requireActiveShippingOption } from './shipping.service.ts';
 import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
 
 /**
@@ -62,6 +64,7 @@ const ORDER_SELECT = {
   shippingFee: true,
   total: true,
   shippingMethod: true,
+  shippingEtaText: true,
   addressSnapshot: true,
   customerNote: true,
   createdAt: true,
@@ -74,19 +77,7 @@ const ORDER_SELECT = {
   cancelledAt: true,
   refundedAt: true,
   trackingNumber: true,
-  shipments: {
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      carrier: true,
-      trackingNumber: true,
-      trackingUrl: true,
-      status: true,
-      estimatedDelivery: true,
-      shippedAt: true,
-      deliveredAt: true,
-    },
-  },
+  shipments: ORDER_SHIPMENTS_SELECT,
   items: {
     orderBy: { createdAt: 'asc' },
     select: {
@@ -236,16 +227,24 @@ function provinceOf(addresses: CheckoutAddressDto[]): string | null {
   return addresses.find((address) => address.isDefault)?.province ?? addresses[0]?.province ?? null;
 }
 
-function shippingOptionsFor(subtotal: number, province: string | null): ShippingOptionDto[] {
-  return SHIPPING_OPTIONS.map((option) => {
-    const available = province === null ? true : isShippingAvailable(option.code, province);
+/**
+ * วิธีจัดส่งที่ลูกค้าเลือกได้ — **เฉพาะที่ร้านเปิดใช้** (อัตราอ่านจากตาราง ShippingRate · STEP 44)
+ * วิธีที่ร้านปิดไว้ไม่โผล่เลย ไม่ใช่โชว์แล้วกดไม่ได้ (ลูกค้าแก้อะไรไม่ได้อยู่ดี)
+ */
+function shippingOptionsFor(
+  options: readonly ShippingOption[],
+  subtotal: number,
+  province: string | null,
+): ShippingOptionDto[] {
+  return options.map((option) => {
+    const available = province === null ? true : isShippingAvailable(option, province);
 
     return {
       code: option.code,
       name: option.name,
       description: option.description,
       etaText: option.etaText,
-      fee: calculateShippingFee(option.code, subtotal),
+      fee: calculateShippingFee(option, subtotal),
       baseFee: option.baseFee,
       freeOverSubtotal: option.freeOverSubtotal,
       onlyProvinces: option.onlyProvinces,
@@ -266,7 +265,7 @@ export async function getCheckoutSummary(
 ): Promise<CheckoutSummaryDto> {
   const prisma = getPrisma();
 
-  const [cart, addresses, lifetimeSpend] = await Promise.all([
+  const [cart, addresses, lifetimeSpend, activeOptions] = await Promise.all([
     prisma.cart.findFirst({ where: { userId }, select: CART_SELECT }),
     prisma.address.findMany({
       where: { userId, deletedAt: null },
@@ -274,7 +273,13 @@ export async function getCheckoutSummary(
       select: ADDRESS_SELECT,
     }),
     lifetimeSpendOf(prisma, userId),
+    activeShippingOptions(prisma),
   ]);
+
+  if (activeOptions.length === 0) {
+    // ร้านปิดวิธีสุดท้ายไม่ได้ (adminUpdateShippingRate กันไว้) — เกิดได้เฉพาะตารางว่างจากการตั้งค่าผิด
+    throw ApiError.conflict('ร้านยังไม่ได้เปิดวิธีจัดส่ง — ตอนนี้ยังสั่งซื้อไม่ได้');
+  }
 
   const items = cart ? toCart(cart).items.filter((item) => item.selected) : [];
   const subtotal = items
@@ -282,7 +287,7 @@ export async function getCheckoutSummary(
     .reduce((sum, item) => sum + item.lineTotal, 0);
 
   const province = provinceOf(addresses);
-  const options = shippingOptionsFor(subtotal, province);
+  const options = shippingOptionsFor(activeOptions, subtotal, province);
   const chosen = options.find((option) => option.code === shippingMethod) ?? options[0]!;
 
   const blockers: string[] = [];
@@ -493,8 +498,11 @@ export async function createOrder(
   const orderId = await prisma.$transaction(async (tx) => {
     const { addressId, snapshot } = await resolveAddress(tx, userId, input);
 
+    // อัตราอ่านในทรานแซกชันนี้ — ชุดเดียวกับที่บันทึกลงคำสั่งซื้อ · ร้านปิดวิธีนี้แล้ว = 409 (STEP 44)
+    const shipping = await requireActiveShippingOption(tx, input.shippingMethod);
+
     const province = typeof snapshot['province'] === 'string' ? snapshot['province'] : '';
-    if (!isShippingAvailable(input.shippingMethod, province)) {
+    if (!isShippingAvailable(shipping, province)) {
       throw ApiError.badRequest(`วิธีจัดส่งที่เลือกใช้กับจังหวัด${province}ไม่ได้`);
     }
 
@@ -559,7 +567,7 @@ export async function createOrder(
       });
     }
 
-    const shippingFee = calculateShippingFee(input.shippingMethod, subtotal);
+    const shippingFee = calculateShippingFee(shipping, subtotal);
 
     /**
      * ⚠️ ส่วนลดคิดใหม่ **ที่นี่** ด้วยข้อมูลในทรานแซกชันนี้ ไม่ใช่เชื่อยอดที่หน้าเว็บโชว์
@@ -613,6 +621,23 @@ export async function createOrder(
 
     const total = subtotal - discountTotal + shippingFee;
 
+    /**
+     * ⚠️ ยอดที่จะเก็บต้องเท่ากับยอดที่ลูกค้าเห็นตอนกดยืนยัน (STEP 44)
+     *    ค่าส่งแก้ได้จากหลังบ้านแล้ว ราคาสินค้าและคูปองก็เปลี่ยนได้ระหว่างที่ลูกค้าเปิดหน้า checkout ค้างไว้
+     *    → หน้าเว็บส่งยอดที่แสดงอยู่มา ถ้าไม่ตรงกับที่ server คิดได้ = ปฏิเสธ ไม่เก็บยอดใหม่เงียบ ๆ
+     *    (server ไม่ได้ **ใช้** ค่านี้คิดเงิน — ใช้เทียบอย่างเดียว ยอดจริงยังคิดจากฐานข้อมูลทั้งหมด)
+     *    เทียบเป็นสตางค์ (บทเรียนทศนิยมลอยของ STEP 42)
+     */
+    if (
+      input.expectedTotal !== undefined &&
+      Math.round(input.expectedTotal * 100) !== Math.round(total * 100)
+    ) {
+      const message = `ยอดรวมเปลี่ยนจากที่แสดง (เดิม ${input.expectedTotal.toLocaleString('th-TH')} บาท · ตอนนี้ ${total.toLocaleString('th-TH')} บาท) — ค่าส่ง ราคา หรือส่วนลดเพิ่งเปลี่ยน กรุณาตรวจยอดใหม่ก่อนกดสั่งซื้อ`;
+
+      // `field` บอกหน้าเว็บว่าเป็นเรื่องยอดเปลี่ยน (โหลดยอดใหม่) ไม่ใช่ของหมด (กลับไปแก้ตะกร้า) — 409 เหมือนกัน
+      throw ApiError.conflict(message, [{ field: 'expectedTotal', message }]);
+    }
+
     const order = await tx.order.create({
       data: {
         orderNumber: await nextOrderNumber(tx),
@@ -627,6 +652,8 @@ export async function createOrder(
         // snapshot ของรหัสคูปอง — ประวัติต้องอ่านได้แม้คูปองถูกปิดใช้งานภายหลัง (กฎ STEP 10 ข้อ 5)
         couponCode,
         shippingMethod: input.shippingMethod,
+        // ระยะเวลาที่ลูกค้าเห็นตอนสั่ง — ร้านแก้ข้อความนี้ได้ภายหลัง (กฎ STEP 10 ข้อ 5)
+        shippingEtaText: shipping.etaText,
         shippingAddressId: addressId,
         addressSnapshot: snapshot,
         customerNote: input.customerNote ?? null,

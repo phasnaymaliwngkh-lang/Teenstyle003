@@ -26,16 +26,6 @@ export const PAYMENT_STATUS_LABEL: Record<string, string> = {
   PARTIALLY_REFUNDED: "คืนเงินบางส่วน",
 };
 
-export const SHIPMENT_STATUS_LABEL: Record<string, string> = {
-  PENDING: "เตรียมจัดส่ง",
-  PREPARING: "กำลังเตรียมพัสดุ",
-  SHIPPED: "ส่งออกแล้ว",
-  IN_TRANSIT: "อยู่ระหว่างขนส่ง",
-  DELIVERED: "ส่งถึงแล้ว",
-  FAILED: "ส่งไม่สำเร็จ",
-  RETURNED: "ตีกลับ",
-};
-
 /** สีของ chip สถานะ — ใช้ token ของแบรนด์เท่านั้น */
 export function orderStatusTone(status: string): string {
   switch (status) {
@@ -58,10 +48,6 @@ export function orderStatusLabel(status: string): string {
 
 export function paymentStatusLabel(status: string): string {
   return PAYMENT_STATUS_LABEL[status] ?? status;
-}
-
-export function shipmentStatusLabel(status: string): string {
-  return SHIPMENT_STATUS_LABEL[status] ?? status;
 }
 
 /** วันเวลาแบบไทยที่อ่านง่าย */

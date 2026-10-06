@@ -10,6 +10,13 @@ import { cn } from "@/lib/utils";
 import { updateOrderStatus } from "@/services/admin.service";
 import type { AdminOrder, UpdateOrderStatusInput } from "@/types/admin";
 
+import {
+  EMPTY_TRACKING,
+  toTrackingInput,
+  TrackingFields,
+  trackingReady as isTrackingReady,
+} from "./tracking-fields";
+
 /**
  * ฟอร์มเปลี่ยนสถานะคำสั่งซื้อ (STEP 13)
  *
@@ -22,9 +29,7 @@ export function OrderStatusForm({ order }: { order: AdminOrder }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState(order.allowedNextStatuses[0] ?? "");
-  const [carrier, setCarrier] = useState("");
-  const [trackingNumber, setTrackingNumber] = useState("");
-  const [trackingUrl, setTrackingUrl] = useState("");
+  const [tracking, setTracking] = useState(EMPTY_TRACKING);
   const [adminNote, setAdminNote] = useState(order.adminNote ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +44,7 @@ export function OrderStatusForm({ order }: { order: AdminOrder }) {
    *    กลับมาโดยไม่รู้ว่าช่องไหนขาด ทั้งที่ช่องมีดอกจันกำกับว่าบังคับอยู่แล้ว
    *    ด่านจริงยังอยู่ที่ server เหมือนเดิม — อันนี้คือการไม่ยิงคำขอที่รู้อยู่แล้วว่าจะถูกปฏิเสธ
    */
-  const trackingReady = !needsTracking || (carrier.trim() !== "" && trackingNumber.trim() !== "");
+  const trackingReady = !needsTracking || isTrackingReady(tracking);
 
   if (order.allowedNextStatuses.length === 0) {
     return (
@@ -60,13 +65,7 @@ export function OrderStatusForm({ order }: { order: AdminOrder }) {
     const input: UpdateOrderStatusInput = {
       status,
       ...(adminNote.trim() !== "" ? { adminNote: adminNote.trim() } : {}),
-      ...(needsTracking
-        ? {
-            carrier: carrier.trim(),
-            trackingNumber: trackingNumber.trim(),
-            ...(trackingUrl.trim() !== "" ? { trackingUrl: trackingUrl.trim() } : {}),
-          }
-        : {}),
+      ...(needsTracking ? toTrackingInput(tracking) : {}),
     };
 
     try {
@@ -74,9 +73,7 @@ export function OrderStatusForm({ order }: { order: AdminOrder }) {
 
       setDone(`อัปเดตเป็น ${orderStatusLabel(updated.status)} แล้ว`);
       setStatus(updated.allowedNextStatuses[0] ?? "");
-      setCarrier("");
-      setTrackingNumber("");
-      setTrackingUrl("");
+      setTracking(EMPTY_TRACKING);
       startTransition(() => router.refresh());
     } catch (caught) {
       setError(describeApiError(caught, "อัปเดตสถานะไม่สำเร็จ"));
@@ -91,6 +88,12 @@ export function OrderStatusForm({ order }: { order: AdminOrder }) {
       <p className="mt-1 text-sm text-muted">
         สถานะปัจจุบัน: <strong className="text-ink">{orderStatusLabel(order.status)}</strong>
       </p>
+      {order.canReship && (
+        <p className="mt-2 rounded-[12px] border border-warning/30 bg-warning/5 p-3 text-sm font-semibold text-warning">
+          พัสดุถูกตีกลับถึงร้านแล้ว — ส่งพัสดุใหม่ได้ที่ส่วน &quot;ส่งพัสดุใหม่&quot;
+          หรือยกเลิกคำสั่งซื้อเพื่อรับของกลับเข้าคลัง
+        </p>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-2">
         {order.allowedNextStatuses.map((next) => (
@@ -112,39 +115,8 @@ export function OrderStatusForm({ order }: { order: AdminOrder }) {
       </div>
 
       {needsTracking && (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">
-            <span className="mb-1 block font-semibold">ผู้ให้บริการขนส่ง *</span>
-            <input
-              value={carrier}
-              onChange={(event) => setCarrier(event.target.value)}
-              placeholder="Flash Express / Thailand Post"
-              disabled={disabled}
-              className={inputClass}
-            />
-          </label>
-
-          <label className="block text-sm">
-            <span className="mb-1 block font-semibold">เลขพัสดุจริง *</span>
-            <input
-              value={trackingNumber}
-              onChange={(event) => setTrackingNumber(event.target.value)}
-              placeholder="TH1234567890"
-              disabled={disabled}
-              className={inputClass}
-            />
-          </label>
-
-          <label className="block text-sm sm:col-span-2">
-            <span className="mb-1 block font-semibold">ลิงก์ติดตาม (ไม่บังคับ)</span>
-            <input
-              value={trackingUrl}
-              onChange={(event) => setTrackingUrl(event.target.value)}
-              placeholder="https://..."
-              disabled={disabled}
-              className={inputClass}
-            />
-          </label>
+        <div className="mt-4">
+          <TrackingFields value={tracking} onChange={setTracking} disabled={disabled} />
         </div>
       )}
 
@@ -202,6 +174,3 @@ export function OrderStatusForm({ order }: { order: AdminOrder }) {
     </div>
   );
 }
-
-const inputClass =
-  "min-h-11 w-full rounded-[12px] border border-line bg-white px-3 text-sm outline-none focus:border-brand-soft";

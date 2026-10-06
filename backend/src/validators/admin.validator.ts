@@ -1,6 +1,12 @@
 import { z } from 'zod';
 
 import { ORDER_STATUSES } from './order.validator.ts';
+import {
+  carrierSchema,
+  estimatedDeliverySchema,
+  trackingNumberSchema,
+  trackingUrlSchema,
+} from './shipping.validator.ts';
 
 /**
  * Validator ของหลังบ้าน (STEP 13)
@@ -29,16 +35,11 @@ const MANAGEABLE_STATUSES = [
 export const updateOrderStatusSchema = z.object({
   status: z.enum(MANAGEABLE_STATUSES, { message: 'สถานะที่เลือกไม่อยู่ในรายการที่จัดการได้' }),
   /** บังคับเมื่อเปลี่ยนเป็น SHIPPING (ตรวจที่ service) */
-  carrier: z.string().trim().min(2, 'กรุณาระบุผู้ให้บริการขนส่ง').max(80).optional(),
-  trackingNumber: z
-    .string()
-    .trim()
-    .min(4, 'เลขพัสดุสั้นเกินไป')
-    .max(60)
-    .regex(/^[A-Za-z0-9-]+$/, 'เลขพัสดุใช้ได้เฉพาะตัวอักษร ตัวเลข และขีดกลาง')
-    .optional(),
-  trackingUrl: z.string().trim().url('ลิงก์ติดตามไม่ถูกต้อง').max(500).optional(),
-  estimatedDelivery: z.string().datetime({ message: 'รูปแบบวันเวลาไม่ถูกต้อง' }).optional(),
+  carrier: carrierSchema.optional(),
+  trackingNumber: trackingNumberSchema.optional(),
+  /** https เท่านั้น — กฎเดียวกับหน้าแก้พัสดุ (STEP 44 · ดู shipping.validator.ts) */
+  trackingUrl: trackingUrlSchema.optional(),
+  estimatedDelivery: estimatedDeliverySchema.optional(),
   adminNote: z.string().trim().max(500).optional(),
 });
 

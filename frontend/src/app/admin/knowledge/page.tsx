@@ -79,6 +79,8 @@ export default function AdminKnowledgePage() {
   const [articles, setArticles] = useState<KnowledgeArticle[]>([]);
   /** ยอดจริงที่ตรงเงื่อนไข — ใช้บอกเมื่อรายการถูกตัด (กฎ STEP 34 ข้อ 6) */
   const [totalArticles, setTotalArticles] = useState(0);
+  /** ตัวแปรนโยบายที่ใช้ในบทความได้ (STEP 44) — มาจาก backend ไม่พิมพ์รายการเอง */
+  const [policyTokens, setPolicyTokens] = useState<{ token: string; description: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<KnowledgeCategory | "ALL">("ALL");
@@ -139,6 +141,7 @@ export default function AdminKnowledgePage() {
       });
       setArticles(res.items);
       setTotalArticles(res.total);
+      setPolicyTokens(res.policyTokens);
     } catch (err) {
       console.error("Failed to load admin articles:", err);
       setErrorMessage(describeApiError(err, "ไม่สามารถโหลดข้อมูลบทความคลังความรู้ได้"));
@@ -161,6 +164,7 @@ export default function AdminKnowledgePage() {
         if (!cancelled) {
           setArticles(res.items);
           setTotalArticles(res.total);
+          setPolicyTokens(res.policyTokens);
           setLoading(false);
         }
       } catch (err) {
@@ -885,8 +889,28 @@ export default function AdminKnowledgePage() {
                   value={formData.content}
                   onChange={(e) => setFormData((p) => ({ ...p, content: e.target.value }))}
                   placeholder="ระบุข้อความ รายละเอียด เงื่อนไข และตารางอย่างชัดเจน..."
+                  aria-describedby={policyTokens.length > 0 ? "kb-policy-tokens" : undefined}
                   className="w-full rounded-xl border border-line p-3 text-sm text-ink font-sans focus:border-brand focus:outline-none"
                 />
+                {policyTokens.length > 0 && (
+                  <div
+                    id="kb-policy-tokens"
+                    className="mt-2 rounded-xl border border-line bg-lilac-50 p-3 text-xs text-muted"
+                  >
+                    <p className="font-semibold text-ink">
+                      ห้ามพิมพ์ค่าส่งหรือยอดส่งฟรีเป็นตัวเลข — ใช้ตัวแปรเหล่านี้แทน
+                      ระบบแทนค่าจริงตอนลูกค้าอ่าน (แก้ค่าส่งแล้วบทความเปลี่ยนตามเอง)
+                    </p>
+                    <ul className="mt-1 space-y-0.5">
+                      {policyTokens.map((item) => (
+                        <li key={item.token}>
+                          <code className="font-mono text-brand-dark">{item.token}</code> —{" "}
+                          {item.description}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               {/* FAQ Pairs Manager */}

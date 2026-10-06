@@ -14,6 +14,8 @@ export const LOG_TARGET_TYPES = [
   "AIConversation",
   "Coupon",
   "ReturnRequest",
+  "ShippingRate",
+  "Shipment",
 ] as const;
 
 export type LogTargetType = (typeof LOG_TARGET_TYPES)[number];
@@ -28,6 +30,7 @@ export const LOG_ACTION_GROUPS = [
   "customer",
   "coupon",
   "return",
+  "shipping",
 ] as const;
 
 export type LogActionGroup = (typeof LOG_ACTION_GROUPS)[number];

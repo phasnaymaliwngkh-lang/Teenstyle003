@@ -1,9 +1,14 @@
 import { getPrisma, Prisma } from '@teenstyle/database';
 
-import { toOrder, type OrderDto } from '../models/order.model.ts';
+import { ORDER_SHIPMENTS_SELECT, toOrder, type OrderDto } from '../models/order.model.ts';
 import { releaseCouponForCancelledOrder } from './coupon.service.ts';
 import { refundStateForOrder, type OrderRefundStateDto } from './return.service.ts';
 import { toNumber } from '../models/pricing.ts';
+import {
+  SHIPMENT_IN_FLIGHT,
+  shippingOrderActions,
+  type ShipmentStatusCode,
+} from '../models/shipping.model.ts';
 import { writeAdminLog } from '../models/admin-log.model.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type { UpdateOrderStatusInput } from '../validators/admin.validator.ts';
@@ -40,6 +45,11 @@ import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
  *      ระบบจะสร้างแถว Shipment ให้ ไม่มีการสร้างเลขพัสดุสมมติ
  *   6. **ตั้ง REFUNDED จากฟอร์มนี้ไม่ได้** — คำสั่งซื้อเป็น REFUNDED เมื่อบันทึกการคืนเงินครบทุกชิ้น
  *      ผ่านระบบคืนสินค้า ([return.service.ts](./return.service.ts) · STEP 43) เท่านั้น
+ *   7. **ใบที่ "จัดส่งแล้ว" ทำอะไรได้ขึ้นกับพัสดุล่าสุด** (STEP 44 · `shippingOrderActions`)
+ *      ยังอยู่กับขนส่ง → กดส่งถึงได้ ยกเลิกไม่ได้ · ตีกลับถึงร้านแล้ว → ยกเลิก (รับของเข้าคลัง) หรือส่งใหม่
+ *      ไม่ใช่ยกเลิกได้ตลอด — ของที่ยังไม่กลับมาจะ "รับเข้าคลัง" ไม่ได้ ยอดคลังจะเกินของจริง
+ *   8. **ล็อกแถวคำสั่งซื้อก่อนตัดสินทุกครั้ง** (`FOR UPDATE`) — การเปลี่ยนสถานะคำสั่งซื้อและสถานะพัสดุ
+ *      (shipment.service.ts) ล็อกแถวเดียวกัน สองคนกดพร้อมกันจึงเรียงคิวกัน ไม่ใช่ทำงานบนข้อมูลเก่าทั้งคู่
  */
 
 const ORDER_SELECT = {
@@ -57,6 +67,7 @@ const ORDER_SELECT = {
   shippingFee: true,
   total: true,
   shippingMethod: true,
+  shippingEtaText: true,
   addressSnapshot: true,
   customerNote: true,
   adminNote: true,
@@ -86,19 +97,7 @@ const ORDER_SELECT = {
       product: { select: { id: true, slug: true } },
     },
   },
-  shipments: {
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      carrier: true,
-      trackingNumber: true,
-      trackingUrl: true,
-      status: true,
-      estimatedDelivery: true,
-      shippedAt: true,
-      deliveredAt: true,
-    },
-  },
+  shipments: ORDER_SHIPMENTS_SELECT,
   payments: {
     orderBy: { createdAt: 'desc' },
     select: { provider: true, status: true, amount: true, paidAt: true, failureReason: true },
@@ -119,6 +118,8 @@ export interface AdminOrderDto extends OrderDto {
   }[];
   /** สถานะที่เปลี่ยนไปได้จากสถานะปัจจุบัน (ให้ UI แสดงเฉพาะปุ่มที่ทำได้จริง) */
   allowedNextStatuses: string[];
+  /** ส่งพัสดุชิ้นใหม่ได้ไหม — ได้เฉพาะเมื่อพัสดุล่าสุดถูกตีกลับถึงร้านแล้ว (STEP 44) */
+  canReship: boolean;
 }
 
 /** เส้นทางสถานะที่อนุญาต — นอกเหนือจากนี้ถูกปฏิเสธที่ server */
@@ -127,13 +128,36 @@ const ALLOWED_TRANSITIONS: Record<string, readonly string[]> = {
   PAID: ['PROCESSING', 'CANCELLED'],
   PROCESSING: ['PACKING', 'CANCELLED'],
   PACKING: ['SHIPPING', 'CANCELLED'],
-  SHIPPING: ['DELIVERED'],
+  // ยกเลิกได้เฉพาะเมื่อพัสดุตีกลับถึงร้านแล้ว — ตรวจเพิ่มด้วย `shippingOrderActions` (STEP 44)
+  SHIPPING: ['DELIVERED', 'CANCELLED'],
   DELIVERED: [],
   CANCELLED: [],
   REFUNDED: [],
 };
 
+/** พัสดุล่าสุดของใบนี้ — `shipments` เรียงใหม่สุดก่อน (ORDER_SHIPMENTS_SELECT) */
+function latestShipmentStatus(order: {
+  shipments: { status: string }[];
+}): ShipmentStatusCode | null {
+  return (order.shipments[0]?.status as ShipmentStatusCode | undefined) ?? null;
+}
+
+/** เส้นทางที่ไปได้จริงตอนนี้ — ใบที่จัดส่งแล้วตัดตามสถานะพัสดุล่าสุด */
+function allowedNextFor(status: string, latest: ShipmentStatusCode | null): string[] {
+  const base = ALLOWED_TRANSITIONS[status] ?? [];
+
+  if (status !== 'SHIPPING') return [...base];
+
+  const actions = shippingOrderActions(latest);
+
+  return base.filter((next) =>
+    next === 'DELIVERED' ? actions.canDeliver : next === 'CANCELLED' ? actions.canCancel : true,
+  );
+}
+
 function toAdminOrder(order: AdminOrderRow): AdminOrderDto {
+  const latest = latestShipmentStatus(order);
+
   return {
     ...toOrder(order),
     adminNote: order.adminNote,
@@ -147,7 +171,8 @@ function toAdminOrder(order: AdminOrderRow): AdminOrderDto {
       paidAt: payment.paidAt?.toISOString() ?? null,
       failureReason: payment.failureReason,
     })),
-    allowedNextStatuses: [...(ALLOWED_TRANSITIONS[order.status] ?? [])],
+    allowedNextStatuses: allowedNextFor(order.status, latest),
+    canReship: order.status === 'SHIPPING' && shippingOrderActions(latest).canReship,
   };
 }
 
@@ -371,14 +396,43 @@ export async function updateOrderStatus(
   let pointsAward = null as PointsAward | null;
 
   await prisma.$transaction(async (tx) => {
-    // อ่านสถานะซ้ำในทรานแซกชัน กันพนักงานสองคนกดพร้อมกัน
+    /**
+     * ล็อกแถวก่อนอ่านสถานะซ้ำ — แค่อ่านซ้ำ (แบบเดิม) ไม่กันสองคนที่กดพร้อมกัน เพราะทั้งคู่อ่านได้ค่าเดิม
+     * ก่อนอีกฝ่าย commit (READ COMMITTED) · การเปลี่ยนสถานะพัสดุล็อกแถวเดียวกันนี้ (STEP 44)
+     */
+    await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${current.id}::uuid FOR UPDATE`;
+
     const fresh = await tx.order.findUniqueOrThrow({
       where: { id: current.id },
-      select: { status: true, paymentStatus: true },
+      select: {
+        status: true,
+        paymentStatus: true,
+        shipments: {
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: 1,
+          select: { status: true },
+        },
+      },
     });
 
     if (fresh.status !== current.status) {
       throw ApiError.conflict('สถานะคำสั่งซื้อถูกเปลี่ยนไปแล้วโดยคนอื่น — กรุณารีเฟรช');
+    }
+
+    if (current.status === 'SHIPPING') {
+      const actions = shippingOrderActions(latestShipmentStatus(fresh));
+
+      if (input.status === 'DELIVERED' && !actions.canDeliver) {
+        throw ApiError.conflict(
+          'พัสดุถูกตีกลับมาที่ร้านแล้ว — ส่งพัสดุใหม่ หรือยกเลิกคำสั่งซื้อแทนการกดส่งถึง',
+        );
+      }
+
+      if (input.status === 'CANCELLED' && !actions.canCancel) {
+        throw ApiError.conflict(
+          'ยกเลิกคำสั่งซื้อที่ส่งออกไปแล้วได้เมื่อพัสดุตีกลับถึงร้านแล้วเท่านั้น — ตอนนี้ของยังอยู่กับขนส่ง',
+        );
+      }
     }
 
     const paymentUpdate: Prisma.OrderUpdateInput = {};
@@ -391,7 +445,6 @@ export async function updateOrderStatus(
        */
       if (current.status === 'PENDING_PAYMENT') {
         await releaseReservationForOrder(tx, current);
-        await releaseCouponForCancelledOrder(tx, current.id);
       } else {
         await restockForOrder(
           tx,
@@ -406,6 +459,13 @@ export async function updateOrderStatus(
        * (ใบที่จ่ายแล้วแต่ถูกยกเลิก ไม่ใช่ "เงินที่ร้านได้รับ" อีกต่อไป จึงต้องไม่เหลือแต้มค้าง)
        */
       await releasePointsForCancelledOrder(tx, current.id);
+
+      /**
+       * คืนโควตาคูปองทุกกรณีที่ยกเลิก (กฎ STEP 41 ข้อ 5: "ทุกที่")
+       * ⚠️ แก้ตอน STEP 44 — เดิมคืนเฉพาะใบที่ยังไม่จ่าย ร้านยกเลิกใบที่จ่ายแล้ว (หรือใบที่พัสดุตีกลับ)
+       *    โควตาจึงค้างเป็น "ใช้แล้ว" ทั้งที่ไม่มีใครได้ส่วนลดนั้นจริง
+       */
+      await releaseCouponForCancelledOrder(tx, current.id);
 
       paymentUpdate.paymentStatus = fresh.paymentStatus === 'PAID' ? 'PAID' : 'CANCELLED';
 
@@ -441,6 +501,8 @@ export async function updateOrderStatus(
           ...(input.estimatedDelivery !== undefined
             ? { estimatedDelivery: new Date(input.estimatedDelivery) }
             : {}),
+          // ประวัติสถานะของพัสดุเริ่มที่นี่ (STEP 44)
+          events: { create: { status: 'SHIPPED', createdById: actor.id } },
         },
         select: { trackingNumber: true },
       });
@@ -450,10 +512,25 @@ export async function updateOrderStatus(
     }
 
     if (input.status === 'DELIVERED') {
-      await tx.shipment.updateMany({
-        where: { orderId: current.id },
-        data: { status: 'DELIVERED', deliveredAt: new Date() },
+      /**
+       * ปิดเฉพาะพัสดุที่ยังอยู่กับขนส่ง — ชิ้นที่ถูกตีกลับไปแล้วต้องคงสถานะ "ตีกลับ" ไว้ตามจริง
+       * (เดิมตั้งทุกแถวเป็น DELIVERED ซึ่งถูกเฉพาะตอนที่หนึ่งใบมีพัสดุชิ้นเดียว · แก้ตอน STEP 44)
+       */
+      const inFlight = await tx.shipment.findMany({
+        where: { orderId: current.id, status: { in: [...SHIPMENT_IN_FLIGHT] } },
+        select: { id: true },
       });
+
+      for (const shipment of inFlight) {
+        await tx.shipment.update({
+          where: { id: shipment.id },
+          data: {
+            status: 'DELIVERED',
+            deliveredAt: new Date(),
+            events: { create: { status: 'DELIVERED', createdById: actor.id } },
+          },
+        });
+      }
     }
 
     await tx.order.update({

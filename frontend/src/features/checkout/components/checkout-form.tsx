@@ -124,7 +124,10 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
   const pointsDiscount = points?.discount ?? 0;
   const total = summary.subtotal - couponDiscount - pointsDiscount + shippingFee;
 
-  async function checkCoupon() {
+  /**
+   * @param method วิธีจัดส่งที่จะใช้คิด — ส่งมาตอนเปลี่ยนวิธีจัดส่ง เพราะค่าใน state ยังเป็นค่าเดิม
+   */
+  async function checkCoupon(method: ShippingOption["code"] = shippingMethod) {
     const code = couponInput.trim();
 
     if (code === "") {
@@ -138,7 +141,7 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
     resetPoints("เปลี่ยนคูปองแล้ว — กดใช้แต้มอีกครั้งเพื่อคิดเพดานใหม่");
 
     try {
-      const result = await applyCoupon(code, shippingMethod);
+      const result = await applyCoupon(code, method);
 
       setCoupon(result.applied);
       setCouponMessage(result.usable ? null : result.message);
@@ -166,6 +169,8 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
       ...(coupon !== null ? { couponCode: coupon.code } : {}),
       ...(points !== null ? { pointsToRedeem: points.points } : {}),
       ...(values.customerNote ? { customerNote: values.customerNote } : {}),
+      // ยอดที่ลูกค้าเห็นอยู่ — server ใช้เทียบเท่านั้น ไม่ตรงได้ 409 แทนการเก็บยอดอื่นเงียบ ๆ (STEP 44)
+      expectedTotal: Math.round(total * 100) / 100,
       ...(values.addressChoice === "new"
         ? {
             newAddress: {
@@ -190,12 +195,22 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
       router.push(`/checkout/success?order=${encodeURIComponent(order.orderNumber)}`);
     } catch (error) {
       const apiError = error instanceof ApiClientError ? error : null;
+      const totalChanged =
+        apiError?.status === 409 && mentionsField(apiError.details, "expectedTotal");
 
       setSubmitError({
         message: apiError?.message ?? "สั่งซื้อไม่สำเร็จ กรุณาลองอีกครั้ง",
         // 409 = ของหมด/ไม่พอ ระหว่างที่กำลังสั่ง → ต้องกลับไปแก้ตะกร้า
-        stockIssue: apiError?.status === 409,
+        // (ยกเว้นยอดเปลี่ยน — ตะกร้าไม่ผิด แค่ต้องดูยอดใหม่)
+        stockIssue: apiError?.status === 409 && !totalChanged,
       });
+
+      if (totalChanged) {
+        // โหลดยอดใหม่จาก server · ส่วนลดคูปอง/แต้มที่ถืออยู่บนจออาจเก่าไปด้วย → ตรวจใหม่
+        resetPoints("ยอดเปลี่ยน — กดใช้แต้มอีกครั้งเพื่อคิดเพดานใหม่");
+        if (coupon !== null) void checkCoupon();
+        router.refresh();
+      }
     }
   }
 
@@ -359,10 +374,15 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
                     value={option.code}
                     disabled={!available}
                     {...form.register("shippingMethod", {
-                      // คูปองส่งฟรีลดตามค่าส่งของวิธีที่เลือก → เพดานแต้มเปลี่ยนตาม
-                      onChange: () => {
+                      /**
+                       * คูปองส่งฟรีลดตามค่าส่งของวิธีที่เลือก → ต้องตรวจคูปองใหม่ และเพดานแต้มเปลี่ยนตาม
+                       * ⚠️ แก้ตอน STEP 44: เดิมรีเซ็ตแค่แต้ม ส่วนลดคูปองบนจอจึงยังเป็นของวิธีเดิม
+                       *    ยอดที่โชว์ไม่ตรงกับที่ server คิด (ตอนนี้ server ปฏิเสธยอดที่ไม่ตรง — expectedTotal)
+                       */
+                      onChange: (event: React.ChangeEvent<HTMLInputElement>) => {
                         if (coupon !== null) {
                           resetPoints("เปลี่ยนวิธีจัดส่งแล้ว — กดใช้แต้มอีกครั้งเพื่อคิดเพดานใหม่");
+                          void checkCoupon(event.target.value as ShippingOption["code"]);
                         }
                       },
                     })}
@@ -376,6 +396,12 @@ export function CheckoutForm({ summary }: { summary: CheckoutSummary }) {
                       </span>
                     </span>
                     <span className="block text-muted">{option.description}</span>
+                    {/* ยอดส่งฟรีมาจากอัตราที่ร้านตั้ง (STEP 44) — ไม่อยู่ในคำอธิบายอีกแล้วเพราะจะค้างค่าเก่า */}
+                    {option.freeOverSubtotal !== null && option.fee > 0 && (
+                      <span className="block text-xs font-semibold text-brand-dark">
+                        ส่งฟรีเมื่อยอดสินค้าครบ {formatBaht(option.freeOverSubtotal)}
+                      </span>
+                    )}
                     <span className="block text-xs text-muted-light">{option.etaText}</span>
                     {!available && (
                       <span className="block text-xs font-semibold text-warning">
@@ -604,5 +630,16 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="text-muted">{label}</dt>
       <dd className="shrink-0 font-semibold">{value}</dd>
     </div>
+  );
+}
+
+/** `details` ของ API มีช่องนี้ไหม (`{ field, message }[]`) */
+function mentionsField(details: unknown, field: string): boolean {
+  return (
+    Array.isArray(details) &&
+    details.some(
+      (item) =>
+        typeof item === "object" && item !== null && (item as { field?: unknown }).field === field,
+    )
   );
 }

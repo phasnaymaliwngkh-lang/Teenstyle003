@@ -1,5 +1,6 @@
 import { apiFetch } from "@/lib/api";
 import type {
+  AdminKnowledgeSearchResult,
   KnowledgeArticle,
   KnowledgeAskResponse,
   KnowledgeCategory,
@@ -127,7 +128,7 @@ export async function voteKnowledgeHelpful(
 
 export async function fetchAdminKnowledgeArticles(
   params?: KnowledgeQueryParams,
-): Promise<KnowledgeSearchResult> {
+): Promise<AdminKnowledgeSearchResult> {
   const query = new URLSearchParams();
   if (params?.q) query.set("q", params.q);
   if (params?.category) query.set("category", params.category);
@@ -136,9 +137,12 @@ export async function fetchAdminKnowledgeArticles(
   if (params?.limit) query.set("limit", String(params.limit));
 
   const qs = query.toString();
-  return apiFetch<KnowledgeSearchResult>(`/api/admin/knowledge/articles${qs ? `?${qs}` : ""}`, {
-    cache: "no-store",
-  });
+  return apiFetch<AdminKnowledgeSearchResult>(
+    `/api/admin/knowledge/articles${qs ? `?${qs}` : ""}`,
+    {
+      cache: "no-store",
+    },
+  );
 }
 
 export async function createAdminKnowledgeArticle(
