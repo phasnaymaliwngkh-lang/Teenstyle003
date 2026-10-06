@@ -134,7 +134,12 @@ Prisma schema เขียน CHECK ไม่ได้ จึงอยู่ใ�
 
 ไฟล์เดียวกันยังสร้าง **partial index** สำหรับ query ที่ใช้บ่อย (สินค้า active, คำสั่งซื้อที่ยังไม่ปิด,
 สินค้าใกล้หมด, notification ที่ยังไม่อ่าน, รีวิวที่อนุมัติแล้ว) และเปิด `pg_trgm`
-พร้อม GIN index บน `Product.name` / `Product.sku` เพื่อให้ค้นหาแบบ `ILIKE '%คำ%'` เร็ว (STEP 45)
+
+⚠️ **ไฟล์นั้นเคยสร้าง GIN index trigram บน `Product.name` / `Product.sku` ด้วย แต่ถูกลบไปตั้งแต่ migration ถัดมา**
+(`20260913223900_add_authjs_tables` — `prisma migrate dev` ลบ index ที่ไม่อยู่ใน schema ทิ้งเอง) และ STEP 34
+วัดแล้วว่าที่ 5,000 สินค้า planner เลือก seq scan เองอยู่ดี จึง **ไม่ได้สร้างกลับ** — การค้นสินค้า (STEP 45)
+วัดเวลาด้วย `audit-performance.mjs` ไม่ได้พึ่ง index นี้ · index trigram ที่มีจริงอยู่ที่ Order/User (STEP 34)
+· **index ที่เขียน SQL เองต้องประกาศใน schema ด้วย** ไม่งั้น `migrate dev` ครั้งถัดไปจะลบทิ้งเงียบ ๆ แบบนี้อีก
 
 ### 5. Soft delete
 

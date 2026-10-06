@@ -3,8 +3,11 @@ import { getPrisma, Prisma } from '@teenstyle/database';
 import { toLookDetail, type LookDetailDto } from '../models/look-detail.model.ts';
 import { toLookCard, type LookCardDto } from '../models/look.model.ts';
 import { resolveVariantPrice } from '../models/pricing.ts';
+import { likePattern } from '../models/search.model.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type { LookQuery } from '../validators/look.validator.ts';
+
+import { splitSearchTerms } from './shop.service.ts';
 
 /**
  * Look service (STEP 7) — ไอเดียการแต่งตัวที่จัดไว้แล้ว
@@ -133,8 +136,9 @@ export async function searchLooks(query: LookQuery): Promise<LookListResult> {
     Prisma.sql`l."isActive" = true`,
   ];
 
-  if (query.q) {
-    const pattern = `%${query.q}%`;
+  // หลายคำ ทุกคำต้องตรง · escape % _ — กฎเดียวกับการค้นสินค้า (splitSearchTerms · STEP 45)
+  for (const term of splitSearchTerms(query.q)) {
+    const pattern = likePattern(term);
     conditions.push(Prisma.sql`(l."name" ILIKE ${pattern} OR l."description" ILIKE ${pattern})`);
   }
 

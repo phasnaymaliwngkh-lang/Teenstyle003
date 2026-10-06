@@ -94,7 +94,12 @@ export function organizationJsonLd(): JsonLdObject {
   };
 }
 
-/** เว็บไซต์ — **ไม่มี `SearchAction`** เพราะ /search ยังเป็น placeholder (STEP 45) */
+/**
+ * เว็บไซต์ + `SearchAction` (ประกาศตั้งแต่ STEP 45 — ก่อนหน้านั้น /search เป็น placeholder จึงห้ามประกาศ)
+ *
+ * `/search?q=…` รับคำค้นอะไรก็ได้และตอบด้วยสินค้าจริงจากฐานข้อมูล · หมายเหตุ: Google เลิกแสดงช่องค้นหา
+ * ใต้ผลลัพธ์ (sitelinks search box) ไปตั้งแต่ปลายปี 2024 — ประกาศไว้เพราะเป็นความจริงของเว็บ ไม่ได้หวังผลกับ Google
+ */
 export function webSiteJsonLd(): JsonLdObject {
   return {
     "@context": "https://schema.org",
@@ -102,6 +107,11 @@ export function webSiteJsonLd(): JsonLdObject {
     name: SITE_NAME,
     url: SITE_URL,
     inLanguage: "th-TH",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: { "@type": "EntryPoint", urlTemplate: `${SITE_URL}/search?q={search_term_string}` },
+      "query-input": "required name=search_term_string",
+    },
   };
 }
 

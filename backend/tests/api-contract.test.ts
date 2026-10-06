@@ -51,6 +51,9 @@ const GUEST_REACHABLE: Record<string, Extract<ApiRouteAuth, 'public' | 'optional
   'POST /api/products/availability': 'public',
   'GET /api/products/:slug': 'public',
   'GET /api/categories': 'public',
+  // ค้นหาทั้งร้าน (STEP 45) — อ่านอย่างเดียว ลูกค้าต้องค้นได้ก่อนล็อกอิน
+  'GET /api/search': 'public',
+  'GET /api/search/suggest': 'public',
   'GET /api/looks': 'public',
   'GET /api/looks/search': 'public',
   'GET /api/looks/filters': 'public',

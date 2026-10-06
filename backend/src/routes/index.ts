@@ -14,6 +14,7 @@ import { couponRouter } from './coupon.route.ts';
 import { checkoutRouter, orderRouter } from './order.route.ts';
 import { paymentRouter } from './payment.route.ts';
 import { returnRouter } from './return.route.ts';
+import { searchRouter } from './search.route.ts';
 import { reviewRouter } from './review.route.ts';
 import { shippingRouter } from './shipping.route.ts';
 import { userRouter } from './user.route.ts';
@@ -52,6 +53,12 @@ const API_GROUPS: readonly ApiGroup[] = [
     note: 'แคตตาล็อกสินค้า ค้นหา ตัวกรอง ตรวจสต็อก และรีวิวของสินค้า (เปิดให้ทุกคน)',
   },
   { path: '/categories', router: categoryRouter, step: 6, note: 'หมวดหมู่สินค้าแบบต้นไม้' },
+  {
+    path: '/search',
+    router: searchRouter,
+    step: 45,
+    note: 'ค้นหาทั้งร้านจากช่องเดียว — ตีความสี ไซซ์ ราคา จากคำค้นภาษาคน · คำแนะนำระหว่างพิมพ์ (เปิดให้ทุกคน)',
+  },
   {
     path: '/looks',
     router: lookRouter,

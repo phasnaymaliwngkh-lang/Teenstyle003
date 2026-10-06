@@ -32,6 +32,10 @@ export const ROUTES = [
   { path: '/ai-stylist', as: 'guest' },
   { path: '/about', as: 'guest' },
   { path: '/search', as: 'guest' },
+  // ผลค้นหาจริง (STEP 45): ตีความสี+งบ · พิมพ์ผิดแล้วมีคำแนะนำ · สีที่ร้านไม่มี
+  { path: '/search?q=เสื้อสีดำ ไม่เกิน 800 บาท', as: 'guest' },
+  { path: '/search?q=กระโปง', as: 'guest' },
+  { path: '/search?q=เดรสสีแดง', as: 'guest' },
   { path: '/signin', as: 'guest' },
   { path: '/unauthorized', as: 'guest' },
   { path: '/forbidden', as: 'guest' },

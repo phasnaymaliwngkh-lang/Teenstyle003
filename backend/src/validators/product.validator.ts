@@ -12,6 +12,8 @@ export const PRODUCT_SORTS = [
   'discount',
   'popular',
   'bestselling',
+  /** ใกล้เคียงคำค้นมากสุดก่อน (STEP 45) — ไม่มีคำค้นจะเรียงใหม่สุดก่อน */
+  'relevance',
 ] as const;
 
 /** แปลง "a,b,c" เป็น ['a','b','c'] และตัดค่าว่างออก */
@@ -26,7 +28,7 @@ const csvToArray = z
   .pipe(z.array(z.string().max(120)).max(20));
 
 export const shopQuerySchema = z.object({
-  /** คำค้น — ใช้ GIN index (pg_trgm) ที่สร้างไว้ใน STEP 2 */
+  /** คำค้น — คั่นหลายคำด้วยช่องว่าง ทุกคำต้องตรง (ดู `termCondition` ใน shop.service.ts) */
   q: z.string().trim().max(120).optional(),
   /** slug ของหมวดหมู่ (รวมสินค้าในหมวดย่อยให้ด้วย) */
   category: z.string().trim().max(120).optional(),

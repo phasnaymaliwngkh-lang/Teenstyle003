@@ -2,6 +2,7 @@ import { getPrisma, Prisma } from '@teenstyle/database';
 
 import { HAS_AVAILABLE_STOCK_SQL } from '../models/availability.ts';
 import { resolveVariantPrice } from '../models/pricing.ts';
+import { likePattern, MAX_SEARCH_TERMS } from '../models/search.model.ts';
 import { toProductDetail, type ProductDetailDto } from '../models/product-detail.model.ts';
 import { type ProductCardDto } from '../models/product.model.ts';
 import { ApiError } from '../utils/api-error.ts';
@@ -30,6 +31,43 @@ export interface ShopResult {
   totalPages: number;
   /** ส่งกลับ filter ที่ใช้จริง เพื่อให้ UI แสดงสถานะได้ตรง */
   appliedSort: ShopQuery['sort'];
+}
+
+/**
+ * คำค้นจากช่องค้นหา → รายการคำ (คั่นด้วยช่องว่าง) · ทุกคำต้องตรง (AND)
+ * เดิมเทียบทั้งประโยคเป็นก้อนเดียว ("เสื้อ ดำ" ต้องอยู่ติดกันในชื่อ) จึงหาไม่เจอแทบทุกครั้งที่พิมพ์มากกว่าหนึ่งคำ
+ */
+export function splitSearchTerms(q: string | undefined): string[] {
+  if (q === undefined) return [];
+
+  return [...new Set(q.trim().split(/\s+/).filter(Boolean))].slice(0, MAX_SEARCH_TERMS);
+}
+
+/**
+ * หนึ่งคำค้นตรงกับสินค้าได้หลายทาง (STEP 45): ชื่อ · SKU · คำอธิบาย · tag · ชื่อหมวด (รวมหมวดแม่) · ชื่อแบรนด์
+ * "กางเกง" จึงเจอยีนส์ที่อยู่หมวด "ยีนส์" ใต้หมวด "กางเกงและกระโปรง" แม้ชื่อสินค้าไม่มีคำว่ากางเกง
+ *
+ * ⚠️ ทุกขาเป็นเงื่อนไขของตาราง Product เอง (subquery ของหมวด/แบรนด์ไม่อ้างแถวนอก) — ไม่ใช่ OR ข้ามตารางที่ join กัน
+ *    (กฎ STEP 34 ข้อ 2) · `likePattern` escape `%` `_` ให้แล้ว ("50%" หาเครื่องหมาย % จริง)
+ * ⚠️ ไม่มี index trigram ของ `Product.name` โดยเจตนา — วัดตอน STEP 34 แล้วที่ 5,000 สินค้า planner เลือก seq scan เอง
+ *    (index ที่ migration แรกสร้างไว้ถูกลบไปตั้งแต่ migration ถัดมา · คอมเมนต์เดิมที่บอกว่า "ใช้ GIN index" ไม่จริง)
+ */
+function termCondition(term: string): Prisma.Sql {
+  const pattern = likePattern(term);
+
+  return Prisma.sql`(
+    p."name" ILIKE ${pattern}
+    OR p."sku" ILIKE ${pattern}
+    OR p."description" ILIKE ${pattern}
+    OR EXISTS (SELECT 1 FROM unnest(p."tags") AS tag WHERE tag ILIKE ${pattern})
+    OR p."categoryId" IN (
+      SELECT c.id FROM "Category" c
+       WHERE c."deletedAt" IS NULL
+         AND (c."name" ILIKE ${pattern}
+              OR c."parentId" IN (SELECT parent.id FROM "Category" parent WHERE parent."name" ILIKE ${pattern}))
+    )
+    OR p."brandId" IN (SELECT b.id FROM "Brand" b WHERE b."name" ILIKE ${pattern})
+  )`;
 }
 
 /** นิพจน์ราคาที่ลูกค้าจ่ายจริง */
@@ -72,8 +110,20 @@ const SAVES_JOIN = Prisma.sql`
  * คืนทั้งสองส่วนคู่กันเพราะการเรียงบางแบบต้องใช้ยอดรวมจากตารางอื่น
  * ซึ่งต้องรวมมาเป็น JOIN ไม่ใช่ subquery ต่อแถว (ดูคอมเมนต์ของ SALES_JOIN)
  */
-function sortFragments(sort: ShopQuery['sort']): { join: Prisma.Sql; orderBy: Prisma.Sql } {
+function sortFragments(
+  sort: ShopQuery['sort'],
+  terms: readonly string[],
+): { join: Prisma.Sql; orderBy: Prisma.Sql } {
   switch (sort) {
+    case 'relevance':
+      // ความใกล้เคียงของคำค้นกับชื่อสินค้า (pg_trgm) — ไม่มีคำค้นก็ไม่มีอะไรให้วัด จึงเรียงใหม่สุดก่อน
+      return terms.length === 0
+        ? sortFragments('newest', terms)
+        : {
+            join: NO_JOIN,
+            orderBy: Prisma.sql`word_similarity(${terms.join(' ')}, p."name") DESC,
+              p."publishedAt" DESC NULLS LAST, p."createdAt" DESC`,
+          };
     case 'price-asc':
       return { join: NO_JOIN, orderBy: Prisma.sql`${EFFECTIVE_PRICE} ASC, p."createdAt" DESC` };
     case 'price-desc':
@@ -109,20 +159,22 @@ function sortFragments(sort: ShopQuery['sort']): { join: Prisma.Sql; orderBy: Pr
   }
 }
 
-/** ค้นหาสินค้าตามเงื่อนไข */
-export async function searchProducts(query: ShopQuery): Promise<ShopResult> {
+/**
+ * ค้นหาสินค้าตามเงื่อนไข
+ * @param query.terms คำค้นที่ตีความแล้ว (หน้า /search · STEP 45) — ไม่ส่งมา = แยกจาก `q` ด้วยช่องว่าง
+ */
+export async function searchProducts(
+  query: ShopQuery & { terms?: readonly string[] },
+): Promise<ShopResult> {
+  const terms = query.terms ?? splitSearchTerms(query.q);
   const prisma = getPrisma();
   const conditions: Prisma.Sql[] = [
     Prisma.sql`p."deletedAt" IS NULL`,
     Prisma.sql`p."status" = 'ACTIVE'`,
   ];
 
-  if (query.q) {
-    // ILIKE ใช้ GIN index (pg_trgm) ที่สร้างไว้ใน STEP 2
-    const pattern = `%${query.q}%`;
-    conditions.push(
-      Prisma.sql`(p."name" ILIKE ${pattern} OR p."sku" ILIKE ${pattern} OR ${query.q} = ANY(p."tags"))`,
-    );
+  for (const term of terms) {
+    conditions.push(termCondition(term));
   }
 
   if (query.category) {
@@ -180,7 +232,7 @@ export async function searchProducts(query: ShopQuery): Promise<ShopResult> {
 
   const offset = (query.page - 1) * query.limit;
 
-  const { join, orderBy } = sortFragments(query.sort);
+  const { join, orderBy } = sortFragments(query.sort, terms);
 
   // count(*) OVER () ให้จำนวนรวมมาพร้อมผลลัพธ์ ไม่ต้อง query ซ้ำ
   const rows = await prisma.$queryRaw<Array<{ id: string; total: bigint }>>(Prisma.sql`

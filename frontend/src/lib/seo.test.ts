@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -133,11 +136,26 @@ describe("ตัวตนของร้าน — ห้ามประกา�
     expect(data["@type"]).toBe("OnlineStore");
   });
 
-  it("WebSite ไม่ประกาศ SearchAction เพราะ /search ยังเป็น placeholder (STEP 45)", () => {
-    const data = webSiteJsonLd();
+  /**
+   * ประกาศได้เพราะ /search ทำงานจริงแล้ว (STEP 45) — ถ้าหน้านั้นกลับไปเป็น placeholder
+   * เทสต์นี้ต้องล้ม (ประกาศสิ่งที่ไม่มีจริงใน structured data · กฎ STEP 33 ข้อ 1)
+   */
+  it("WebSite ประกาศ SearchAction ที่ชี้ไป /search ซึ่งเป็นหน้าค้นหาที่ทำงานจริง", () => {
+    const data = webSiteJsonLd() as {
+      inLanguage: string;
+      potentialAction: { target: { urlTemplate: string } };
+    };
+    const page = readFileSync(
+      join(process.cwd(), "src", "app", "(storefront)", "search", "page.tsx"),
+      "utf8",
+    );
 
-    expect(data.potentialAction).toBeUndefined();
     expect(data.inLanguage).toBe("th-TH");
+    expect(data.potentialAction.target.urlTemplate.endsWith("/search?q={search_term_string}")).toBe(
+      true,
+    );
+    expect(page).not.toContain("ComingSoon");
+    expect(page).toContain("fetchSearchResults");
   });
 });
 

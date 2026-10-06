@@ -160,6 +160,36 @@ const INTERACTIONS = [
       return { ok: false, reason: 'ส่งคำค้นแล้วไม่มีแบนเนอร์ผลการค้นหาขึ้นเลย' };
     })()`,
   },
+  {
+    route: '/search',
+    width: 360,
+    name: 'พิมพ์ในช่องค้นหาแล้วต้องมีคำแนะนำจากสินค้าจริงโผล่ (STEP 45)',
+    /**
+     * พิสูจน์ทั้งทาง: JS ทำงาน · หน่วงแล้วยิง /api/search/suggest ผ่าน proxy/CSP ได้ ·
+     * listbox มีตัวเลือกที่เป็นสินค้า (มีรูปหรือราคา) ไม่ใช่แค่ "ค้นหา “…”" ที่สร้างฝั่งหน้าเว็บเอง
+     * ช่องที่จอ 360px ต้องไม่ถูกตัด — กล่องแนะนำต้องไม่กว้างเกินจอ
+     */
+    script: `(async () => {
+      const input = document.querySelector('input[role="combobox"]');
+      if (!input) return { ok: false, reason: 'ไม่พบช่องค้นหา [role=combobox]' };
+      input.focus();
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+      setter.call(input, 'ฮู้ด');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      for (let i = 0; i < 25; i += 1) {
+        await new Promise((r) => setTimeout(r, 200));
+        const listbox = document.getElementById(input.getAttribute('aria-controls'));
+        const options = listbox ? [...listbox.querySelectorAll('[role="option"]')] : [];
+        if (options.length > 1) {
+          if (input.getAttribute('aria-expanded') !== 'true') return { ok: false, reason: 'มีคำแนะนำแต่ aria-expanded ไม่เป็น true' };
+          const box = listbox.getBoundingClientRect();
+          if (box.right > window.innerWidth + 1) return { ok: false, reason: 'กล่องแนะนำกว้างเกินจอ' };
+          return { ok: true, reason: '' };
+        }
+      }
+      return { ok: false, reason: 'พิมพ์แล้ว 5 วินาทียังไม่มีคำแนะนำที่เป็นสินค้าโผล่' };
+    })()`,
+  },
   /* eslint-enable no-undef */
 ];
 

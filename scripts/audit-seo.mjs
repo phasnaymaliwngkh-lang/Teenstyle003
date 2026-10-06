@@ -43,6 +43,7 @@ const MUST_NOINDEX = [
   '/cart',
   '/checkout',
   '/search',
+  '/search?q=เสื้อสีดำ',
   '/signin',
   '/shop?q=เสื้อ',
   '/looks?q=สตรีท',

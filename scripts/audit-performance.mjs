@@ -415,6 +415,32 @@ const ROUTES = [
   { path: '/api/products/product-1', budgetMs: 250, note: 'หน้าสินค้า' },
   { path: '/api/products/product-1/reviews?limit=10', budgetMs: 250, note: 'รีวิวในหน้าสินค้า' },
   { path: '/api/looks/search?limit=12', budgetMs: 300, note: '/looks' },
+  // ค้นหา (STEP 45) — แต่ละคำตรวจ ชื่อ · SKU · คำอธิบาย · tag · ชื่อหมวด/หมวดแม่ · ชื่อแบรนด์
+  {
+    path: '/api/products/search?q=' + encodeURIComponent('ทดสอบ') + '&limit=24',
+    budgetMs: 300,
+    note: 'คำที่ตรงเกือบทุกชิ้น',
+  },
+  {
+    path: '/api/products/search?q=' + encodeURIComponent('คำที่ไม่มีในร้านแน่นอน') + '&limit=24',
+    budgetMs: 300,
+    note: 'ไม่ตรงเลย = ตรวจทุกเงื่อนไขทุกแถว',
+  },
+  {
+    path: '/api/search?q=' + encodeURIComponent('เสื้อผ้า หมายเลข 4321 ไม่เกิน 900 บาท'),
+    budgetMs: 400,
+    note: 'หลายคำ + ตีความราคา + ลุค + บทความ',
+  },
+  {
+    path: '/api/search?q=' + encodeURIComponent('เสือผาทดสบ'),
+    budgetMs: 500,
+    note: 'พิมพ์ผิด → คำนวณความคล้ายกับทุกชื่อสินค้า/tag/หมวด',
+  },
+  {
+    path: '/api/search/suggest?q=' + encodeURIComponent('ทดสอบ'),
+    budgetMs: 250,
+    note: 'ระหว่างพิมพ์',
+  },
   {
     path: '/api/admin/overview',
     budgetMs: 700,
@@ -621,8 +647,11 @@ async function measure() {
   return results;
 }
 
+/** path ที่มีภาษาไทยถูก encode เป็น %E0… — ถอดกลับตอนแสดง ไม่งั้นตารางกว้างจนอ่านไม่ออก */
+const shown = (path) => decodeURIComponent(path);
+
 function report(results) {
-  const width = Math.max(...results.map((r) => r.route.path.length), 20);
+  const width = Math.max(...results.map((r) => shown(r.route.path).length), 20);
   log('');
   log(
     'เส้นทาง'.padEnd(width) + 'เวลา'.padStart(9) + 'งบ'.padStart(8) + 'ขนาด'.padStart(9) + '  ผล',
@@ -632,7 +661,7 @@ function report(results) {
   for (const r of results) {
     const mark = r.failed ? `✗ status ${r.status}` : r.over ? '✗ เกินงบ' : 'ok';
     log(
-      r.route.path.padEnd(width) +
+      shown(r.route.path).padEnd(width) +
         `${r.ms.toFixed(0)} ms`.padStart(9) +
         `${r.route.budgetMs}`.padStart(8) +
         `${(r.bytes / 1024).toFixed(0)} KB`.padStart(9) +
@@ -653,7 +682,9 @@ function report(results) {
     const why = r.failed
       ? `ตอบ status ${r.status} (ยิงไม่สำเร็จ — ผลเวลาเชื่อไม่ได้)`
       : `${r.ms.toFixed(0)}ms เกินงบ ${r.route.budgetMs}ms`;
-    log(`  · ${r.route.path}\n      ${why}${r.route.note ? `\n      บริบท: ${r.route.note}` : ''}`);
+    log(
+      `  · ${shown(r.route.path)}\n      ${why}${r.route.note ? `\n      บริบท: ${r.route.note}` : ''}`,
+    );
   }
   log('');
   log('ไล่หาสาเหตุต่อได้ด้วย --keep แล้วเปิด EXPLAIN (ANALYZE, BUFFERS) กับคิวรีที่สงสัย');
