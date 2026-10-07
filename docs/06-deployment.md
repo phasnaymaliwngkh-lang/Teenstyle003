@@ -51,13 +51,13 @@ Dockerfile กับ compose เป็น **โค้ดที่ไม่มี
 
 ## สถาปัตยกรรมตอน production
 
-| ส่วน               | บริการที่แนะนำ       | ทางเลือก                                    |
-| ------------------ | -------------------- | ------------------------------------------- |
-| Frontend (Next.js) | **Vercel**           | Netlify, Cloudflare Pages, self-host Docker |
-| Backend (Express)  | **Railway** / Render | VPS + Docker, Fly.io                        |
-| PostgreSQL         | **Neon** / Supabase  | Railway Postgres, RDS                       |
-| Redis              | **Upstash**          | Redis Cloud, Railway                        |
-| รูปภาพ             | **Cloudinary**       | S3 + CloudFront                             |
+| ส่วน               | บริการที่แนะนำ                        | ทางเลือก                                                                  |
+| ------------------ | ------------------------------------- | ------------------------------------------------------------------------- |
+| Frontend (Next.js) | **Vercel**                            | Netlify, Cloudflare Pages, self-host Docker                               |
+| Backend (Express)  | **Railway** / Render                  | VPS + Docker, Fly.io                                                      |
+| PostgreSQL         | **Neon** / Supabase                   | Railway Postgres, RDS                                                     |
+| Redis              | **Upstash**                           | Redis Cloud, Railway                                                      |
+| รูปภาพ             | **volume ของ backend** (`UPLOAD_DIR`) | S3 / R2 / Cloudinary — ยังไม่มี adapter (ดู [20-images.md](20-images.md)) |
 
 เหตุผลที่แยก frontend/backend: Vercel เหมาะกับ Next.js แต่ไม่เหมาะกับ long-running process
 (background job, webhook worker, connection pool) ซึ่งเป็นงานของ backend
@@ -102,6 +102,18 @@ engine ของ Prisma CLI เป็น Rust binary แยกตัวและ
 3. Start command: `npm run start:backend` (หรือ `node backend/dist/server.js`)
 4. Health check path: `/health` — คืน 503 เมื่อ dependency ล่ม จึงใช้กับ load balancer ได้เลย
 5. ถ้า deploy ด้วย Docker: `docker/backend.Dockerfile` (multi-stage, non-root, มี HEALTHCHECK)
+
+### ⚠️ 2.2 รูปที่อัปโหลดต้องอยู่บน volume ถาวร (STEP 47)
+
+รูปสินค้าและรูปรีวิวเก็บเป็นไฟล์ที่ `UPLOAD_DIR` (Docker ตั้งเป็น `/app/uploads` ให้แล้ว)
+**ไม่มี volume = รูปทั้งร้านหายทุกครั้งที่ redeploy** ขณะที่ฐานข้อมูลยังชี้ไปที่ไฟล์เหล่านั้น → รูปแตกทั้งร้าน
+
+- compose: volume `uploads` ผูกกับ `/app/uploads` แล้ว · Railway/Render/Fly: สร้าง volume แล้ว mount ที่ path เดียวกัน
+- **รัน backend ได้ instance เดียว** จนกว่าจะเปลี่ยนที่เก็บใน `backend/src/services/media-storage.ts`
+  ไปเป็น object storage (instance อื่นมองไม่เห็นไฟล์ที่อีกตัวเขียน)
+- **backup ต้องรวมโฟลเดอร์นี้** — backup แค่ฐานข้อมูลแล้ว restore จะได้แถว `MediaAsset` ที่ไม่มีไฟล์ (STEP 50)
+- frontend ต้องมี rewrite `/media/:path*` ไป backend (อยู่ใน `next.config.ts` แล้ว เปิดเสมอ) ·
+  `NEXT_PUBLIC_API_URL` จึงต้องเป็นที่อยู่ที่ server ของ frontend ยิงถึง backend ได้
 
 ### ⚠️ 2.1 ทำไมต้อง `npm ci --include=dev` ไม่ใช่ `npm install`
 
@@ -262,7 +274,8 @@ node scripts/audit-deploy.mjs --env .env.prod       # ตรวจค่าใ�
 ### Data
 
 - [ ] `migrate:deploy` รันสำเร็จ · `migrate status` ไม่มี pending
-- [ ] ตั้ง backup อัตโนมัติ + ทดสอบ restore แล้ว (STEP 50)
+- [ ] ตั้ง backup อัตโนมัติ + ทดสอบ restore แล้ว (STEP 50) — **รวมโฟลเดอร์รูป `UPLOAD_DIR`**
+- [ ] `UPLOAD_DIR` อยู่บน volume ถาวร และ backend รันอยู่ instance เดียว (STEP 47)
 - [ ] มี index ครบตาม query ที่ใช้จริง (STEP 34)
 
 ### Quality

@@ -67,6 +67,11 @@ export const ROUTES = [
   { path: '/admin/products', as: 'admin' },
   { path: '/admin/products/new', as: 'admin' },
   { path: '/admin/products/{productId}', as: 'admin' },
+  {
+    path: '/admin/media',
+    as: 'admin',
+    note: 'คลังรูป (STEP 47) — การ์ดรูปมีชื่อสินค้า/อีเมลผู้อัปโหลดที่ยาวได้',
+  },
   { path: '/admin/inventory', as: 'admin' },
   { path: '/admin/inventory/movements', as: 'admin' },
   { path: '/admin/inventory/{variantId}', as: 'admin' },

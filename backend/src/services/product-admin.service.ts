@@ -14,6 +14,7 @@ import type {
 } from '../validators/product-admin.validator.ts';
 
 import { notifySafely, notifyWishlistPriceDrops } from './notification.service.ts';
+import { toAdminProductImage, type AdminProductImageDto } from './product-image.service.ts';
 
 /**
  * จัดการสินค้าในหลังบ้าน (STEP 14)
@@ -96,7 +97,7 @@ export interface AdminProductDto {
   viewCount: number;
   category: { id: string; name: string; slug: string };
   brand: { id: string; name: string; slug: string } | null;
-  images: { id: string; url: string; alt: string; isMain: boolean; sortOrder: number }[];
+  images: AdminProductImageDto[];
   variants: {
     id: string;
     sku: string;
@@ -174,7 +175,7 @@ function toAdminProduct(product: AdminProductRow): AdminProductDto {
     viewCount: product.viewCount,
     category: product.category,
     brand: product.brand,
-    images: product.images,
+    images: product.images.map(toAdminProductImage),
     variants,
     orderItemCount: product._count.orderItems,
     publishedAt: product.publishedAt?.toISOString() ?? null,
@@ -285,11 +286,29 @@ export interface ProductFormOptionsDto {
   colors: { name: string; slug: string; hex: string }[];
   sizes: { name: string; code: string }[];
   allowedImageHosts: string[];
+  /**
+   * เงื่อนไขของการอัปโหลดรูปสินค้า (STEP 47) — หน้าเว็บใช้เตือนล่วงหน้าเท่านั้น
+   * ตัวตัดสินจริงคือ backend ที่อ่านเนื้อไฟล์
+   */
+  imageUpload: {
+    maxBytes: number;
+    acceptedTypes: string[];
+    acceptedText: string;
+    minShortEdge: number;
+    maxImages: number;
+  };
 }
 
 export async function getProductFormOptions(): Promise<ProductFormOptionsDto> {
   const prisma = getPrisma();
-  const { ALLOWED_IMAGE_HOSTS } = await import('../config/media.ts');
+  const {
+    ALLOWED_IMAGE_HOSTS,
+    ACCEPTED_IMAGE_MIME_TYPES,
+    ACCEPTED_IMAGE_TEXT,
+    MEDIA_RULES,
+    PRODUCT_IMAGE_LIMIT,
+    UPLOAD_LIMITS,
+  } = await import('../config/media.ts');
 
   const [categories, brands, colors, sizes] = await Promise.all([
     prisma.category.findMany({
@@ -325,6 +344,13 @@ export async function getProductFormOptions(): Promise<ProductFormOptionsDto> {
     colors,
     sizes,
     allowedImageHosts: [...ALLOWED_IMAGE_HOSTS],
+    imageUpload: {
+      maxBytes: UPLOAD_LIMITS.maxBytes,
+      acceptedTypes: [...ACCEPTED_IMAGE_MIME_TYPES],
+      acceptedText: ACCEPTED_IMAGE_TEXT,
+      minShortEdge: MEDIA_RULES.PRODUCT.minShortEdge,
+      maxImages: PRODUCT_IMAGE_LIMIT,
+    },
   };
 }
 
@@ -541,13 +567,24 @@ export async function createProduct(
           publishedAt: input.status === 'ACTIVE' ? new Date() : null,
           images: {
             createMany: {
-              data: input.images.map((image, index) => ({
-                url: image.url,
-                alt: image.alt,
-                // ถ้าไม่ได้เลือกรูปหลักไว้ ให้รูปแรกเป็นรูปหลัก
-                isMain: image.isMain || (index === 0 && !input.images.some((row) => row.isMain)),
-                sortOrder: image.sortOrder,
-              })),
+              /**
+               * กฎ "รูปแรก = รูปหลัก" (STEP 47): ย้ายรูปที่เลือกเป็นรูปหลักขึ้นก่อน
+               * แล้วเรียงที่เหลือตาม sortOrder ที่ส่งมา · ไม่ได้เลือก = รูปแรกเป็นรูปหลัก
+               */
+              data: [...input.images]
+                .map((image, index) => ({ image, index }))
+                .sort(
+                  (a, b) =>
+                    Number(b.image.isMain) - Number(a.image.isMain) ||
+                    a.image.sortOrder - b.image.sortOrder ||
+                    a.index - b.index,
+                )
+                .map(({ image }, position) => ({
+                  url: image.url,
+                  alt: image.alt,
+                  isMain: position === 0,
+                  sortOrder: position,
+                })),
             },
           },
         },
@@ -626,27 +663,11 @@ export async function updateProduct(
       }
 
       if (input.status === 'ACTIVE') {
-        assertPublishable({
-          images: input.images ?? current.images,
-          variants: current.variants,
-        });
+        // รูปจัดการแยกที่ product-image.service.ts แล้ว (STEP 47) — ใช้รูปที่มีอยู่จริงตอนนี้
+        assertPublishable({ images: current.images, variants: current.variants });
       }
 
       const refs = await resolveRefs(tx, input);
-
-      // เปลี่ยนรูป = แทนที่ทั้งชุด (ง่ายและคาดเดาได้ · STEP 47 จะทำจัดการรูปแบบละเอียด)
-      if (input.images !== undefined) {
-        await tx.productImage.deleteMany({ where: { productId } });
-        await tx.productImage.createMany({
-          data: input.images.map((image, index) => ({
-            productId,
-            url: image.url,
-            alt: image.alt,
-            isMain: image.isMain || (index === 0 && !input.images!.some((row) => row.isMain)),
-            sortOrder: image.sortOrder,
-          })),
-        });
-      }
 
       await tx.product.update({
         where: { id: productId },
@@ -683,10 +704,7 @@ export async function updateProduct(
        *    "ชื่อสินค้าถูกล้างเป็นค่าว่าง" ทั้งที่ไม่มีใครแตะชื่อ (เจอจริงตอนตรวจ STEP 27)
        *    ตอนนี้เก็บค่าเดิมเฉพาะช่องที่ถูกแก้จริง ประวัติจึงอ่านได้ว่า "จาก X เป็น Y"
        */
-      const after: Record<string, unknown> = {
-        ...input,
-        images: input.images === undefined ? undefined : input.images.length,
-      };
+      const after: Record<string, unknown> = { ...input };
 
       const currentValues: Record<string, unknown> = {
         name: current.name,
@@ -701,7 +719,6 @@ export async function updateProduct(
         minimumStock: current.minimumStock,
         tags: current.tags,
         status: current.status,
-        images: current.images.length,
       };
 
       const before: Record<string, unknown> = {};

@@ -196,17 +196,29 @@ async function seedProducts(): Promise<{ products: number; variants: number; uni
         },
       });
 
-      // ProductImage ไม่มี unique key ตามธรรมชาติ จึงลบแล้วสร้างใหม่ให้ผลลัพธ์คงที่
-      await tx.productImage.deleteMany({ where: { productId: product.id } });
-      await tx.productImage.createMany({
-        data: item.images.map((image, index) => ({
-          productId: product.id,
-          url: image.url,
-          alt: image.alt,
-          sortOrder: index,
-          isMain: index === 0,
-        })),
+      /**
+       * ProductImage ไม่มี unique key ตามธรรมชาติ จึงลบแล้วสร้างใหม่ให้ผลลัพธ์คงที่
+       *
+       * ⚠️ ยกเว้นสินค้าที่ร้านอัปโหลดรูปเองแล้ว (url ขึ้นต้นด้วย `/media/` — STEP 47)
+       *    seed เป็นเจ้าของ "ข้อมูลตัวอย่าง" ไม่ใช่รูปที่คนถ่ายแล้วอัปโหลดมา
+       *    ถ้าเขียนทับ การรัน seed ซ้ำจะลบรูปจริงทิ้งเงียบ ๆ
+       */
+      const uploaded = await tx.productImage.count({
+        where: { productId: product.id, url: { startsWith: '/media/' } },
       });
+
+      if (uploaded === 0) {
+        await tx.productImage.deleteMany({ where: { productId: product.id } });
+        await tx.productImage.createMany({
+          data: item.images.map((image, index) => ({
+            productId: product.id,
+            url: image.url,
+            alt: image.alt,
+            sortOrder: index,
+            isMain: index === 0,
+          })),
+        });
+      }
 
       for (const color of colors) {
         for (const size of sizes) {

@@ -42,7 +42,7 @@ export interface MyProfile {
   email: string;
   emailVerified: boolean;
   name: string | null;
-  /** รูปจาก Google — ยังอัปโหลดเองไม่ได้ (STEP 47) */
+  /** รูปจาก Google — ยังอัปโหลดเองไม่ได้ (ระบบอัปโหลดของ STEP 47 รับแค่รูปสินค้าและรูปรีวิว) */
   image: string | null;
   phone: string | null;
   /** YYYY-MM-DD */

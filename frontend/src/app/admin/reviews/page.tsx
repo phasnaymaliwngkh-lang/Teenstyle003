@@ -6,6 +6,7 @@ import { Pagination } from "@/components/shared/pagination";
 import { SectionError } from "@/components/shared/section";
 import { ReviewModeration } from "@/features/admin/components/review-moderation";
 import { RatingStars } from "@/features/reviews/components/rating-stars";
+import { ReviewPhotos } from "@/features/reviews/components/review-photos";
 import { ApiClientError } from "@/lib/api";
 import { requirePermission } from "@/lib/dal";
 import { createQueryHelpers, toSearchParams, type RawSearchParams } from "@/lib/query-params";
@@ -225,6 +226,9 @@ export default async function AdminReviewsPage({
                   <p className="mt-2 text-sm leading-relaxed whitespace-pre-line text-ink-soft">
                     {review.comment}
                   </p>
+
+                  {/* รูปต้องผ่านการตรวจพร้อมข้อความ — ไม่งั้นรูปที่ไม่เหมาะสมหลุดขึ้นหน้าสินค้าได้ (STEP 47) */}
+                  <ReviewPhotos images={review.images} label="รีวิวนี้" />
 
                   <p className="mt-3 text-xs text-muted">
                     โดย {review.customer.name ?? "ไม่ระบุชื่อ"} ({review.customer.email}) ·{" "}

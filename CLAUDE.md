@@ -4,10 +4,11 @@
 > Full Stack Fashion E-Commerce สำหรับวัยรุ่น — Next.js + Express + PostgreSQL + Prisma + OpenAI
 
 โปรเจกต์นี้เดินตาม **Master Prompt STEP 1–55** ทำทีละ STEP แล้วหยุดรอคำสั่งถัดไป
-สถานะปัจจุบัน: **STEP 1–46 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
+สถานะปัจจุบัน: **STEP 1–47 เสร็จแล้ว** — ครบวงจรทั้งฝั่งลูกค้าและร้าน:
 หน้าร้าน + **ค้นหาด้วยภาษาคน (STEP 45)** + **แนะนำสินค้าจากสิ่งที่ลูกค้าทำจริง (STEP 46)** → ตะกร้า → checkout (คูปอง + ใช้แต้ม) → ชำระเงิน (COD จริง · Stripe รอใส่ key) → ติดตามคำสั่งซื้อ → รีวิวสินค้า → แจ้งเตือนในบัญชี → **ขอคืนสินค้า/คืนเงิน (STEP 43)** → **ค่าส่งที่ร้านแก้เองได้ + จัดการพัสดุ (STEP 44)**
 → **บัญชีของฉัน: ข้อมูลส่วนตัว + สมุดที่อยู่ + แต้มสะสม/ระดับสมาชิก (STEP 42)**
 → **หลังบ้าน: ภาพรวมร้าน + รายงานยอดขาย + จัดการคำสั่งซื้อ + จัดการสินค้า + คลังสินค้า + แจ้งเตือนสต็อก + บาร์โค้ด/QR + นำเข้า/ส่งออก (CSV, Excel) + ตรวจรีวิว + จัดการลูกค้า + ประวัติการแก้ไข (Audit)**
+→ **รูป: อัปโหลดรูปสินค้า + รูปในรีวิว + คลังรูป (STEP 47)** — แปลงเป็น WebP ตัด GPS ทุกไฟล์ · เก็บบนดิสก์ของ backend (ยังไม่มี Cloudinary)
 → **AI: AI Stylist (STEP 19) · AI Customer Service + Human Handoff (STEP 20) · AI Knowledge Base / FAQ (STEP 21) · Recommendation Engine (STEP 46)**
 ทุกตัวมี Intelligent Fallback Engine ทำงานได้เต็มรูปแบบแม้ไม่มี `OPENAI_API_KEY`
 → ดู [docs/02-step-progress.md](docs/02-step-progress.md) · **endpoint ทุกเส้นทางอยู่ที่ [docs/09-api-reference.md](docs/09-api-reference.md)**
@@ -42,7 +43,7 @@ npm run dev              # db:sync + backend :4000 + frontend :3000
 npm run build            # db:sync → tsc backend → next build
 npm run typecheck        # tsc ทั้ง 3 workspace — ต้องผ่านก่อน commit
 npm run lint             # eslint backend + frontend
-npm test                 # vitest ของ backend + frontend (990 เคส)
+npm test                 # vitest ของ backend + frontend (1,052 เคส)
 npm run test:coverage    # วัดว่าโค้ดส่วนไหนยังไม่มีเทสต์แตะเลย (ไม่ใช่เป้าให้ไล่ถึง 100%)
 
 npm run db:sync          # prisma generate + build database (รันหลังแก้ schema ทุกครั้ง)
@@ -154,7 +155,8 @@ app/
 │   ├── layout.tsx          แถบ admin + requireStaff() ป้องกันทุกหน้าใต้ /admin
 │   ├── page.tsx            ภาพรวมร้าน (STEP 13)
 │   ├── orders/ orders/[orderNumber]/   จัดการคำสั่งซื้อ (STEP 13)
-│   ├── products/ products/new/ products/[productId]/   จัดการสินค้า (STEP 14)
+│   ├── products/ products/new/ products/[productId]/   จัดการสินค้า (STEP 14) · รูปสินค้า (STEP 47)
+│   ├── media/              คลังรูป: ไฟล์ทั้งหมด ใช้ที่ไหน ลบไฟล์ที่ไม่ได้ใช้ (STEP 47 · media:manage)
 │   ├── inventory/ inventory/movements/ inventory/[variantId]/   คลังสินค้า (STEP 15)
 │   ├── alerts/             แจ้งเตือนสต็อก (STEP 16)
 │   ├── barcodes/ barcodes/labels/   สแกนบาร์โค้ด + พิมพ์ป้าย (STEP 17)
@@ -183,7 +185,9 @@ app/
 5. **ห้าม setState ใน `useEffect` เพื่อ reset state ตาม path** — ใช้แพตเทิร์นปรับ state ระหว่าง render
    (ดูตัวอย่างใน [mobile-menu.tsx](frontend/src/components/layout/mobile-menu.tsx)) ไม่งั้นติดกฎ `react-hooks/set-state-in-effect`
 6. **รูปจากภายนอกต้องประกาศใน `images.remotePatterns`** ของ `next.config.ts` ก่อนใช้กับ `next/image`
-   (ปัจจุบันมี `lh3.googleusercontent.com` สำหรับรูปโปรไฟล์ Google)
+   (ปัจจุบันมี `lh3.googleusercontent.com` สำหรับรูปโปรไฟล์ Google และ Unsplash ของข้อมูลตัวอย่าง)
+   · รูปที่ร้านอัปโหลดเองเป็น path ภายใน `/media/...` (`images.localPatterns` + rewrite ไป backend — STEP 47)
+   · `backend/tests/media-config.test.ts` เทียบโฮสต์และ path กับ backend — แก้ฝั่งเดียวแล้วเทสต์ล้ม
 
 ⚠️ **ผลข้างเคียงที่ต้องจัดการใน STEP 33/34:** navbar อ่าน session จึงทำให้ทุกหน้าในหน้าร้าน
 เป็น dynamic (`ƒ`) ไม่ถูก prerender เป็น static อีก → ตอนทำ SEO/Performance ให้พิจารณา
@@ -666,8 +670,9 @@ POST /api/admin/products/:productId/variants · PATCH …/variants/:variantId
    ใช้ราคา **และโปรโมชัน** ของสินค้าแม่ → salePrice ลอย ๆ จะไม่มีผลกับเงินที่เก็บจริง
    ส่ง `salePrice: null` / `price: null` = ล้างค่า (ต่างจากไม่ส่งมาเลย = ไม่แก้)
 4. **เปิดขาย (ACTIVE) ต้องมีรูป ≥ 1 และ variant ที่ `isActive` ≥ 1** · `publishedAt` ตั้งครั้งแรกครั้งเดียว
-5. **รูปรับได้เฉพาะ https + โฮสต์ใน [config/media.ts](backend/src/config/media.ts)**
-   ซึ่งต้องตรงกับ `images.remotePatterns` ของ `next.config.ts` · ฟอร์มอ่านรายการนี้จาก API ไม่ฮาร์ดโค้ด
+5. **รูปมาจากการอัปโหลดเท่านั้น** (ส่วน "รูปสินค้า" ในหน้าแก้ไข — STEP 47) · `images` ตอนสร้างผ่าน API
+   ยังรับลิงก์ https จากโฮสต์ใน [config/media.ts](backend/src/config/media.ts) · **PATCH สินค้าไม่รับ `images` แล้ว**
+   (เดิม "แทนที่ทั้งชุด" ซึ่งจะลบรูปที่อัปโหลดไว้ทิ้ง) — ดูหัวข้อ **Image Management (STEP 47)**
 6. **PATCH ส่งเฉพาะฟิลด์ที่เปลี่ยน** (`toUpdateInput` diff กับค่าเดิม) ไม่เขียนทับทั้งก้อน
    · ตั้งแต่ STEP 17 `updateVariantSchema` รับ `barcode` ด้วย (`null` = ล้างค่า) และเพราะ
    `barcode` เป็นคอลัมน์ unique การอัปเดต variant จึงต้องผ่าน `rethrowUnique` เพื่อให้เลขซ้ำ
@@ -1024,9 +1029,10 @@ GET    /api/admin/reviews?status=&rating=&q=   PATCH /api/admin/reviews/:id/stat
 9. **`strictRateLimiter` ที่ POST/PATCH รีวิวและการโหวต** — สองอย่างนี้สร้างเนื้อหาสาธารณะ
    และขยับตัวเลขที่คนอื่นใช้ตัดสินใจซื้อ ยิงรัวได้แปลว่าปั่นได้
 
-⚠️ **ยังไม่มีการแนบรูปในรีวิว** — คอลัมน์ `Review.images` มีอยู่แต่ส่งกลับเป็น `[]` เสมอ
-เพราะยังไม่มีระบบอัปโหลด (STEP 47) · **ห้ามแก้ด้วยการรับ URL จาก client**
-เพราะจะกลายเป็นช่องให้แปะรูปจากที่ไหนก็ได้โดยร้านตรวจไม่ได้
+⚠️ **รูปในรีวิวแนบได้แล้วตั้งแต่ STEP 47** — ทางเดียวคืออัปโหลดไฟล์ (`POST /api/reviews/:id/images`)
+**ห้ามเพิ่มทางรับ URL จาก client** เพราะจะกลายเป็นช่องให้แปะรูปจากที่ไหนก็ได้โดยร้านตรวจไม่ได้
+· **แนบหรือถอดรูป = กลับไปรอตรวจใหม่** (กฎเดียวกับข้อ 3) · เขียนรีวิวใหม่หลังลบต้องล้าง `images` ด้วย
+ไม่งั้นรูปของรีวิวที่ลบไปแล้วกลับมาโผล่ (มีเทสต์)
 
 ⚠️ **รีวิวของผู้ที่กำลังดูถูกดึงออกจากรายการสาธารณะ** แล้วส่งแยกเป็น `myReview`
 เพื่อไม่ให้ขึ้นซ้ำสองที่ และให้เจ้าของเห็นรีวิว `PENDING` ของตัวเองได้ (คนอื่นยังไม่เห็น)
@@ -1110,7 +1116,8 @@ PATCH /api/admin/customers/:userId/role    { role, reason }     (user:role:manag
    **`email` แก้ไม่ได้** เพราะเป็นตัวระบุตัวตนของบัญชี Google ที่ callback `signIn` ใช้ผูกบัญชี
    (ดูเหตุผลของ `allowDangerousEmailAccountLinking`) · `role` `status` `points`
    **ไม่อยู่ในสคีมาของ PATCH เลย** ส่งมาก็ถูก Zod ตัดทิ้ง (มี test ยัดมาแล้วยืนยัน)
-   · **รูปโปรไฟล์ยังเปลี่ยนเองไม่ได้** — รับ URL จาก client = แปะรูปจากที่ไหนก็ได้ (STEP 47)
+   · **รูปโปรไฟล์ยังเปลี่ยนเองไม่ได้** — รับ URL จาก client = แปะรูปจากที่ไหนก็ได้ · ระบบอัปโหลดของ STEP 47
+   รับแค่รูปสินค้าและรูปรีวิว — รูปโปรไฟล์ยังไม่มี STEP ไหนรับงานนี้ไว้
 2. **ยอดซื้อในหลังบ้านนับจากตาราง `Order` จริงทุกครั้ง** — เดิมมีคอลัมน์ `User.totalSpent`
    ที่ไม่มีใครเขียน (0 ทุกคน) **ถูกถอดออกจาก schema ตอน STEP 42** · ระดับสมาชิกก็คิดจากยอดเดียวกันนี้
    (ปัญหาชนิดเดียวกับ `Product.totalStock` ที่ไม่ใช่ "จำนวนที่ขายได้จริง" — STEP 15)
@@ -1370,6 +1377,8 @@ grep -c '<script[^>]*nonce=' p.html
    ซึ่งไม่ส่ง `buf`) — เหตุผลเต็มและเงื่อนไขที่ต้องกลับมาทบทวนอยู่ใน docs/08-security.md ข้อ 4.1
 2. **อัปโหลดไฟล์รับเฉพาะ `.csv` / `.xlsx` / `.xls` และ 1 ไฟล์ต่อคำขอ**
    ปฏิเสธที่ชั้น multer ก่อนถึงตัวแปลง — `.xlsx` คือ zip ปล่อยให้แกะก่อนคือเปิดช่อง zip bomb
+   · **รูป (STEP 47)** มี middleware ของตัวเอง ([upload-image.ts](backend/src/middlewares/upload-image.ts)):
+   1 ไฟล์ · ≤ 8MB · ตัวตัดสินจริงคือเนื้อไฟล์ใน `processImage()` (ดูหัวข้อ Image Management)
 3. **ห้ามใช้ `dangerouslySetInnerHTML`** — ตอนนี้ไม่มีในโปรเจกต์เลย และต้องไม่มีต่อไป
    (SVG บาร์โค้ดใส่ผ่าน data URL ใน `<img>` ซึ่งรันสคริปต์ไม่ได้)
 4. **error 500 ห้ามหลุดรายละเอียดภายใน** — `errorHandler` แปลง error ที่ไม่รู้จักเป็นข้อความกลาง
@@ -1728,7 +1737,8 @@ Satori (ตัวเรนเดอร์ของ `next/og`) ไม่มีฟ
 ลง migration ชุดเดียวกับของจริง เติมข้อมูลปริมาณจริง (สินค้า 5,000 · คำสั่งซื้อ 60,000 ·
 รายการในบิล 120,000 · ผู้ใช้ 20,000 · ประวัติหลังบ้าน 150,000) แล้ว **เปิด backend ตัวจริง**
 ชี้ไปฐานข้อมูลนั้น ยิงทุก endpoint ที่หนัก เทียบกับงบเวลาต่อเส้นทาง แล้วลบฐานข้อมูลทิ้ง
-· ผลล่าสุด **35 เส้นทาง อยู่ในงบทั้งหมด** (ตอนปิด STEP 45 — เพิ่มเส้นทางค้นหา 5 เส้น) · ตัวเลขก่อน/หลังทั้งหมดอยู่ใน [docs/10-performance.md](docs/10-performance.md)
+· ผลล่าสุด **40 เส้นทาง อยู่ในงบทั้งหมด** (ตอนปิด STEP 47 — เพิ่มคลังรูป 2 เส้น ซึ่ง**ค้างเกิน 2 นาที**ในรอบแรก
+เพราะ `EXISTS` กับ CTE กลายเป็น correlated subquery — ดูกฎข้อ 1) · ตัวเลขก่อน/หลังทั้งหมดอยู่ใน [docs/10-performance.md](docs/10-performance.md)
 
 **⚠️ วัดบนฐานข้อมูล dev ไม่ได้** — 12 สินค้า / 0 คำสั่งซื้อทำให้ทุกคิวรีเร็วเท่ากันหมด
 และ planner เลือก seq scan ทุกครั้งเพราะตารางเล็กกว่าที่ index จะคุ้ม
@@ -1739,6 +1749,8 @@ Satori (ตัวเรนเดอร์ของ `next/og`) ไม่มีฟ
 1. **ห้ามเขียน subquery ที่อ้างแถวของตารางนอกในเงื่อนไข/การเรียง** (correlated subquery)
    PostgreSQL รันซ้ำ **ทีละแถว** — ที่ 5,000 สินค้าคือ 5,000 รอบ
    เจอตอน STEP 34 ถึง 6 ที่ หนักสุดคือ `/shop?sort=bestselling` ซึ่งเป็น**หน้าสาธารณะ** ใช้ 552ms
+   · **ห่อเป็น CTE ก็ไม่รอด** (STEP 47): `WITH used AS (UNION 6 ตาราง) … EXISTS (SELECT 1 FROM used WHERE url = a.url)`
+   ถูก inline แล้วคำนวณ UNION ใหม่ทีละแถว → เกิน 2 นาที · เขียนเป็น `LEFT JOIN used` แล้ว 121ms
    ใช้ตัวช่วยที่มีอยู่แล้วแทน (ทั้งหมดอยู่ใน [models/availability.ts](backend/src/models/availability.ts)
    และ [shop.service.ts](backend/src/services/shop.service.ts)):
    - ถามว่า "มีของขายไหม" → `HAS_AVAILABLE_STOCK_SQL` (`EXISTS` หยุดที่ตัวแรกที่เจอ)
@@ -1887,6 +1899,42 @@ STEP 4 จดไว้ว่า "navbar อ่าน session ทำให้ท�
 `199.7 + 0.1 + 0.2 = 199.99999999999997` → `Math.floor(x / 10)` ได้ 19 แทน 20
 ทุกการคิดแต้มจากเงินต้องแปลงเป็นสตางค์จำนวนเต็มก่อน (`Math.round(baht * 100)`) — มีเทสต์ที่ยืนยันว่ากับดักยังอยู่จริง
 
+## Image Management (STEP 47 — ใช้งานได้จริงแล้ว)
+
+**รายละเอียดทั้งหมดอยู่ที่ [docs/20-images.md](docs/20-images.md)**
+รูปสินค้าอัปโหลดที่หน้าแก้ไขสินค้า · รูปรีวิวแนบในฟอร์มรีวิว · `/admin/media` คลังรูป (`media:manage`)
+· กฎล้วนอยู่ที่ [models/media.model.ts](backend/src/models/media.model.ts) · แปลง/เก็บ/ล้างอยู่ที่
+[services/media.service.ts](backend/src/services/media.service.ts) · แตะดิสก์ที่
+[services/media-storage.ts](backend/src/services/media-storage.ts) **ที่เดียว** · ค่าทั้งหมดอยู่ที่ [config/media.ts](backend/src/config/media.ts)
+
+### กฎที่ห้ามละเมิด
+
+1. **ทุกไฟล์ต้องผ่าน `storeImage()`** — ถอดรหัสแล้วเข้ารหัสใหม่เป็น WebP · หมุนตาม EXIF · **ไม่คัดลอก metadata**
+   (รูปจากมือถือมีพิกัด GPS ของบ้านลูกค้า) · ชนิดไฟล์ตัดสินจากเนื้อไฟล์ ไม่ใช่ mimetype/นามสกุล
+   **ห้ามเพิ่มทางรับ url รูปจาก client** (ยกเว้นโฮสต์ที่อนุญาตตอนสร้างสินค้าผ่าน API)
+2. **เขียนไฟล์ก่อน แล้วเขียนฐานข้อมูลในทรานแซกชัน** — ล้ม = ลบไฟล์ที่เพิ่งเขียน (มีเทสต์นับไฟล์บนดิสก์)
+3. **ยังไม่มี Cloudinary/S3 และห้ามแกล้งว่ามี** — ไฟล์อยู่ที่ `UPLOAD_DIR` (production = volume ถาวร ·
+   backend instance เดียว · backup ต้องรวมโฟลเดอร์นี้) · ย้ายที่เก็บ = แก้ `media-storage.ts` ที่เดียว
+4. **url เป็น path ของเว็บเอง `/media/...`** (rewrite ไป backend) — Next 16 ไม่ย่อรูปจาก IP ภายใน
+   **ห้ามเปิด `dangerouslyAllowLocalIP`** (ช่อง SSRF) · `localPatterns` ห้ามมี query
+5. **`/media` ต้อง mount ก่อน `globalRateLimiter`** — รูปทั้งร้านมาจาก IP ของ server frontend ตัวเดียว
+   · เสิร์ฟเฉพาะ path ที่ตรง `MEDIA_KEY_PATTERN` (ไฟล์ `.tmp` ระหว่างเขียนเปิดไม่ได้)
+6. **รูปแรก = รูปหลัก** — ทุกที่เลือกรูปด้วย `isMain` · "ตั้งเป็นรูปหลัก" = ย้ายขึ้นลำดับแรก ·
+   unique index `ProductImage_one_main_per_product` (partial — Prisma ไม่แตะ) · เรียงใหม่ต้องส่งรูปครบทุกรูป ไม่งั้น 409
+7. **ล็อกแถวก่อนนับเพดานรูป** (`FOR UPDATE` บนสินค้า/รีวิว) — อัปโหลดพร้อมกันต้องไม่เกิน 10 รูป (มีเทสต์ยิงพร้อมกัน)
+8. **ถอดรูปไม่ลบไฟล์** — url อยู่ใน snapshot `OrderItem.imageUrl` · ลบได้เฉพาะไฟล์ที่ไม่มีที่ไหนใช้ต่อเนื่องเกิน 24 ชม.
+   (mark & sweep) · **เพิ่มที่เก็บ url รูปแห่งใหม่ ต้องเพิ่มขาใน `usedMediaUrlsSql()`** ไม่งั้นตัวล้างลบไฟล์ที่ยังใช้อยู่
+9. **หน้าคลังรูปอ่านอย่างเดียว** — จด `unusedSince` เฉพาะตอนถอดรูป/ลบรีวิว/กดล้าง (บทเรียน STEP 46)
+10. **seed ไม่แตะรูปของสินค้าที่มีรูป `/media/` แล้ว** — seed เป็นเจ้าของข้อมูลตัวอย่าง ไม่ใช่รูปที่ร้านถ่ายมา
+11. **ค่าที่ต้องตรงกันสองฝั่งมีเทสต์** (`backend/tests/media-config.test.ts`): เพดานรูปรีวิวใน
+    [lib/image-upload.ts](frontend/src/lib/image-upload.ts) · `localPatterns`/rewrite `/media` · โฮสต์ภายนอก
+
+### ⚠️ ทุกที่ที่เรียก backend เองโดยไม่ผ่าน `apiFetch` ต้องใช้ `apiUrlOf()`
+
+ปุ่มนำเข้า/ส่งออกของหลังบ้านเคยใช้ `publicEnv.apiUrl` ตรง ๆ → ตอน production เป็นคำขอข้ามโดเมน
+เบราว์เซอร์บล็อก cookie แล้วได้ 401 ทุกครั้ง (dev ไม่เจอเพราะ localhost ทั้งคู่) · อัปโหลดไฟล์ให้ใช้
+`apiFetch(path, { formData })` · **ห้ามตั้ง `Content-Type` เองตอนส่ง FormData** (เบราว์เซอร์ต้องใส่ boundary เอง)
+
 ## AI Recommendation (STEP 46 — ใช้งานได้จริงแล้ว)
 
 **รายละเอียดทั้งหมดอยู่ที่ [docs/19-recommendation.md](docs/19-recommendation.md)**
@@ -1953,11 +2001,14 @@ index trigram ของ `Product.name/sku` ที่ migration แรกสร�
 ถัดมา (ไม่อยู่ใน schema) แล้วคอมเมนต์ 3 ที่กับเอกสารยังอ้างว่ามีอยู่จนถึง STEP 45 · การค้นหาตอนนี้วัดแล้วอยู่ในงบ
 โดยไม่มี index นั้น (`audit-performance`: แย่สุด 130ms จากงบ 500)
 
-### ⚠️ แก้โค้ดที่มี backslash ห้ามเขียนผ่าน heredoc หรือ `node -e` — ใช้ Edit/Write tool
+### ⚠️ แก้โค้ดที่มี backslash หรือ backtick ห้ามเขียนผ่าน heredoc หรือ `node -e` — ใช้ Edit/Write tool
 
 เจอซ้ำหลายครั้งใน STEP 43–45: `split(/\s+/)` กลายเป็น `split(/s+/)` (ตัดคำที่ตัว "s" แทนช่องว่าง) ·
 regex ในเทสต์เสียจน parse ไม่ผ่าน · backtick ในคอมเมนต์ถูก escape เกิน — ทุกครั้งเกิดจากการเขียนโค้ดผ่าน shell
 ซึ่งกิน backslash ไปหนึ่งชั้น **โค้ดที่มี backslash ให้แก้ด้วย Edit/Write tool เท่านั้น** แล้วรันเทสต์ที่ครอบโค้ดนั้นทันที
+· STEP 47 เจออีกแบบ: **backtick ใน `node -e "…"` ถูก bash ตีความเป็น command substitution** —
+`` `file` `` หายไปจากคอมเมนต์ทั้งคำ (เหลือ "multipart (STEP 47)") โดย bash แค่พิมพ์เตือน แล้วสคริปต์ยังเขียนไฟล์ต่อ
+→ **ข้อความที่มี backtick ก็ใช้ Edit/Write tool เท่านั้น** แล้ว `git diff` ดูบรรทัดที่แก้ทุกครั้ง
 
 ## Shipping Management (STEP 44 — ใช้งานได้จริงแล้ว)
 
@@ -2151,8 +2202,8 @@ status ของเอกสารตรงกับที่คาด · **ก�
 
 ## Testing (STEP 37 — เทสต์คอมโพเนนต์จริงแล้ว และวัด coverage แล้ว)
 
-**รายละเอียดทั้งหมดอยู่ที่ [docs/11-testing.md](docs/11-testing.md)** · `npm test` = **990 เคส** (ตอนปิด STEP 46)
-(backend 831 + frontend 159) · `npm run test:coverage` วัดว่าส่วนไหนยังไม่มีเทสต์แตะเลย
+**รายละเอียดทั้งหมดอยู่ที่ [docs/11-testing.md](docs/11-testing.md)** · `npm test` = **1,052 เคส** (ตอนปิด STEP 47)
+(backend 879 + frontend 173) · `npm run test:coverage` วัดว่าส่วนไหนยังไม่มีเทสต์แตะเลย
 
 frontend แยกเป็น 2 project ใน [vitest.config.mts](frontend/vitest.config.mts) เพราะสภาพแวดล้อมต่างกันจริง
 

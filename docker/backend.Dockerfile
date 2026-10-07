@@ -55,6 +55,11 @@ COPY --from=builder /app/database/dist ./database/dist
 COPY --from=builder /app/database/prisma ./database/prisma
 COPY --from=builder /app/database/generated ./database/generated
 
+# โฟลเดอร์รูปที่อัปโหลด (STEP 47) — สร้างให้ user `node` เป็นเจ้าของก่อนถอดสิทธิ์ root
+# (volume ที่ mount ทับครั้งแรกรับ owner จากโฟลเดอร์นี้ · ไม่มี volume = รูปหายทุก redeploy)
+ENV UPLOAD_DIR=/app/uploads
+RUN mkdir -p /app/uploads && chown node:node /app/uploads
+
 # ไม่รันด้วย root
 USER node
 

@@ -1,9 +1,11 @@
 import { Router } from 'express';
 
 import {
+  addReviewImageHandler,
   createReviewHandler,
   deleteReviewHandler,
   listMyReviewsHandler,
+  removeReviewImageHandler,
   reviewEligibilityHandler,
   setReviewHelpfulHandler,
   updateReviewHandler,
@@ -11,6 +13,7 @@ import {
 import { requireAuth } from '../middlewares/authenticate.ts';
 import { requirePermission } from '../middlewares/authorize.ts';
 import { strictRateLimiter } from '../middlewares/rate-limit.ts';
+import { uploadImageFile } from '../middlewares/upload-image.ts';
 import { verifyOrigin } from '../middlewares/verify-origin.ts';
 
 /**
@@ -23,6 +26,8 @@ import { verifyOrigin } from '../middlewares/verify-origin.ts';
  * - `verifyOrigin` ทุกเส้นทาง กัน CSRF (production ใช้ `SameSite=None` จึงต้องตรวจ Origin เอง)
  * - **`strictRateLimiter` ที่การเขียนรีวิวและการโหวต** — สองอย่างนี้สร้างเนื้อหาสาธารณะ
  *   และขยับตัวเลขที่คนอื่นใช้ตัดสินใจซื้อ ยิงรัวได้แปลว่าปั่นได้
+ * - **แนบรูป (STEP 47) ก็ใช้ `strictRateLimiter`** — แปลงรูปกิน CPU จริงทุกครั้ง และเรียกจากเบราว์เซอร์เท่านั้น
+ *   (ไม่ใช่ Server Component — โควตานับต่อ IP จึงไม่ถูกแชร์ทั้งเว็บ · กฎ STEP 29)
  */
 export const reviewRouter = Router();
 
@@ -35,3 +40,5 @@ reviewRouter.post('/', strictRateLimiter, createReviewHandler);
 reviewRouter.patch('/:reviewId', strictRateLimiter, updateReviewHandler);
 reviewRouter.delete('/:reviewId', deleteReviewHandler);
 reviewRouter.patch('/:reviewId/helpful', strictRateLimiter, setReviewHelpfulHandler);
+reviewRouter.post('/:reviewId/images', strictRateLimiter, uploadImageFile, addReviewImageHandler);
+reviewRouter.delete('/:reviewId/images/:imageId', removeReviewImageHandler);

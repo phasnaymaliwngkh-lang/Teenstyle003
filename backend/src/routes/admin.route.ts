@@ -26,6 +26,15 @@ import {
   updateVariantHandler,
 } from '../controllers/product-admin.controller.ts';
 import {
+  listProductImagesHandler,
+  removeProductImageHandler,
+  reorderProductImagesHandler,
+  updateProductImageHandler,
+  uploadProductImageHandler,
+} from '../controllers/product-image.controller.ts';
+import { getMediaLibraryHandler, purgeMediaHandler } from '../controllers/media.controller.ts';
+import { uploadImageFile } from '../middlewares/upload-image.ts';
+import {
   adjustStockHandler,
   getVariantInventoryHandler,
   listInventoryHandler,
@@ -220,6 +229,44 @@ adminRouter.patch(
   requirePermission('product:update'),
   updateVariantHandler,
 );
+
+/**
+ * รูปสินค้า (STEP 47) — จัดการทีละรูป · ทั้งหมดเป็น `product:update` (ADMIN ขึ้นไป)
+ * ตรวจสิทธิ์ **ก่อน** รับไฟล์ คนที่ไม่มีสิทธิ์จึงไม่ทำให้ server ต้องอ่านไฟล์ 8MB หรือแปลงรูป
+ */
+adminRouter.get(
+  '/products/:productId/images',
+  requirePermission('product:read'),
+  listProductImagesHandler,
+);
+adminRouter.post(
+  '/products/:productId/images',
+  requirePermission('product:update'),
+  uploadImageFile,
+  uploadProductImageHandler,
+);
+adminRouter.put(
+  '/products/:productId/images/order',
+  requirePermission('product:update'),
+  reorderProductImagesHandler,
+);
+adminRouter.patch(
+  '/products/:productId/images/:imageId',
+  requirePermission('product:update'),
+  updateProductImageHandler,
+);
+adminRouter.delete(
+  '/products/:productId/images/:imageId',
+  requirePermission('product:update'),
+  removeProductImageHandler,
+);
+
+/**
+ * คลังรูป (STEP 47) — `media:manage` (ADMIN ขึ้นไป)
+ * มีรูปที่ลูกค้าแนบรีวิว (รวมที่ยังรอตรวจ) และปุ่มลบไฟล์ถาวร · การดูไม่แตะข้อมูลอะไรเลย
+ */
+adminRouter.get('/media', requirePermission('media:manage'), getMediaLibraryHandler);
+adminRouter.post('/media/purge', requirePermission('media:manage'), purgeMediaHandler);
 
 /**
  * คลังสินค้า (STEP 15)

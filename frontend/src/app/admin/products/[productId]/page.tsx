@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { SectionError } from "@/components/shared/section";
 import { DeleteProductButton } from "@/features/admin/components/delete-product-button";
 import { ProductForm } from "@/features/admin/components/product-form";
+import { ProductImageManager } from "@/features/admin/components/product-image-manager";
 import { VariantManager } from "@/features/admin/components/variant-manager";
 import { ApiClientError } from "@/lib/api";
 import { requirePermission } from "@/lib/dal";
@@ -26,8 +27,8 @@ export const metadata: Metadata = {
  *
  * ⚠️ **ห้ามมี `loading.tsx` ในโฟลเดอร์นี้** และต้อง `await` ข้อมูลที่ระดับ page
  *    ไม่งั้น `notFound()` จะคืน HTTP 200 (soft 404) — ยืนยันแล้วตอน STEP 6
- * ⚠️ ฟอร์มสินค้า / ตัวเลือก / การลบ แยกกันคนละส่วน เพื่อให้แก้ทีละเรื่องได้
- *    โดยไม่ต้องกดบันทึกทั้งหน้า
+ * ⚠️ รูป / ฟอร์มสินค้า / ตัวเลือก / การลบ แยกกันคนละส่วน เพื่อให้แก้ทีละเรื่องได้
+ *    โดยไม่ต้องกดบันทึกทั้งหน้า (รูปบันทึกทีละรูปทันที — STEP 47)
  */
 export default async function EditProductPage({
   params,
@@ -141,6 +142,18 @@ export default async function EditProductPage({
         </div>
       ) : (
         <>
+          <div className="mt-6">
+            {/* ตัวจัดการรูปถือผลล่าสุดจาก server เอง — ไม่ใส่ key เพื่อไม่ให้ router.refresh()
+                ทำให้มัน mount ใหม่แล้วข้อความแจ้งผลกับคิวที่รออัปโหลดหายไป */}
+            <ProductImageManager
+              productId={product.id}
+              productName={product.name}
+              isActive={product.status === "ACTIVE"}
+              initialImages={product.images}
+              rules={options.imageUpload}
+            />
+          </div>
+
           <ProductForm mode="edit" options={options} product={product} />
 
           <div className="mt-6 space-y-6">

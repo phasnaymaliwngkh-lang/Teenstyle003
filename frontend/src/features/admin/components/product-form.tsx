@@ -1,8 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertTriangle, Check, ImagePlus, Loader2, Plus, Trash2 } from "lucide-react";
-import Image from "next/image";
+import { AlertTriangle, Check, Loader2, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
@@ -29,9 +28,10 @@ import type { AdminProduct, ProductFormOptions } from "@/types/admin";
  * ⚠️ **ไม่มีช่องแก้จำนวนสต็อกของตัวเลือกที่มีอยู่แล้ว** — สต็อกเดินผ่าน
  *    InventoryMovement เท่านั้น (รับเข้าครั้งแรกกรอกได้ตอนสร้างตัวเลือก
  *    ส่วนการปรับยอดภายหลังทำที่หน้าคลังสินค้า `/admin/inventory`)
- * ⚠️ ตัวเลือกหมวดหมู่/แบรนด์/สี/ไซซ์ และโฮสต์รูปที่อนุญาต มาจากฐานข้อมูลจริง
+ * ⚠️ ตัวเลือกหมวดหมู่/แบรนด์/สี/ไซซ์ มาจากฐานข้อมูลจริง
  *    ผ่าน `options` — ฟอร์มไม่ฮาร์ดโค้ดรายการเหล่านี้เอง
  * ⚠️ โหมดแก้ไขส่งเฉพาะฟิลด์ที่เปลี่ยนจริง ไม่เขียนทับทั้งก้อน
+ * ⚠️ **รูปไม่อยู่ในฟอร์มนี้** (STEP 47) — อยู่ที่ `ProductImageManager` ซึ่งบันทึกทีละรูปทันที
  */
 export function ProductForm({
   mode,
@@ -53,19 +53,18 @@ export function ProductForm({
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(
       createProductFormSchema({
-        allowedImageHosts: options.allowedImageHosts,
         mode,
         hasActiveVariant,
+        // จำนวนรูปมาจากข้อมูลที่ server ส่งมาล่าสุด — ตัวจัดการรูปสั่ง router.refresh() ทุกครั้งที่เปลี่ยน
+        imageCount: product?.images.length ?? 0,
       }),
     ),
     defaultValues: product !== undefined ? toFormValues(product) : emptyFormValues(),
     mode: "onBlur",
   });
 
-  const images = useFieldArray({ control: form.control, name: "images" });
   const variants = useFieldArray({ control: form.control, name: "variants" });
 
-  const imageValues = useWatch({ control: form.control, name: "images" });
   const priceValue = useWatch({ control: form.control, name: "price" });
   const salePriceValue = useWatch({ control: form.control, name: "salePrice" });
   const statusValue = useWatch({ control: form.control, name: "status" });
@@ -273,112 +272,16 @@ export function ProductForm({
         )}
       </section>
 
-      {/* ─── รูปสินค้า ─── */}
-      <section className="rounded-[var(--radius-card)] border border-line bg-white p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h2 className="text-lg">รูปสินค้า</h2>
-            <p className="mt-1 text-sm text-muted">
-              ใส่ลิงก์รูปจากโฮสต์ที่ระบบอนุญาตเท่านั้น: {options.allowedImageHosts.join(", ")}
-              {mode === "edit" && " · การบันทึกจะแทนที่ชุดรูปเดิมทั้งหมด"}
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => images.append({ url: "", alt: "", isMain: images.fields.length === 0 })}
-            disabled={disabled || images.fields.length >= 10}
-            className="flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50 disabled:opacity-50"
-          >
-            <ImagePlus className="size-4" aria-hidden />
-            เพิ่มรูป
-          </button>
-        </div>
-
-        {images.fields.length === 0 ? (
-          <p className="mt-4 rounded-[12px] border border-dashed border-line bg-lilac-50 p-4 text-sm text-muted">
-            ยังไม่มีรูป — สินค้าที่ไม่มีรูปบันทึกเป็นฉบับร่างได้ แต่เปิดขายไม่ได้
+      {/* ─── รูปสินค้า: อัปโหลดได้หลังมีสินค้าแล้ว (STEP 47) ─── */}
+      {mode === "create" && (
+        <section className="rounded-[var(--radius-card)] border border-dashed border-line bg-lilac-50 p-5">
+          <h2 className="text-lg">รูปสินค้า</h2>
+          <p className="mt-1 text-sm text-muted">
+            อัปโหลดรูปได้หลังบันทึกฉบับร่าง — ระบบจะพาไปหน้าแก้ไขที่มีส่วนเพิ่มรูปให้ทันที
+            สินค้าที่ยังไม่มีรูปบันทึกเป็นฉบับร่างได้ แต่เปิดขายไม่ได้
           </p>
-        ) : (
-          <ul className="mt-4 space-y-3">
-            {images.fields.map((field, index) => {
-              const url = imageValues?.[index]?.url ?? "";
-              const previewable = isHttpsUrl(url, options.allowedImageHosts);
-
-              return (
-                <li key={field.id} className="rounded-[12px] border border-line p-3">
-                  <div className="flex gap-3">
-                    <div className="relative size-16 shrink-0 overflow-hidden rounded-[10px] bg-lilac-50">
-                      {previewable ? (
-                        <Image
-                          src={url}
-                          alt=""
-                          fill
-                          sizes="64px"
-                          className="object-cover"
-                          unoptimized
-                        />
-                      ) : (
-                        <span className="grid size-full place-items-center text-xs text-muted">
-                          ไม่มีภาพ
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="grid min-w-0 flex-1 gap-2">
-                      <input
-                        {...form.register(`images.${index}.url`)}
-                        placeholder="https://images.unsplash.com/..."
-                        disabled={disabled}
-                        className={inputClass}
-                      />
-                      <input
-                        {...form.register(`images.${index}.alt`)}
-                        placeholder="คำอธิบายรูปสำหรับผู้ใช้ screen reader"
-                        disabled={disabled}
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => images.remove(index)}
-                      disabled={disabled}
-                      aria-label={`ลบรูปที่ ${index + 1}`}
-                      className="grid size-11 shrink-0 place-items-center rounded-full border border-line transition hover:border-danger hover:text-danger"
-                    >
-                      <Trash2 className="size-4" aria-hidden />
-                    </button>
-                  </div>
-
-                  <label className="mt-2 flex min-h-11 items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      {...form.register(`images.${index}.isMain`)}
-                      disabled={disabled}
-                      className="size-4 accent-[var(--color-brand)]"
-                    />
-                    ใช้เป็นรูปหลัก
-                  </label>
-
-                  {(errors.images?.[index]?.url?.message !== undefined ||
-                    errors.images?.[index]?.alt?.message !== undefined) && (
-                    <p role="alert" className="mt-2 text-sm font-semibold text-danger">
-                      {errors.images[index]?.url?.message ?? errors.images[index]?.alt?.message}
-                    </p>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-
-        {typeof errors.images?.message === "string" && (
-          <p role="alert" className="mt-2 text-sm font-semibold text-danger">
-            {errors.images.message}
-          </p>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* ─── ตัวเลือกสินค้า (เฉพาะตอนสร้าง) ─── */}
       {mode === "create" && (
@@ -562,16 +465,6 @@ export function ProductForm({
       </div>
     </form>
   );
-}
-
-function isHttpsUrl(value: string, allowedHosts: string[]): boolean {
-  try {
-    const url = new URL(value);
-
-    return url.protocol === "https:" && allowedHosts.includes(url.hostname);
-  } catch {
-    return false;
-  }
 }
 
 function Field({

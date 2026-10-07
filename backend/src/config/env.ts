@@ -90,6 +90,12 @@ const EnvSchema = z.object({
   OPENAI_API_KEY: optionalSecret,
   OPENAI_MODEL: z.string().min(1).default('gpt-4o-mini'),
 
+  /**
+   * โฟลเดอร์เก็บรูปที่อัปโหลด (STEP 47) — ไม่ตั้ง = `backend/uploads`
+   * ⚠️ ตอน deploy ต้องชี้ไปที่ volume ถาวร ไม่งั้นรูปทั้งหมดหายทุกครั้งที่ redeploy
+   */
+  UPLOAD_DIR: optionalSecret,
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(900_000),

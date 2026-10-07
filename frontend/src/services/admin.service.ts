@@ -1,5 +1,4 @@
-import { apiFetch } from "@/lib/api";
-import { publicEnv } from "@/lib/env";
+import { apiFetch, apiUrlOf } from "@/lib/api";
 import type {
   AdminCoupon,
   CreateCouponInput,
@@ -7,7 +6,9 @@ import type {
   AdjustStockInput,
   AdminOrder,
   AdminProduct,
+  AdminProductImage,
   AssignBarcodeResult,
+  MediaPurgeResult,
   CreateProductInput,
   DeleteProductResult,
   FileFormat,
@@ -144,8 +145,8 @@ export function assignBarcode(variantId: string): Promise<AssignBarcodeResult> {
 /* ─────────────── นำเข้าและส่งออกข้อมูล (STEP 18) ─────────────── */
 
 async function triggerFileDownload(path: string, fallbackFilename: string): Promise<void> {
-  const base = publicEnv.apiUrl;
-  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  // ผ่าน apiUrlOf เพื่อให้ใช้ proxy path ตอน production (แก้ตอน STEP 47 — เดิมยิงข้ามโดเมนแล้ว cookie ถูกบล็อก)
+  const url = apiUrlOf(path);
 
   const response = await fetch(url, {
     credentials: "include",
@@ -203,25 +204,84 @@ export function downloadAdminTemplate(
   );
 }
 
-async function uploadFile<T>(path: string, file: File, dryRun = false): Promise<T> {
-  const base = publicEnv.apiUrl;
-  const url = `${base}${path.startsWith("/") ? path : `/${path}`}${path.includes("?") ? "&" : "?"}dryRun=${dryRun}`;
+/**
+ * ส่งไฟล์นำเข้า — ผ่าน `apiFetch` (แก้ตอน STEP 47)
+ *
+ * เดิมเรียก `fetch` เองด้วย `publicEnv.apiUrl` ซึ่ง (1) ข้าม proxy path ตอน production
+ * แล้ว cookie ถูกบล็อกจนได้ 401 ทุกครั้ง และ (2) โยน `Error` เปล่าที่ไม่มี `details`
+ * หน้าเว็บจึงบอกได้แค่ข้อความรวม ไม่บอกว่าแถวไหนผิด
+ */
+function uploadFile<T>(path: string, file: File, dryRun = false): Promise<T> {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(url, {
+  return apiFetch<T>(`${path}${path.includes("?") ? "&" : "?"}dryRun=${dryRun}`, {
     method: "POST",
-    credentials: "include",
-    headers: { Accept: "application/json" },
-    body: formData,
+    formData,
+    cache: "no-store",
+    // ไฟล์ Excel ใหญ่ ๆ ใช้เวลาแปลงนานกว่าคำขอทั่วไป
+    timeoutMs: 60_000,
   });
+}
 
-  const json = await response.json();
-  if (!response.ok || !json.success) {
-    throw new Error(json.message || "อัปโหลดไฟล์ไม่สำเร็จ");
-  }
+/* ─────────────── รูปสินค้า (STEP 47) ─────────────── */
 
-  return json.data as T;
+/** อัปโหลดรูปหนึ่งรูป — server แปลงเป็น WebP ตัด metadata และตรวจเนื้อไฟล์เอง */
+export function uploadProductImage(
+  productId: string,
+  file: File,
+  alt: string,
+): Promise<AdminProductImage[]> {
+  const formData = new FormData();
+  formData.append("alt", alt);
+  formData.append("file", file);
+
+  return apiFetch<AdminProductImage[]>(
+    `/api/admin/products/${encodeURIComponent(productId)}/images`,
+    { method: "POST", formData, cache: "no-store", timeoutMs: 60_000 },
+  );
+}
+
+export function updateProductImageAlt(
+  productId: string,
+  imageId: string,
+  alt: string,
+): Promise<AdminProductImage[]> {
+  return apiFetch<AdminProductImage[]>(
+    `/api/admin/products/${encodeURIComponent(productId)}/images/${encodeURIComponent(imageId)}`,
+    { method: "PATCH", json: { alt }, cache: "no-store" },
+  );
+}
+
+/** ลำดับใหม่ของรูป **ทุกรูป** — รูปแรกคือรูปหลัก (ส่งไม่ครบ = 409) */
+export function reorderProductImages(
+  productId: string,
+  imageIds: string[],
+): Promise<AdminProductImage[]> {
+  return apiFetch<AdminProductImage[]>(
+    `/api/admin/products/${encodeURIComponent(productId)}/images/order`,
+    { method: "PUT", json: { imageIds }, cache: "no-store" },
+  );
+}
+
+/** ถอดรูปออกจากสินค้า — ไฟล์ยังอยู่จนตัวล้างไฟล์ลบ (อาจเป็น snapshot ของคำสั่งซื้อ) */
+export function removeProductImage(
+  productId: string,
+  imageId: string,
+): Promise<AdminProductImage[]> {
+  return apiFetch<AdminProductImage[]>(
+    `/api/admin/products/${encodeURIComponent(productId)}/images/${encodeURIComponent(imageId)}`,
+    { method: "DELETE", cache: "no-store" },
+  );
+}
+
+/** ลบไฟล์ที่ไม่มีที่ไหนใช้เกินช่วงผ่อนผัน (`media:manage`) */
+export function purgeUnusedMedia(): Promise<MediaPurgeResult> {
+  return apiFetch<MediaPurgeResult>("/api/admin/media/purge", {
+    method: "POST",
+    cache: "no-store",
+    timeoutMs: 60_000,
+  });
 }
 
 export function importAdminProducts(file: File, dryRun = false): Promise<ProductImportResult> {

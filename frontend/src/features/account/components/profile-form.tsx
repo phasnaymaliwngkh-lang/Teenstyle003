@@ -20,7 +20,7 @@ import type { MyProfile } from "@/types/customer";
  *
  * ⚠️ **รูปโปรไฟล์ยังเปลี่ยนเองไม่ได้** — มาจากบัญชี Google เท่านั้น
  *    การรับ URL รูปจาก client คือการยอมให้แปะรูปจากที่ไหนก็ได้ (ปัญหาเดียวกับรูปในรีวิว STEP 23)
- *    การอัปโหลดจริงเป็นงานของ STEP 47
+ *    ระบบอัปโหลดของ STEP 47 รับแค่รูปสินค้าและรูปรีวิว — รูปโปรไฟล์ยังไม่มี STEP ไหนรับงานนี้ไว้
  */
 const inputClass =
   "mt-1 min-h-11 w-full rounded-[var(--radius-card)] border border-line bg-white px-3 text-sm outline-none focus:border-brand-soft focus:ring-2 focus:ring-brand/20";

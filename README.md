@@ -45,7 +45,8 @@ npm run dev
 **Frontend** — Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind CSS v4 · shadcn/ui-ready · Framer Motion · React Hook Form · Zod · Zustand
 **Backend** — Node.js · Express 5 · TypeScript (ESM) · Zod · Helmet · CORS · express-rate-limit · pino
 **Database** — PostgreSQL 17 · Prisma 7 (driver adapter `@prisma/adapter-pg`)
-**จะเพิ่มตาม STEP** — Auth.js + Google OAuth (3) · OpenAI (19) · Redis + BullMQ (34, 52) · Cloudinary (47) · Stripe/PromptPay (11)
+**จะเพิ่มตาม STEP** — Auth.js + Google OAuth (3) · OpenAI (19) · Redis + BullMQ (34, 52) · Stripe/PromptPay (11)
+· รูปที่อัปโหลด (47) เก็บบนดิสก์ของ backend + แปลงด้วย sharp — **ยังไม่ใช้ Cloudinary** (ดู [docs/20-images.md](docs/20-images.md))
 
 ## โครงสร้าง
 

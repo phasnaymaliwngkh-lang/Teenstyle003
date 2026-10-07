@@ -40,6 +40,7 @@ export const PERMISSIONS: ReadonlyArray<{ key: string; description: string }> = 
   { key: 'analytics:read', description: 'ดูรายงานและสถิติ' },
   { key: 'log:read', description: 'ดู Audit log ของระบบหลังบ้าน' },
   { key: 'settings:manage', description: 'แก้ไขการตั้งค่าร้าน' },
+  { key: 'media:manage', description: 'ดูคลังรูปทั้งหมดและลบไฟล์รูปที่ไม่ได้ใช้แล้ว' },
   { key: 'user:role:manage', description: 'เปลี่ยนบทบาทและสิทธิ์ของผู้ใช้' },
   { key: 'backup:manage', description: 'สั่ง backup และกู้คืนข้อมูล' },
 ];
@@ -80,6 +81,8 @@ const ADMIN_PERMISSIONS = [
   'analytics:read',
   'log:read',
   'settings:manage',
+  // คลังรูปมีรูปที่ลูกค้าแนบรีวิว (รวมที่ยังรอตรวจ) และปุ่มลบไฟล์ถาวร (STEP 47)
+  'media:manage',
 ];
 
 export const ROLES: ReadonlyArray<{

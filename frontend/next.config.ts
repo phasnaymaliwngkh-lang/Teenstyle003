@@ -33,13 +33,26 @@ const nextConfig: NextConfig = {
 
   images: {
     formats: ["image/avif", "image/webp"],
+    /**
+     * รูปที่ร้านอัปโหลดเอง (STEP 47) — url ในฐานข้อมูลเป็น path ของเว็บเราเอง `/media/...`
+     * แล้ว rewrite ด้านล่างส่งต่อไป backend ที่เก็บไฟล์จริง
+     *
+     * ทำไมไม่ใส่ host ของ backend ใน `remotePatterns`: Next 16 ปฏิเสธการย่อรูปจาก IP ภายใน
+     * (`dangerouslyAllowLocalIP` = false) ซึ่ง backend ตอน dev (localhost) และใน docker network
+     * เป็น IP ภายในทั้งคู่ — การเปิดค่านั้นคือเปิดช่อง SSRF ให้ตัวย่อรูปยิงเข้าเครือข่ายภายใน
+     * path ภายในของเว็บเองไม่ติดกฎนั้น และไม่ต้องประกาศโดเมนของ backend ให้เบราว์เซอร์รู้
+     *
+     * `search: ''` = ห้ามมี query — ไม่ให้ใครใช้ตัวย่อรูปของเราย่อ url ที่เราไม่ได้ตั้งใจ
+     * ⚠️ ต้องตรงกับ `MEDIA_URL_PREFIX` ใน backend/src/config/media.ts
+     */
+    localPatterns: [{ pathname: "/media/**", search: "" }],
     remotePatterns: [
       // รูปโปรไฟล์จากบัญชี Google (แสดงบน navbar)
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
       /**
-       * รูปสินค้าที่ seed ไว้ตอนนี้ชี้ไป Unsplash
+       * รูปสินค้าตัวอย่างจาก seed ชี้ไป Unsplash — รูปที่ร้านอัปโหลดเองอยู่ที่ `/media` (ด้านบน)
        * ถ้าไม่ประกาศ host ที่นี่ next/image จะ error ตอน render
-       * STEP 47 จะย้ายรูปไป Cloudinary แล้วเปลี่ยน host ตรงนี้
+       * ⚠️ ต้องตรงกับ `ALLOWED_IMAGE_HOSTS` ใน backend/src/config/media.ts
        */
       { protocol: "https", hostname: "images.unsplash.com" },
     ],
@@ -58,14 +71,21 @@ const nextConfig: NextConfig = {
    */
   async rewrites() {
     const prefix = process.env.NEXT_PUBLIC_API_PROXY_PATH;
-    const target = process.env.NEXT_PUBLIC_API_URL;
+    const target = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/$/, "");
 
-    if (!prefix || !target) return [];
+    /**
+     * รูปที่ร้านเก็บเอง (STEP 47) — เปิดเสมอทั้ง dev และ production
+     * เบราว์เซอร์และตัวย่อรูปของ Next เห็นรูปเป็นไฟล์ของเว็บเราเอง (ดูเหตุผลที่ `images.localPatterns`)
+     */
+    const media = { source: "/media/:path*", destination: `${target}/media/:path*` };
+
+    if (!prefix) return [media];
 
     return [
+      media,
       {
         source: `${prefix.replace(/\/$/, "")}/:path*`,
-        destination: `${target.replace(/\/$/, "")}/:path*`,
+        destination: `${target}/:path*`,
       },
     ];
   },

@@ -10,6 +10,7 @@ import type {
   BarcodeLookupResult,
   InventoryListResult,
   LabelSheet,
+  MediaLibrary,
   MovementListResult,
   ProductFormOptions,
   StockAlertListResult,
@@ -22,6 +23,15 @@ import type {
  * ทุก endpoint ต้องล็อกอิน + เป็นพนักงาน + มีสิทธิ์ตรงกับงาน (backend ตรวจ)
  * หน้า admin ตรวจสิทธิ์ซ้ำที่ layout/page ผ่าน DAL อีกชั้น
  */
+
+/** คลังรูป (STEP 47) — `media:manage` · อ่านอย่างเดียว */
+export function fetchMediaLibraryOnServer(params: URLSearchParams): Promise<MediaLibrary> {
+  const qs = params.toString();
+
+  return apiFetchAsUser<MediaLibrary>(`/api/admin/media${qs ? `?${qs}` : ""}`, {
+    cache: "no-store",
+  });
+}
 
 export function fetchAdminOverviewOnServer(): Promise<AdminOverview> {
   return apiFetchAsUser<AdminOverview>("/api/admin/overview", { cache: "no-store" });

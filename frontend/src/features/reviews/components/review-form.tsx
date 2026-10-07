@@ -1,16 +1,32 @@
 "use client";
 
-import { Loader2, Star } from "lucide-react";
+import { Camera, Loader2, Star, X } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { describeApiError } from "@/lib/api-error-text";
+import { megabytes, precheckImageFile, REVIEW_PHOTO_RULES } from "@/lib/image-upload";
 import { cn } from "@/lib/utils";
-import { createReview, updateReview } from "@/services/review.service";
-import type { Review } from "@/types/catalog";
+import {
+  attachReviewImage,
+  createReview,
+  removeReviewImage,
+  updateReview,
+} from "@/services/review.service";
+import type { Review, ReviewImage } from "@/types/catalog";
 
 const MAX_COMMENT = 2000;
 const MIN_COMMENT = 10;
+
+/** รูปที่เลือกไว้แต่ยังไม่ได้แนบ (STEP 47) */
+interface PendingPhoto {
+  key: string;
+  file: File;
+  previewUrl: string;
+  /** ตรวจไม่ผ่านตั้งแต่ในเบราว์เซอร์ หรือ server ปฏิเสธ */
+  error: string | null;
+}
 
 const RATING_LABEL: Record<number, string> = {
   1: "ไม่ดีเลย",
@@ -52,8 +68,74 @@ export function ReviewForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** รีวิวที่บันทึกแล้ว — รีวิวใหม่ที่รูปบางรูปแนบไม่สำเร็จ กดส่งอีกครั้งต้องไม่สร้างรีวิวซ้ำ */
+  const [savedReviewId, setSavedReviewId] = useState<string | null>(existing?.id ?? null);
+  const [savedImages, setSavedImages] = useState<ReviewImage[]>(existing?.images ?? []);
+  const [photos, setPhotos] = useState<PendingPhoto[]>([]);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  // คืนหน่วยความจำของภาพตัวอย่างตอนปิดฟอร์ม — เขียน ref ใน effect ไม่ใช่ระหว่าง render
+  const photosRef = useRef(photos);
+  useEffect(() => {
+    photosRef.current = photos;
+  }, [photos]);
+  useEffect(
+    () => () => {
+      for (const photo of photosRef.current) URL.revokeObjectURL(photo.previewUrl);
+    },
+    [],
+  );
+
   const isEdit = existing !== undefined;
   const tooShort = comment.trim().length < MIN_COMMENT;
+  const photoSlots = REVIEW_PHOTO_RULES.maxPhotos - savedImages.length - photos.length;
+
+  function onPickPhotos(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = [...(event.target.files ?? [])];
+    event.target.value = "";
+    if (files.length === 0) return;
+
+    const accepted = files.slice(0, Math.max(0, photoSlots));
+    setError(
+      accepted.length < files.length
+        ? `แนบรูปได้ไม่เกิน ${REVIEW_PHOTO_RULES.maxPhotos} รูปต่อรีวิว`
+        : null,
+    );
+
+    setPhotos([
+      ...photos,
+      ...accepted.map((file, index) => ({
+        key: `${file.name}-${file.size}-${file.lastModified}-${photos.length + index}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        error: precheckImageFile(file, REVIEW_PHOTO_RULES),
+      })),
+    ]);
+  }
+
+  function dropPhoto(key: string) {
+    const photo = photos.find((entry) => entry.key === key);
+    if (photo) URL.revokeObjectURL(photo.previewUrl);
+    setPhotos(photos.filter((entry) => entry.key !== key));
+  }
+
+  /** ลบรูปที่แนบไว้แล้ว — มีผลทันที และรีวิวกลับไปรอร้านตรวจ (server เป็นคนตัดสิน) */
+  async function removeSaved(image: ReviewImage) {
+    if (savedReviewId === null || image.id === null) return;
+
+    setRemovingId(image.id);
+    setError(null);
+
+    try {
+      const result = await removeReviewImage(savedReviewId, image.id);
+      setSavedImages(result.review.images);
+      router.refresh();
+    } catch (err) {
+      setError(describeApiError(err, "ลบรูปไม่สำเร็จ กรุณาลองใหม่"));
+    } finally {
+      setRemovingId(null);
+    }
+  }
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -72,30 +154,72 @@ export function ReviewForm({
     setPending(true);
     setError(null);
 
+    let reviewId = savedReviewId;
+
     try {
-      if (isEdit) {
-        await updateReview(existing.id, {
+      if (reviewId !== null) {
+        await updateReview(reviewId, {
           rating,
           title: title.trim() || null,
           comment: comment.trim(),
         });
       } else {
-        await createReview({
+        const created = await createReview({
           productId,
           rating,
           ...(title.trim() ? { title: title.trim() } : {}),
           comment: comment.trim(),
         });
+        reviewId = created.review.id;
+        setSavedReviewId(reviewId);
       }
-
-      // ให้ Server Component ดึงข้อมูลใหม่ สถานะ "รอตรวจสอบ" จะได้ตรงกับของจริง
-      router.refresh();
-      onDone?.();
     } catch (err) {
       setError(describeApiError(err, "ส่งรีวิวไม่สำเร็จ กรุณาลองใหม่"));
-    } finally {
       setPending(false);
+      return;
     }
+
+    // ข้อความบันทึกแล้ว — แนบรูปทีละรูป รูปที่ไม่ผ่านค้างไว้พร้อมเหตุผลให้ลองใหม่หรือเอาออก
+    let failed = 0;
+    let remaining = photos;
+
+    for (const photo of photos) {
+      // ข้ามเฉพาะไฟล์ที่ผิดตั้งแต่ในเบราว์เซอร์ — ไฟล์ที่ server เคยปฏิเสธ (เช่นระบบล่มชั่วคราว)
+      // ลองใหม่ได้ด้วยการกดส่งอีกครั้ง ไม่ต้องเอาออกแล้วเลือกใหม่
+      if (precheckImageFile(photo.file, REVIEW_PHOTO_RULES) !== null) {
+        failed += 1;
+        continue;
+      }
+
+      try {
+        const result = await attachReviewImage(reviewId, photo.file);
+        setSavedImages(result.review.images);
+        URL.revokeObjectURL(photo.previewUrl);
+        remaining = remaining.filter((entry) => entry.key !== photo.key);
+      } catch (err) {
+        failed += 1;
+        remaining = remaining.map((entry) =>
+          entry.key === photo.key
+            ? { ...entry, error: describeApiError(err, "แนบรูปนี้ไม่สำเร็จ") }
+            : entry,
+        );
+      }
+    }
+
+    setPhotos(remaining);
+    setPending(false);
+
+    // ให้ Server Component ดึงข้อมูลใหม่ สถานะ "รอตรวจสอบ" จะได้ตรงกับของจริง
+    router.refresh();
+
+    if (failed > 0) {
+      setError(
+        `บันทึกรีวิวแล้ว แต่แนบรูปไม่สำเร็จ ${failed} รูป — เอารูปนั้นออก หรือแก้แล้วกดส่งอีกครั้ง`,
+      );
+      return;
+    }
+
+    onDone?.();
   };
 
   return (
@@ -177,6 +301,93 @@ export function ReviewForm({
         </p>
       </div>
 
+      {/* ─── รูปประกอบ (STEP 47) ─── */}
+      <fieldset>
+        <legend className="text-sm font-bold">
+          รูปประกอบ <span className="font-normal text-muted">(ไม่บังคับ)</span>
+        </legend>
+        <p className="mt-1 text-xs text-muted">
+          แนบได้สูงสุด {REVIEW_PHOTO_RULES.maxPhotos} รูป · {REVIEW_PHOTO_RULES.acceptedText}{" "}
+          ไม่เกิน {megabytes(REVIEW_PHOTO_RULES.maxBytes)} · ร้านลบข้อมูลที่ติดมากับรูป (ตำแหน่ง GPS
+          รุ่นกล้อง) ให้ก่อนเก็บ · รูปขึ้นหน้าสินค้าหลังร้านตรวจพร้อมรีวิว
+        </p>
+
+        {(savedImages.length > 0 || photos.length > 0) && (
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {savedImages.map((image, index) => (
+              <li key={image.url} className="relative size-20">
+                <span className="relative block size-20 overflow-hidden rounded-[12px] border border-line bg-lilac-50">
+                  <Image src={image.url} alt="" fill sizes="80px" className="object-cover" />
+                </span>
+                {image.id !== null && (
+                  <button
+                    type="button"
+                    onClick={() => void removeSaved(image)}
+                    disabled={pending || removingId !== null}
+                    aria-label={`ลบรูปที่ ${index + 1} ที่แนบไว้แล้ว`}
+                    className="absolute -top-2 -right-2 grid size-11 place-items-center rounded-full border border-line bg-white shadow-[var(--shadow-soft)] transition hover:border-danger hover:text-danger disabled:opacity-50"
+                  >
+                    {removingId === image.id ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                    ) : (
+                      <X className="size-4" aria-hidden />
+                    )}
+                  </button>
+                )}
+              </li>
+            ))}
+
+            {photos.map((photo, index) => (
+              <li key={photo.key} className="relative w-20">
+                <span
+                  className={cn(
+                    "relative block size-20 overflow-hidden rounded-[12px] border bg-lilac-50",
+                    photo.error !== null ? "border-danger" : "border-dashed border-brand-soft",
+                  )}
+                >
+                  <Image src={photo.previewUrl} alt="" fill sizes="80px" className="object-cover" />
+                </span>
+                <button
+                  type="button"
+                  onClick={() => dropPhoto(photo.key)}
+                  disabled={pending}
+                  aria-label={`เอารูปใหม่ที่ ${index + 1} (${photo.file.name}) ออก`}
+                  className="absolute -top-2 -right-2 grid size-11 place-items-center rounded-full border border-line bg-white shadow-[var(--shadow-soft)] transition hover:border-danger hover:text-danger disabled:opacity-50"
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
+                {photo.error !== null && (
+                  <p
+                    role="alert"
+                    className="mt-1 text-[11px] leading-tight font-semibold text-danger"
+                  >
+                    {photo.error}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <label
+          className={cn(
+            "mt-2 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-[var(--radius-pill)] border border-line px-4 text-sm font-semibold transition focus-within:ring-2 focus-within:ring-brand hover:border-brand-soft hover:bg-lilac-50",
+            (photoSlots <= 0 || pending) && "pointer-events-none opacity-50",
+          )}
+        >
+          <Camera className="size-4" aria-hidden />
+          {photoSlots <= 0 ? "แนบครบจำนวนแล้ว" : "เลือกรูป"}
+          <input
+            type="file"
+            accept={REVIEW_PHOTO_RULES.acceptedTypes.join(",")}
+            multiple
+            onChange={onPickPhotos}
+            disabled={photoSlots <= 0 || pending}
+            className="sr-only"
+          />
+        </label>
+      </fieldset>
+
       <p className="rounded-[var(--radius-card)] border border-line bg-lilac-50 px-3 py-2 text-xs text-muted">
         รีวิวจะขึ้นหน้าสินค้าหลังร้านตรวจสอบแล้ว ·
         ชื่อที่แสดงจะถูกย่อเหลือชื่อต้นกับอักษรแรกของนามสกุล เช่น &ldquo;สมชาย ก.&rdquo; —
@@ -196,7 +407,7 @@ export function ReviewForm({
           className="btn-brand flex min-h-11 items-center gap-2 rounded-[var(--radius-pill)] px-6 text-sm font-bold transition disabled:opacity-50"
         >
           {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-          {isEdit ? "บันทึกการแก้ไข" : "ส่งรีวิว"}
+          {isEdit || savedReviewId !== null ? "บันทึกการแก้ไข" : "ส่งรีวิว"}
         </button>
 
         {onCancel && (

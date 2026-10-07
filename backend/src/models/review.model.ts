@@ -1,3 +1,5 @@
+import type { ReviewImageDto } from './media.model.ts';
+
 /**
  * Review DTO + กฎการแปลงข้อมูล (STEP 23)
  *
@@ -29,8 +31,11 @@ export interface ReviewDto {
   rating: number;
   title: string | null;
   comment: string;
-  /** รูปที่ลูกค้าแนบ — ตอนนี้ว่างเสมอ เพราะระบบอัปโหลดรูปเป็นงานของ STEP 47 */
-  images: string[];
+  /**
+   * รูปที่ลูกค้าแนบ (STEP 47) — อัปโหลดผ่าน `POST /api/reviews/:id/images` เท่านั้น
+   * ผ่านการตรวจของร้านพร้อมข้อความ (รีวิวที่ยังไม่อนุมัติคนอื่นไม่เห็น รวมถึงรูป)
+   */
+  images: ReviewImageDto[];
   /** ซื้อจริงจากร้านนี้หรือไม่ — คำนวณจากคำสั่งซื้อ ไม่ใช่ค่าที่ client ส่งมา */
   isVerifiedPurchase: boolean;
   helpfulCount: number;

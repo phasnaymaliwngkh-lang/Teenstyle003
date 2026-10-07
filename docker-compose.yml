@@ -78,11 +78,12 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:-}
       BACKEND_JWT_SECRET: ${BACKEND_JWT_SECRET:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
-      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
-      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      # รูปที่อัปโหลด (STEP 47) — ต้องอยู่บน volume ไม่งั้นหายทุกครั้งที่สร้าง container ใหม่
+      UPLOAD_DIR: /app/uploads
       PAYMENT_SECRET: ${PAYMENT_SECRET:-}
       PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:-}
+    volumes:
+      - uploads:/app/uploads
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     networks:
@@ -128,6 +129,8 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  # ไฟล์รูปสินค้า/รีวิว (STEP 47) — backup ต้องรวม volume นี้ด้วย ไม่ใช่แค่ฐานข้อมูล
+  uploads:
 
 networks:
   teenstyle:

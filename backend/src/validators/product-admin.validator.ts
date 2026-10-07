@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { allowedImageHostsText, isAllowedImageUrl } from '../config/media.ts';
+import { allowedImageHostsText, isAllowedImageUrl, PRODUCT_IMAGE_LIMIT } from '../config/media.ts';
 
 import { gtinSchema } from './barcode.validator.ts';
 
@@ -47,11 +47,40 @@ const imageUrl = z
     message: `รูปต้องเป็น https และมาจากโฮสต์ที่อนุญาตเท่านั้น (${allowedImageHostsText()})`,
   });
 
+/** คำอธิบายรูปสำหรับผู้ใช้ screen reader — บังคับทุกรูป (กฎ accessibility ข้อ 12) */
+const imageAlt = z
+  .string({ message: 'กรุณาใส่คำอธิบายรูป (alt) เพื่อการเข้าถึง' })
+  .trim()
+  .min(2, 'กรุณาใส่คำอธิบายรูป (alt) เพื่อการเข้าถึง')
+  .max(200, 'คำอธิบายรูปยาวได้ไม่เกิน 200 ตัวอักษร');
+
+/**
+ * รูปจากโฮสต์ภายนอกตอน **สร้าง** สินค้าผ่าน API (STEP 14) — หน้าเว็บอัปโหลดไฟล์แทนแล้ว (STEP 47)
+ * หลังสร้างแล้วจัดการรูปทีละรูปผ่าน `/api/admin/products/:id/images` เท่านั้น
+ */
 export const productImageSchema = z.object({
   url: imageUrl,
-  alt: z.string().trim().min(2, 'กรุณาใส่คำอธิบายรูป (alt) เพื่อการเข้าถึง').max(200),
+  alt: imageAlt,
   isMain: z.boolean().default(false),
   sortOrder: z.coerce.number().int().min(0).max(99).default(0),
+});
+
+/** ฟิลด์ข้อความที่ส่งมากับไฟล์รูป (multipart) */
+export const uploadProductImageSchema = z.object({ alt: imageAlt });
+
+export const updateProductImageSchema = z.object({ alt: imageAlt });
+
+/** ลำดับใหม่ของรูปทั้งหมด — รูปแรกคือรูปหลัก */
+export const reorderProductImagesSchema = z.object({
+  imageIds: z
+    .array(z.string().uuid('imageId ต้องเป็น UUID'), { message: 'กรุณาส่งรายการรูป' })
+    .min(1, 'กรุณาส่งรายการรูป')
+    .max(PRODUCT_IMAGE_LIMIT),
+});
+
+export const productImageParamsSchema = z.object({
+  productId: z.string().uuid('productId ต้องเป็น UUID'),
+  imageId: z.string().uuid('imageId ต้องเป็น UUID'),
 });
 
 export const productVariantSchema = z.object({
@@ -120,7 +149,7 @@ export const createProductSchema = productCore
     status: productStatus.default('DRAFT'),
     minimumStock: minimumStock.default(5),
     tags: tags.default([]),
-    images: z.array(productImageSchema).max(10).default([]),
+    images: z.array(productImageSchema).max(PRODUCT_IMAGE_LIMIT).default([]),
     variants: z
       .array(productVariantSchema)
       .min(1, 'ต้องมีตัวเลือกสินค้าอย่างน้อย 1 รายการ')
@@ -152,23 +181,22 @@ export const createProductSchema = productCore
     }
   });
 
-/** แก้สินค้า — ส่งมาเฉพาะฟิลด์ที่ต้องการเปลี่ยน */
-export const updateProductSchema = productCore
-  .partial()
-  .extend({ images: z.array(productImageSchema).max(10).optional() })
-  .superRefine((value, ctx) => {
-    if (value.price !== undefined) {
-      salePriceBelowPrice({ price: value.price, salePrice: value.salePrice }, ctx);
-    }
+/**
+ * แก้สินค้า — ส่งมาเฉพาะฟิลด์ที่ต้องการเปลี่ยน
+ *
+ * ⚠️ **ไม่มี `images` โดยเจตนา** (ถอดตอน STEP 47) — เดิม PATCH รับรูปทั้งชุดแล้ว "ลบทั้งหมด
+ *    สร้างใหม่" ซึ่งเมื่อมีรูปที่อัปโหลดแล้วจะทำให้รูปหายเงียบ ๆ ถ้าคนส่งไม่ได้ใส่รูปนั้นกลับมา
+ *    รูปจัดการทีละรูปที่ `/api/admin/products/:id/images` · ส่ง `images` มาจะถูกตัดทิ้ง
+ */
+export const updateProductSchema = productCore.partial().superRefine((value, ctx) => {
+  if (value.price !== undefined) {
+    salePriceBelowPrice({ price: value.price, salePrice: value.salePrice }, ctx);
+  }
 
-    if (value.images !== undefined && value.images.filter((image) => image.isMain).length > 1) {
-      ctx.addIssue({ code: 'custom', path: ['images'], message: 'ตั้งรูปหลักได้เพียงรูปเดียว' });
-    }
-
-    if (Object.keys(value).length === 0) {
-      ctx.addIssue({ code: 'custom', path: [], message: 'ไม่มีข้อมูลที่จะแก้ไข' });
-    }
-  });
+  if (Object.keys(value).length === 0) {
+    ctx.addIssue({ code: 'custom', path: [], message: 'ไม่มีข้อมูลที่จะแก้ไข' });
+  }
+});
 
 export const adminProductListQuerySchema = z.object({
   q: z.string().trim().max(120).optional(),
@@ -216,3 +244,4 @@ export type UpdateProductInput = z.infer<typeof updateProductSchema>;
 export type AdminProductListQuery = z.infer<typeof adminProductListQuerySchema>;
 export type AddVariantInput = z.infer<typeof addVariantSchema>;
 export type UpdateVariantInput = z.infer<typeof updateVariantSchema>;
+export type ReorderProductImagesInput = z.infer<typeof reorderProductImagesSchema>;

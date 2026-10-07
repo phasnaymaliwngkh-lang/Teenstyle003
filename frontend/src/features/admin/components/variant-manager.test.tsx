@@ -50,6 +50,13 @@ const OPTIONS = {
   colors: [{ name: "ดำ", slug: "black", hex: "#111114" }],
   sizes: [{ name: "M", code: "M" }],
   allowedImageHosts: ["images.unsplash.com"],
+  imageUpload: {
+    maxBytes: 8 * 1024 * 1024,
+    acceptedTypes: ["image/jpeg"],
+    acceptedText: "JPEG",
+    minShortEdge: 600,
+    maxImages: 10,
+  },
 } satisfies ProductFormOptions;
 
 const priceBox = () => screen.getByRole("textbox", { name: /^ราคาเฉพาะตัวเลือกนี้/ });

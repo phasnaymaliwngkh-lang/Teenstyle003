@@ -334,6 +334,33 @@ FROM generate_series(1, ${VOLUME.reviews}) g
 JOIN p ON p.n = g % ${VOLUME.products}
 JOIN u ON u.n = (g * 7) % ${VOLUME.users};
 
+-- STEP 47: ครึ่งหนึ่งของรูปหลักเป็นไฟล์ที่ร้านอัปโหลด · ทุกรายการในบิลเก็บ snapshot ของรูปหลัก
+-- และรูปที่ไม่มีใครใช้แล้ว 3,000 ไฟล์ — คลังรูปต้องไล่ทุกที่ที่ใช้ url (รวม OrderItem ทั้งตาราง)
+-- ⚠️ ไม่ใส่ 'media:manage' ใน PERMISSION_KEYS — migration ของ STEP 47 สร้างแถวนี้ให้แล้ว
+--    (ซ้ำ = ชน unique) และบรรทัด "SUPER_ADMIN ได้ทุกสิทธิ์" ด้านบนผูกให้อยู่แล้ว
+CREATE TEMP TABLE m AS
+  SELECT gen_random_uuid() AS id, pi.id AS image_id
+  FROM "ProductImage" pi
+  WHERE pi."isMain" AND abs(hashtext(pi.id::text)) % 2 = 0;
+
+INSERT INTO "MediaAsset" (id, purpose, "storageKey", url, "mimeType", width, height, bytes,
+                          "originalBytes", "createdAt")
+SELECT m.id, 'PRODUCT', 'products/2026/10/' || m.id || '.webp', '/media/products/2026/10/' || m.id || '.webp',
+       'image/webp', 1600, 1600, 180000, 2400000, now()
+FROM m;
+
+UPDATE "ProductImage" pi SET url = '/media/products/2026/10/' || m.id || '.webp'
+FROM m WHERE m.image_id = pi.id;
+
+UPDATE "OrderItem" oi SET "imageUrl" = pi.url
+FROM "ProductImage" pi WHERE pi."productId" = oi."productId" AND pi."isMain";
+
+INSERT INTO "MediaAsset" (id, purpose, "storageKey", url, "mimeType", width, height, bytes,
+                          "originalBytes", "unusedSince", "createdAt")
+SELECT x.id, 'REVIEW', 'reviews/2026/09/' || x.id || '.webp', '/media/reviews/2026/09/' || x.id || '.webp',
+       'image/webp', 1200, 900, 90000, 1800000, now() - interval '3 day', now() - interval '10 day'
+FROM (SELECT gen_random_uuid() AS id FROM generate_series(1, 3000)) x;
+
 INSERT INTO "Wishlist" (id, "userId", "productId", "priceWhenAdded", "notifyOnPriceDrop", "createdAt")
 SELECT gen_random_uuid(), u.id, p.id, p.price, true, now() - (g % 200) * interval '1 day'
 FROM generate_series(1, ${VOLUME.wishlist}) g
@@ -497,6 +524,18 @@ const ROUTES = [
   { path: '/api/admin/logs?limit=20', budgetMs: 300, staff: true },
   { path: '/api/admin/logs/filters', budgetMs: 400, staff: true },
   { path: '/api/admin/reviews?limit=20', budgetMs: 300, staff: true },
+  {
+    path: '/api/admin/media?limit=24',
+    budgetMs: 400,
+    note: 'คลังรูป — ไล่ว่า url ถูกใช้ที่ไหน (รวม snapshot ใน OrderItem ทั้งตาราง)',
+    staff: true,
+  },
+  {
+    path: '/api/admin/media?usage=unused&limit=24',
+    budgetMs: 500,
+    note: 'กรอง "ไม่ได้ใช้แล้ว" ต้อง anti-join ทุกไฟล์ก่อนแบ่งหน้า',
+    staff: true,
+  },
   { path: '/api/admin/analytics/summary', budgetMs: 400, note: 'ช่วงเริ่มต้น 30 วัน', staff: true },
   {
     path: '/api/admin/analytics/summary?from=2025-09-27&to=2026-09-26&granularity=month',

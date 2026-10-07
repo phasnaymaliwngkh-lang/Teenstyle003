@@ -1,3 +1,4 @@
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -24,3 +25,9 @@ loadEnv({ path: path.resolve(here, '..', '..', '.env'), quiet: true });
 // ใช้ `||` ไม่ใช่ `??=` เพราะ .env มีบรรทัด `STRIPE_WEBHOOK_SECRET=` ว่างไว้ (ค่าเป็น '' ไม่ใช่ undefined)
 process.env['STRIPE_WEBHOOK_SECRET'] =
   process.env['STRIPE_WEBHOOK_SECRET'] || 'whsec_test_local_only_not_a_real_secret';
+
+/**
+ * ไฟล์รูปที่เทสต์อัปโหลด (STEP 47) — ลงโฟลเดอร์ชั่วคราวของระบบเสมอ **ทับค่าใน .env โดยเจตนา**
+ * ไม่งั้นเทสต์จะเขียนไฟล์ลงโฟลเดอร์รูปจริงของ dev แล้วค้างอยู่ (เทสต์แต่ละไฟล์ลบไฟล์ของตัวเองใน afterAll)
+ */
+process.env['UPLOAD_DIR'] = path.join(os.tmpdir(), 'teenstyle-test-uploads');

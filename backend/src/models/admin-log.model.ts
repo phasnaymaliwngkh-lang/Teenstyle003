@@ -36,6 +36,7 @@ export const TARGET_TYPES = [
   'ReturnRequest',
   'ShippingRate',
   'Shipment',
+  'MediaAsset',
 ] as const;
 
 export type TargetType = (typeof TARGET_TYPES)[number];
@@ -75,6 +76,8 @@ const TARGET_META: Readonly<Record<TargetType, TargetMeta>> = {
   // อัตราค่าส่งทุกวิธีแก้ที่หน้าเดียว (/admin/shipping) ไม่มีหน้ารายตัว
   ShippingRate: { label: 'อัตราค่าจัดส่ง', aliases: [], hrefPrefix: null },
   Shipment: { label: 'พัสดุ', aliases: [], hrefPrefix: '/admin/shipments/' },
+  // ไฟล์รูปไม่มีหน้ารายตัว — ดูได้รวมกันที่ /admin/media (STEP 47)
+  MediaAsset: { label: 'ไฟล์รูป', aliases: [], hrefPrefix: null },
 };
 
 /** ทุกชื่อที่เคยใช้แทนชนิดนี้ — ใช้กับ `where.targetType.in` ตอนกรอง */
@@ -115,6 +118,10 @@ export const ACTION_LABELS: Readonly<Record<string, string>> = {
   'product.variant.update': 'แก้ไขตัวเลือกสินค้า',
   'product.variant.barcode.assign': 'ออกบาร์โค้ดให้ตัวเลือกสินค้า',
   'product.import': 'นำเข้าสินค้าจากไฟล์',
+  'product.image.add': 'เพิ่มรูปสินค้า',
+  'product.image.update': 'แก้คำอธิบายรูปสินค้า',
+  'product.image.reorder': 'เรียงรูปสินค้าใหม่ (รูปแรกคือรูปหลัก)',
+  'product.image.remove': 'ถอดรูปออกจากสินค้า',
   'inventory.stock_in': 'รับสินค้าเข้าคลัง',
   'inventory.stock_out': 'ตัดสินค้าออกจากคลัง',
   'inventory.adjustment': 'ปรับยอดตามการตรวจนับ',
@@ -145,6 +152,7 @@ export const ACTION_LABELS: Readonly<Record<string, string>> = {
   'shipping.shipment.status': 'เปลี่ยนสถานะพัสดุ',
   'shipping.shipment.update': 'แก้ข้อมูลพัสดุ',
   'shipping.shipment.create': 'ส่งพัสดุใหม่หลังถูกตีกลับ',
+  'media.purge': 'ลบไฟล์รูปที่ไม่ได้ใช้แล้ว',
 };
 
 /** กลุ่มของการกระทำ — ใช้ทำตัวกรองระดับหยาบ (`action` ขึ้นต้นด้วยอะไร) */
@@ -159,6 +167,7 @@ export const ACTION_GROUPS = [
   'coupon',
   'return',
   'shipping',
+  'media',
 ] as const;
 
 export type ActionGroup = (typeof ACTION_GROUPS)[number];
@@ -175,6 +184,7 @@ export const ACTION_GROUP_LABELS: Readonly<Record<ActionGroup, string>> = {
   coupon: 'คูปองส่วนลด',
   return: 'คืนสินค้าและคืนเงิน',
   shipping: 'การจัดส่ง',
+  media: 'คลังรูป',
 };
 
 /** คำอธิบายของ action — ค่าที่ไม่รู้จักคืนชื่อดิบ (ดีกว่าแสดงว่าง ๆ หรือเดาความหมาย) */

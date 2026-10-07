@@ -16,7 +16,10 @@ import {
 } from '../models/review.model.ts';
 import { ApiError } from '../utils/api-error.ts';
 import { writeAdminLog } from '../models/admin-log.model.ts';
+import { mediaIdFromUrl, toReviewImages } from '../models/media.model.ts';
+import { REVIEW_IMAGE_LIMIT } from '../config/media.ts';
 
+import { markIfUnused, storeImage } from './media.service.ts';
 import { notifyReviewModerated, notifySafely } from './notification.service.ts';
 
 /**
@@ -74,7 +77,7 @@ function toReviewDto(row: ReviewRow, viewer: ViewerContext): ReviewDto {
     rating: row.rating,
     title: row.title,
     comment: row.comment,
-    images: row.images,
+    images: toReviewImages(row.images),
     isVerifiedPurchase: row.isVerifiedPurchase,
     helpfulCount: row.helpfulCount,
     votedHelpful: viewer.votedReviewIds.has(row.id),
@@ -386,8 +389,12 @@ export async function createReview(
     if (softDeleted) {
       const revived = await prisma.review.update({
         where: { id: softDeleted.id },
-        // ล้างร่องรอยของรีวิวเดิมให้หมด — หมายเหตุของร้านและยอดโหวตพูดถึงข้อความที่ไม่มีแล้ว
-        data: { ...data, deletedAt: null, adminNote: null, helpfulCount: 0 },
+        /**
+         * ล้างร่องรอยของรีวิวเดิมให้หมด — หมายเหตุของร้านและยอดโหวตพูดถึงข้อความที่ไม่มีแล้ว
+         * ⚠️ รวมรูปด้วย (STEP 47) — ไม่งั้นรูปของรีวิวที่ลูกค้าลบไปแล้วจะกลับมาโผล่ในรีวิวใหม่
+         *    (ไฟล์ถูกจดว่าไม่ได้ใช้ไปแล้วตอนลบรีวิว ตัวล้างไฟล์จัดการต่อเอง)
+         */
+        data: { ...data, deletedAt: null, adminNote: null, helpfulCount: 0, images: [] },
         select: MY_REVIEW_SELECT,
       });
 
@@ -462,16 +469,116 @@ export async function deleteOwnReview(
   userId: string,
   reviewId: string,
 ): Promise<{ deleted: boolean }> {
-  const { count } = await getPrisma().review.updateMany({
-    where: { id: reviewId, userId, deletedAt: null },
-    data: { deletedAt: new Date() },
-  });
+  return getPrisma().$transaction(async (tx) => {
+    const review = await lockOwnReview(tx, userId, reviewId);
 
-  if (count === 0) {
+    await tx.review.update({ where: { id: reviewId }, data: { deletedAt: new Date() } });
+
+    // ลูกค้าลบรีวิว = ลบรูปที่แนบด้วย — เริ่มนับเวลาให้ตัวล้างไฟล์ (STEP 47)
+    await markIfUnused(tx, review.images);
+
+    return { deleted: true };
+  });
+}
+
+/** ล็อกแถวรีวิวของตัวเองที่ยังไม่ถูกลบ — ไม่ใช่ของเรา/ไม่มี = 404 (ไม่ใช่ 403) */
+async function lockOwnReview(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  reviewId: string,
+): Promise<{ id: string; images: string[] }> {
+  const rows = await tx.$queryRaw<Array<{ id: string; images: string[] }>>`
+    SELECT "id", "images" FROM "Review"
+    WHERE "id" = ${reviewId}::uuid AND "userId" = ${userId}::uuid AND "deletedAt" IS NULL
+    FOR UPDATE
+  `;
+
+  const review = rows[0];
+  if (!review) {
     throw ApiError.notFound('ไม่พบรีวิวนี้ในรายการรีวิวของคุณ');
   }
 
-  return { deleted: true };
+  return review;
+}
+
+/**
+ * แนบรูปกับรีวิวของตัวเอง (STEP 47)
+ *
+ * ⚠️ **แนบรูปแล้วกลับไปรอตรวจใหม่** — กฎเดียวกับการแก้ข้อความ (STEP 23 ข้อ 3)
+ *    ไม่งั้นเขียนรีวิวสุภาพให้ผ่านก่อน แล้วค่อยแปะรูปอะไรก็ได้ขึ้นหน้าสินค้าโดยไม่มีใครตรวจ
+ * ⚠️ รับเฉพาะไฟล์ที่อัปโหลดมา ไม่รับ url — รูปทุกรูปจึงเป็นไฟล์ที่ร้านแปลงและเก็บเอง
+ *    (ตัด GPS ออกจากรูปที่ถ่ายด้วยมือถือของลูกค้าแล้ว)
+ */
+export async function addReviewImage(
+  userId: string,
+  reviewId: string,
+  buffer: Buffer,
+): Promise<{ review: MyReviewDto; needsApproval: boolean }> {
+  const prisma = getPrisma();
+
+  // ตรวจถูก ๆ ก่อนแปลงรูป — ตัวตัดสินจริงอยู่ในทรานแซกชันที่ล็อกแถวแล้ว
+  const existing = await prisma.review.findFirst({
+    where: { id: reviewId, userId, deletedAt: null },
+    select: { images: true },
+  });
+
+  if (!existing) {
+    throw ApiError.notFound('ไม่พบรีวิวนี้ในรายการรีวิวของคุณ');
+  }
+
+  if (existing.images.length >= REVIEW_IMAGE_LIMIT) {
+    throw ApiError.conflict(
+      `แนบรูปได้ไม่เกิน ${REVIEW_IMAGE_LIMIT} รูปต่อรีวิว — ลบรูปเดิมออกก่อน`,
+    );
+  }
+
+  return storeImage({ buffer, purpose: 'REVIEW', uploaderId: userId }, async (tx, image) => {
+    const review = await lockOwnReview(tx, userId, reviewId);
+
+    if (review.images.length >= REVIEW_IMAGE_LIMIT) {
+      throw ApiError.conflict(
+        `แนบรูปได้ไม่เกิน ${REVIEW_IMAGE_LIMIT} รูปต่อรีวิว — ลบรูปเดิมออกก่อน`,
+      );
+    }
+
+    const updated = await tx.review.update({
+      where: { id: reviewId },
+      data: { images: { push: image.url }, status: 'PENDING', adminNote: null },
+      select: MY_REVIEW_SELECT,
+    });
+
+    return { review: toMyReviewDto(updated), needsApproval: true };
+  });
+}
+
+/** ถอดรูปออกจากรีวิวของตัวเอง — เป็นการแก้รีวิวจึงกลับไปรอตรวจเหมือนกัน */
+export async function removeReviewImage(
+  userId: string,
+  reviewId: string,
+  imageId: string,
+): Promise<{ review: MyReviewDto; needsApproval: boolean }> {
+  return getPrisma().$transaction(async (tx) => {
+    const review = await lockOwnReview(tx, userId, reviewId);
+    const url = review.images.find((candidate) => mediaIdFromUrl(candidate) === imageId);
+
+    if (url === undefined) {
+      throw ApiError.notFound('ไม่พบรูปนี้ในรีวิวของคุณ');
+    }
+
+    const updated = await tx.review.update({
+      where: { id: reviewId },
+      data: {
+        images: review.images.filter((candidate) => candidate !== url),
+        status: 'PENDING',
+        adminNote: null,
+      },
+      select: MY_REVIEW_SELECT,
+    });
+
+    await markIfUnused(tx, [url]);
+
+    return { review: toMyReviewDto(updated), needsApproval: true };
+  });
 }
 
 const MY_REVIEW_SELECT = {
@@ -654,7 +761,7 @@ function toAdminReviewDto(row: AdminReviewRow): AdminReviewDto {
     rating: row.rating,
     title: row.title,
     comment: row.comment,
-    images: row.images,
+    images: toReviewImages(row.images),
     isVerifiedPurchase: row.isVerifiedPurchase,
     helpfulCount: row.helpfulCount,
     votedHelpful: false,

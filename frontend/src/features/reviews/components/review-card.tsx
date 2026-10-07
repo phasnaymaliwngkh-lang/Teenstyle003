@@ -9,6 +9,7 @@ import { setReviewHelpful } from "@/services/review.service";
 import type { Review } from "@/types/catalog";
 
 import { RatingStars } from "./rating-stars";
+import { ReviewPhotos } from "./review-photos";
 
 const STATUS_NOTE: Record<string, { label: string; className: string }> = {
   PENDING: {
@@ -128,6 +129,8 @@ export function ReviewCard({
       <p className="mt-2 text-sm leading-relaxed whitespace-pre-line text-ink-soft">
         {review.comment}
       </p>
+
+      <ReviewPhotos images={review.images} label={`รีวิวของ ${review.author.displayName}`} />
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         {review.isMine ? (

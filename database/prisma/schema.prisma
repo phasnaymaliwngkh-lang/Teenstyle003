@@ -179,6 +179,12 @@ enum ReviewStatus {
   REJECTED
 }
 
+/// รูปนี้ถูกอัปโหลดมาเพื่ออะไร (STEP 47) — กำหนดขนาดที่รับ ขนาดที่ย่อ และโฟลเดอร์ที่เก็บ
+enum MediaPurpose {
+  PRODUCT
+  REVIEW
+}
+
 enum NotificationType {
   ORDER_CREATED
   PAYMENT_SUCCESS
@@ -322,6 +328,7 @@ model User {
   returnRequests     ReturnRequest[]
   refundsRecorded    Refund[]            @relation("RefundActor")
   shipmentEvents     ShipmentEvent[]     @relation("ShipmentEventActor")
+  mediaUploads       MediaAsset[]        @relation("MediaAssetUploader")
 
   @@index([roleId])
   @@index([status])
@@ -556,9 +563,10 @@ model ProductImage {
   productId String  @db.Uuid
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
+  /// รูปที่อัปโหลดผ่านร้าน = `MediaAsset.url` (`/media/...`) · รูปจากโฮสต์ภายนอก = https ของโฮสต์ที่อนุญาต
+  /// ไม่มี FK ไปที่ MediaAsset โดยเจตนา — ตัวล้างไฟล์เทียบด้วย url กับทุกที่ที่คัดลอก url ไปเก็บ
+  /// (รวม snapshot `OrderItem.imageUrl`) ดู backend/src/services/media.service.ts
   url       String
-  /// public_id ของ Cloudinary ใช้ตอนลบไฟล์จริง (STEP 47)
-  publicId  String?
   alt       String
   sortOrder Int     @default(0)
   isMain    Boolean @default(false)
@@ -1066,6 +1074,8 @@ model Review {
   rating  Int
   title   String?
   comment String
+  /// url ของรูปที่ลูกค้าแนบ (`MediaAsset.url`) — เพิ่มได้ทางเดียวคืออัปโหลดผ่าน
+  /// `POST /api/reviews/:id/images` (STEP 47) · ห้ามรับ url จาก client
   images  String[] @default([])
 
   isVerifiedPurchase Boolean      @default(false)
@@ -1404,6 +1414,47 @@ model KnowledgeFaq {
   sortOrder Int @default(0)
 
   @@index([articleId, sortOrder])
+}
+
+// ============================================================================
+// MEDIA  (STEP 47)
+// ============================================================================
+
+/// ไฟล์รูปทุกไฟล์ที่ร้านเก็บไว้เอง — หนึ่งแถวต่อหนึ่งไฟล์
+///
+/// ไฟล์ทุกไฟล์ผ่านการแปลงใหม่ (WebP · ตัด metadata รวมพิกัด GPS · หมุนตาม EXIF) ก่อนเก็บ
+/// จึงไม่มีไฟล์ต้นฉบับของผู้ใช้อยู่ในระบบเลย
+///
+/// ⚠️ **ห้ามลบไฟล์ทันทีที่เลิกใช้** — url ถูกคัดลอกไปเป็น snapshot ใน `OrderItem.imageUrl`
+///    ตอนสั่งซื้อ ลบไฟล์แล้วประวัติคำสั่งซื้อจะเป็นรูปแตก
+///    การลบจริงทำแบบ mark & sweep: ตัวตรวจจด `unusedSince` เมื่อไม่มีที่ไหนใช้ url นี้
+///    แล้วลบได้เมื่อไม่ถูกใช้ต่อเนื่องเกินช่วงผ่อนผัน (ดู media.service.ts)
+model MediaAsset {
+  id            String       @id @default(uuid(7)) @db.Uuid
+  purpose       MediaPurpose
+  /// ที่อยู่ในที่เก็บไฟล์ เช่น `products/2026/10/<id>.webp` — ระบบสร้างเอง ไม่มีส่วนไหนมาจากชื่อไฟล์ของผู้ใช้
+  storageKey    String       @unique
+  /// path สาธารณะ `/media/<storageKey>` — ค่าที่ถูกคัดลอกไปเก็บในตารางอื่น
+  url           String       @unique
+  mimeType      String
+  width         Int
+  height        Int
+  /// ขนาดไฟล์ที่เก็บจริง (หลังแปลง)
+  bytes         Int
+  /// ขนาดไฟล์ที่ผู้ใช้ส่งมา — ใช้รายงานว่าการแปลงประหยัดพื้นที่ไปเท่าไร
+  originalBytes Int
+
+  uploadedById String? @db.Uuid
+  uploadedBy   User?   @relation("MediaAssetUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  /// ครั้งแรกที่ตัวตรวจพบว่าไม่มีที่ไหนใช้ไฟล์นี้ — null = ยังถูกใช้อยู่ (หรือยังไม่เคยตรวจ)
+  unusedSince DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([purpose, createdAt])
+  @@index([unusedSince])
+  @@index([uploadedById])
 }
 
 // ============================================================================

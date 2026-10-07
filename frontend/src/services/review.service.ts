@@ -4,7 +4,7 @@ import type { AdminReview, MyReview, ReviewStatus } from "@/types/catalog";
 /**
  * รีวิวสินค้า — ฝั่ง client (STEP 23)
  *
- * ⚠️ client ส่งได้แค่ **ดาว หัวข้อ ข้อความ และรหัสสินค้า**
+ * ⚠️ client ส่งได้แค่ **ดาว หัวข้อ ข้อความ รหัสสินค้า และไฟล์รูป** (รูป — STEP 47)
  *    `orderId` · `isVerifiedPurchase` · `status` backend หาเองจากคำสั่งซื้อจริง
  *    ถ้าส่งมาจะถูก Zod ตัดทิ้ง (มี test ยืนยัน)
  */
@@ -44,6 +44,29 @@ export function deleteReview(reviewId: string): Promise<{ deleted: boolean }> {
     method: "DELETE",
     cache: "no-store",
   });
+}
+
+/**
+ * แนบรูปกับรีวิวของตัวเอง (STEP 47) — ส่งได้แค่ไฟล์ ไม่มีทางส่ง url
+ * รีวิวกลับไปรอร้านตรวจทุกครั้ง (กฎเดียวกับการแก้ข้อความ)
+ */
+export function attachReviewImage(reviewId: string, file: File): Promise<SubmitReviewResult> {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  return apiFetch<SubmitReviewResult>(`/api/reviews/${encodeURIComponent(reviewId)}/images`, {
+    method: "POST",
+    formData,
+    cache: "no-store",
+    timeoutMs: 60_000,
+  });
+}
+
+export function removeReviewImage(reviewId: string, imageId: string): Promise<SubmitReviewResult> {
+  return apiFetch<SubmitReviewResult>(
+    `/api/reviews/${encodeURIComponent(reviewId)}/images/${encodeURIComponent(imageId)}`,
+    { method: "DELETE", cache: "no-store" },
+  );
 }
 
 export function setReviewHelpful(

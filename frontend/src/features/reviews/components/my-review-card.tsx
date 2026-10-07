@@ -13,6 +13,7 @@ import type { MyReview, ReviewStatus } from "@/types/catalog";
 
 import { RatingStars } from "./rating-stars";
 import { ReviewForm } from "./review-form";
+import { ReviewPhotos } from "./review-photos";
 
 const STATUS: Record<ReviewStatus, { label: string; className: string; hint: string }> = {
   PENDING: {
@@ -151,6 +152,8 @@ export function MyReviewCard({ review }: { review: MyReview }) {
           <p className="mt-2 text-sm leading-relaxed whitespace-pre-line text-ink-soft">
             {review.comment}
           </p>
+
+          <ReviewPhotos images={review.images} label="รีวิวของฉัน" />
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button

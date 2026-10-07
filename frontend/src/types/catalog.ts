@@ -817,12 +817,18 @@ export interface ReviewAuthor {
   initial: string;
 }
 
+/** รูปที่ลูกค้าแนบกับรีวิว (STEP 47) — `id` ใช้ลบรูป · รูปผ่านการตรวจของร้านพร้อมรีวิว */
+export interface ReviewImage {
+  id: string | null;
+  url: string;
+}
+
 export interface Review {
   id: string;
   rating: number;
   title: string | null;
   comment: string;
-  images: string[];
+  images: ReviewImage[];
   isVerifiedPurchase: boolean;
   helpfulCount: number;
   votedHelpful: boolean;

@@ -9,6 +9,7 @@ import { pinoHttp } from 'pino-http';
 
 import { env, isDevelopment, isTest } from './config/index.ts';
 import { errorHandler, globalRateLimiter, notFound, requestId } from './middlewares/index.ts';
+import { serveMedia } from './middlewares/media-static.ts';
 import { rootRouter } from './routes/index.ts';
 import { logger } from './utils/logger.ts';
 
@@ -52,6 +53,11 @@ export function createApp(): Express {
       }),
     );
   }
+  /**
+   * รูปที่ร้านเก็บเอง (STEP 47) — ก่อน rate limit โดยเจตนา (เหตุผลอยู่ใน media-static.ts)
+   * และก่อน compression เพราะ WebP บีบอัดแล้ว บีบซ้ำมีแต่เปลือง CPU
+   */
+  app.use('/media', serveMedia);
   app.use(compression());
 
   /**

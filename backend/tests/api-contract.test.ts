@@ -122,12 +122,18 @@ const STRICT_RATE_LIMITED = new Set([
   'POST /api/ai/knowledge/articles/:id/helpful',
   'GET /api/ai/knowledge/articles/:slug', // เพิ่ม viewCount ที่ฐานข้อมูล
   'POST /api/coupons/apply', // เดารหัสคูปองได้ถ้ายิงรัว (STEP 41)
+  'POST /api/reviews/:reviewId/images', // ลูกค้าอัปโหลดรูป = แปลงรูปกิน CPU ทุกครั้ง (STEP 47)
 ]);
 
-/** เส้นทางที่รับไฟล์อัปโหลดได้ — มีแค่การนำเข้าข้อมูลของหลังบ้าน */
+/**
+ * เส้นทางที่รับไฟล์อัปโหลดได้ — นำเข้าข้อมูลของหลังบ้าน (STEP 18) และรูป (STEP 47)
+ * รูปลูกค้าอัปโหลดได้ทางเดียวคือแนบรีวิว
+ */
 const UPLOAD_ROUTES = new Set([
   'POST /api/admin/import/products',
   'POST /api/admin/import/inventory',
+  'POST /api/admin/products/:productId/images',
+  'POST /api/reviews/:reviewId/images',
 ]);
 
 /** กลุ่มที่เอกสารประกาศว่า "ยังไม่มี" — ต้องไม่มีอยู่จริง */

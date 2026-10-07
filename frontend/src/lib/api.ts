@@ -25,6 +25,11 @@ export class ApiClientError extends Error {
 export interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   /** body แบบ object — จะถูกแปลงเป็น JSON ให้เอง */
   json?: unknown;
+  /**
+   * body แบบ multipart (อัปโหลดไฟล์ — STEP 47) · **ห้ามตั้ง Content-Type เอง**
+   * เบราว์เซอร์ต้องเป็นคนใส่ boundary ให้ ถ้าตั้งเองจะได้ header ที่ไม่มี boundary แล้ว server อ่านไม่ออก
+   */
+  formData?: FormData;
   /** timeout หน่วย ms (ค่าเริ่มต้น 15 วินาที) กัน UI ค้างเมื่อ backend ไม่ตอบ */
   timeoutMs?: number;
 }
@@ -44,7 +49,7 @@ export interface ApiRequestOptions extends Omit<RequestInit, "body"> {
  * server: ต้องเป็น URL เต็มเสมอ เพราะ `fetch` ของ Node แปลง path สัมพัทธ์ไม่ได้
  *   (และการยิงตรงจาก server ไป backend เร็วกว่า ไม่ต้องอ้อมผ่าน proxy)
  */
-function apiBase(): string {
+export function apiBase(): string {
   if (typeof window !== "undefined" && publicEnv.apiProxyPath !== "") {
     return publicEnv.apiProxyPath;
   }
@@ -52,15 +57,24 @@ function apiBase(): string {
   return publicEnv.apiUrl;
 }
 
+/**
+ * URL เต็มของ backend สำหรับ path หนึ่ง — **ทุกที่ที่เรียก backend เองโดยไม่ผ่าน `apiFetch`
+ * (เช่นดาวน์โหลดไฟล์) ต้องใช้ตัวนี้** ไม่ใช่ `publicEnv.apiUrl` ตรง ๆ
+ *
+ * ⚠️ เจอตอน STEP 47: ปุ่มนำเข้า/ส่งออกของหลังบ้านใช้ `publicEnv.apiUrl` ตรง ๆ จึงยิงข้ามโดเมน
+ *    ตอน production → เบราว์เซอร์บล็อก cookie แบบ third-party แล้วได้ 401 ทุกครั้ง
+ */
+export function apiUrlOf(path: string): string {
+  return path.startsWith("http") ? path : `${apiBase()}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
 export async function apiFetch<TData>(
   path: string,
   options: ApiRequestOptions = {},
 ): Promise<TData> {
-  const { json, timeoutMs = 15_000, headers, signal, ...rest } = options;
+  const { json, formData, timeoutMs = 15_000, headers, signal, ...rest } = options;
 
-  const url = path.startsWith("http")
-    ? path
-    : `${apiBase()}${path.startsWith("/") ? path : `/${path}`}`;
+  const url = apiUrlOf(path);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -79,6 +93,7 @@ export async function apiFetch<TData>(
         ...headers,
       },
       ...(json !== undefined ? { body: JSON.stringify(json) } : {}),
+      ...(formData !== undefined ? { body: formData } : {}),
     });
 
     const text = await response.text();

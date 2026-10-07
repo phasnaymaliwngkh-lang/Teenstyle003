@@ -47,12 +47,6 @@ const optionalIntegerText = z.union([
   z.string().trim().regex(INTEGER_PATTERN, INTEGER_FORMAT_MESSAGE),
 ]);
 
-export interface ProductImageFormValue {
-  url: string;
-  alt: string;
-  isMain: boolean;
-}
-
 export interface ProductVariantFormValue {
   sku: string;
   colorSlug: string;
@@ -77,42 +71,24 @@ export interface ProductFormValues {
   minimumStock: string;
   /** คั่นด้วยจุลภาค */
   tags: string;
-  images: ProductImageFormValue[];
   /** ใช้เฉพาะโหมดสร้าง — โหมดแก้ไขจัดการตัวเลือกแยกหน้าละรายการ */
   variants: ProductVariantFormValue[];
 }
 
+/**
+ * ⚠️ ฟอร์มนี้ **ไม่มีรูปแล้ว** (STEP 47) — รูปจัดการทีละรูปที่ `ProductImageManager` ในหน้าแก้ไข
+ *    เพราะอัปโหลดได้ต่อเมื่อมีสินค้าอยู่แล้ว และเดิมการบันทึกฟอร์มแปลว่า "แทนที่รูปทั้งชุด"
+ *    ซึ่งจะลบรูปที่อัปโหลดไว้ทิ้งเงียบ ๆ ถ้าฟอร์มไม่ได้ส่งรูปนั้นกลับไปด้วย
+ */
 export interface ProductFormRules {
-  /** โฮสต์รูปที่ระบบอนุญาต — มาจาก backend ไม่ฮาร์ดโค้ด */
-  allowedImageHosts: string[];
   mode: "create" | "edit";
   /** โหมดแก้ไข: มีตัวเลือกที่เปิดใช้งานอยู่แล้วไหม (ใช้ตรวจก่อนเปิดขาย) */
   hasActiveVariant?: boolean;
-}
-
-function isAllowedImageUrl(value: string, allowedHosts: string[]): boolean {
-  try {
-    const url = new URL(value);
-
-    return url.protocol === "https:" && allowedHosts.includes(url.hostname);
-  } catch {
-    return false;
-  }
+  /** โหมดแก้ไข: จำนวนรูปที่สินค้ามีอยู่ตอนนี้ (ใช้ตรวจก่อนเปิดขาย) */
+  imageCount?: number;
 }
 
 export function createProductFormSchema(rules: ProductFormRules) {
-  const imageSchema = z.object({
-    url: z
-      .string()
-      .trim()
-      .min(1, "กรุณาใส่ลิงก์รูป")
-      .refine((value) => isAllowedImageUrl(value, rules.allowedImageHosts), {
-        message: `รูปต้องเป็น https และมาจาก: ${rules.allowedImageHosts.join(", ")}`,
-      }),
-    alt: z.string().trim().min(2, "ใส่คำอธิบายรูปเพื่อการเข้าถึง").max(200),
-    isMain: z.boolean(),
-  });
-
   const variantSchema = z.object({
     sku: z
       .string()
@@ -156,7 +132,6 @@ export function createProductFormSchema(rules: ProductFormRules) {
       status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]),
       minimumStock: optionalIntegerText,
       tags: z.string().max(400),
-      images: z.array(imageSchema).max(10),
       variants: z.array(variantSchema).max(50),
     })
     .superRefine((value, ctx) => {
@@ -168,10 +143,6 @@ export function createProductFormSchema(rules: ProductFormRules) {
           path: ["salePrice"],
           message: "ราคาลดต้องน้อยกว่าราคาปกติ",
         });
-      }
-
-      if (value.images.filter((image) => image.isMain).length > 1) {
-        ctx.addIssue({ code: "custom", path: ["images"], message: "ตั้งรูปหลักได้เพียงรูปเดียว" });
       }
 
       if (rules.mode === "create") {
@@ -225,11 +196,18 @@ export function createProductFormSchema(rules: ProductFormRules) {
 
       // เปิดขายได้ต้องมีของให้ขายจริง (backend บังคับเหมือนกัน)
       if (value.status === "ACTIVE") {
-        if (value.images.length === 0) {
+        // สินค้าใหม่ยังไม่มีรูปเสมอ — อัปโหลดได้หลังบันทึกแล้วเท่านั้น
+        if (rules.mode === "create") {
           ctx.addIssue({
             code: "custom",
             path: ["status"],
-            message: "ต้องมีรูปสินค้าอย่างน้อย 1 รูปก่อนเปิดขาย",
+            message: "บันทึกเป็นฉบับร่างก่อน แล้วเพิ่มรูปในหน้าแก้ไข จึงเปิดขายได้",
+          });
+        } else if ((rules.imageCount ?? 0) === 0) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["status"],
+            message: "ต้องมีรูปสินค้าอย่างน้อย 1 รูปก่อนเปิดขาย — เพิ่มรูปในส่วนรูปสินค้าก่อน",
           });
         }
 
@@ -293,12 +271,6 @@ export function toCreateInput(values: ProductFormValues): CreateProductInput {
     status: values.status,
     minimumStock: values.minimumStock.trim() === "" ? 5 : Number(values.minimumStock),
     tags: parseTags(values.tags),
-    images: values.images.map((image, index) => ({
-      url: image.url.trim(),
-      alt: image.alt.trim(),
-      isMain: image.isMain,
-      sortOrder: index,
-    })),
     variants: values.variants.map((variant) => {
       const price = parseMoney(variant.price);
       const variantSale = parseMoney(variant.salePrice);
@@ -333,11 +305,6 @@ export function toFormValues(product: AdminProduct): ProductFormValues {
     status: product.status,
     minimumStock: String(product.minimumStock),
     tags: product.tags.join(", "),
-    images: product.images.map((image) => ({
-      url: image.url,
-      alt: image.alt,
-      isMain: image.isMain,
-    })),
     variants: [],
   };
 }
@@ -389,21 +356,6 @@ export function toUpdateInput(
   const tags = parseTags(values.tags);
   if (tags.join("|") !== product.tags.join("|")) input.tags = tags;
 
-  const images = values.images.map((image, index) => ({
-    url: image.url.trim(),
-    alt: image.alt.trim(),
-    isMain: image.isMain,
-    sortOrder: index,
-  }));
-  const currentImages = product.images.map((image, index) => ({
-    url: image.url,
-    alt: image.alt,
-    isMain: image.isMain,
-    sortOrder: index,
-  }));
-
-  if (JSON.stringify(images) !== JSON.stringify(currentImages)) input.images = images;
-
   return input;
 }
 
@@ -433,7 +385,6 @@ export function emptyFormValues(): ProductFormValues {
     status: "DRAFT",
     minimumStock: "5",
     tags: "",
-    images: [],
     variants: [emptyVariantRow()],
   };
 }

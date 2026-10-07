@@ -1,6 +1,6 @@
 # 09 — REST API Reference (STEP 29)
 
-Endpoint ทั้งหมดของ TEENSTYLE AI ที่เปิดใช้จริง **150 เส้นทาง** (นับรวม `GET /health` และ `GET /api`)
+Endpoint ทั้งหมดของ TEENSTYLE AI ที่เปิดใช้จริง **159 เส้นทาง** (นับรวม `GET /health` และ `GET /api`)
 
 > **เอกสารนี้ถูกบังคับให้ตรงกับโค้ด**
 > [backend/tests/api-contract.test.ts](../backend/tests/api-contract.test.ts) อ่านแผนผัง endpoint
@@ -118,6 +118,10 @@ backend อ่าน token ได้ 2 ทาง:
 - **เส้นทางที่ส่งไฟล์** (`/export/*`, `/analytics/export`, `/logs/export`) คืนไฟล์ตรง ๆ ไม่ใช่ JSON
   → `format=csv` ได้ `text/csv` ที่ **นำหน้าด้วย UTF-8 BOM** (ไม่งั้น Excel บน Windows อ่านภาษาไทยเพี้ยน)
   · `format=xlsx` ได้ไฟล์ Excel · ชื่อไฟล์อยู่ใน `Content-Disposition`
+- **อัปโหลดรูป** (STEP 47) ส่งเป็น `multipart/form-data` ไฟล์เดียวในชื่อ field `file` · ไม่เกิน 8MB ·
+  JPEG/PNG/WebP/AVIF ที่ตัดสินจาก **เนื้อไฟล์** · ทุกไฟล์ถูกแปลงเป็น WebP + ตัด metadata (รวม GPS) ก่อนเก็บ
+  · รูปที่เก็บแล้วเปิดได้ที่ `/media/<storageKey>` (backend เสิร์ฟเอง ไม่ผ่าน `/api` · cache ได้ตลอดไป)
+  — ไม่อยู่ในตารางของเอกสารนี้เพราะเป็นไฟล์สาธารณะ ไม่ใช่ endpoint
 
 ## วิธีอ่านตาราง
 
@@ -292,14 +296,16 @@ backend อ่าน token ได้ 2 ทาง:
 
 ## รีวิว — `/api/reviews`
 
-| Method | Path                             | ต้องมี                    | รายละเอียด                                                            |
-| ------ | -------------------------------- | ------------------------- | --------------------------------------------------------------------- |
-| GET    | `/api/reviews/me`                | `review:create`           | รีวิวของฉันทุกสถานะ รวมที่ถูกซ่อน/ไม่อนุมัติ + เหตุผลของแอดมิน        |
-| GET    | `/api/reviews/eligibility`       | `review:create`           | ตอบทีละหลายสินค้าว่ารีวิวได้ไหม และถ้าไม่ได้เพราะอะไร                 |
-| POST   | `/api/reviews`                   | `review:create` · 20/นาที | เขียนรีวิว — ได้เฉพาะสินค้าที่ซื้อ **และได้รับของแล้ว** (`DELIVERED`) |
-| PATCH  | `/api/reviews/:reviewId`         | `review:create` · 20/นาที | แก้รีวิวของตัวเอง — **กลับไปรอตรวจใหม่ทุกครั้ง**                      |
-| DELETE | `/api/reviews/:reviewId`         | `review:create`           | ลบแบบ soft delete · เขียนใหม่ทีหลังได้ (เขียนทับแถวเดิม)              |
-| PATCH  | `/api/reviews/:reviewId/helpful` | `review:create` · 20/นาที | โหวต "มีประโยชน์" — หนึ่งคนหนึ่งเสียง · กดของตัวเองไม่ได้             |
+| Method | Path                                     | ต้องมี                    | รายละเอียด                                                                |
+| ------ | ---------------------------------------- | ------------------------- | ------------------------------------------------------------------------- |
+| GET    | `/api/reviews/me`                        | `review:create`           | รีวิวของฉันทุกสถานะ รวมที่ถูกซ่อน/ไม่อนุมัติ + เหตุผลของแอดมิน            |
+| GET    | `/api/reviews/eligibility`               | `review:create`           | ตอบทีละหลายสินค้าว่ารีวิวได้ไหม และถ้าไม่ได้เพราะอะไร                     |
+| POST   | `/api/reviews`                           | `review:create` · 20/นาที | เขียนรีวิว — ได้เฉพาะสินค้าที่ซื้อ **และได้รับของแล้ว** (`DELIVERED`)     |
+| PATCH  | `/api/reviews/:reviewId`                 | `review:create` · 20/นาที | แก้รีวิวของตัวเอง — **กลับไปรอตรวจใหม่ทุกครั้ง**                          |
+| DELETE | `/api/reviews/:reviewId`                 | `review:create`           | ลบแบบ soft delete · เขียนใหม่ทีหลังได้ (เขียนทับแถวเดิม)                  |
+| PATCH  | `/api/reviews/:reviewId/helpful`         | `review:create` · 20/นาที | โหวต "มีประโยชน์" — หนึ่งคนหนึ่งเสียง · กดของตัวเองไม่ได้                 |
+| POST   | `/api/reviews/:reviewId/images`          | `review:create` · 20/นาที | แนบรูป (ไฟล์ field `file`) ได้ไม่เกิน 4 รูป — **กลับไปรอตรวจใหม่**        |
+| DELETE | `/api/reviews/:reviewId/images/:imageId` | `review:create`           | ถอดรูปออกจากรีวิวของตัวเอง (`imageId` = `images[].id`) — กลับไปรอตรวจใหม่ |
 
 `orderId` และ `isVerifiedPurchase` คำนวณที่ server · หนึ่งคนรีวิวได้ครั้งเดียวต่อสินค้า (ไม่ใช่ต่อคำสั่งซื้อ)
 · หน้าร้านไม่ส่งชื่อเต็ม อีเมล หรือรูปโปรไฟล์ของผู้รีวิวออกไป — ย่อเป็น "สมชาย ก."
@@ -369,16 +375,31 @@ backend อ่าน token ได้ 2 ทาง:
 
 ### สินค้า
 
-| Method | Path                                                 | ต้องมี           | รายละเอียด                                                                        |
-| ------ | ---------------------------------------------------- | ---------------- | --------------------------------------------------------------------------------- |
-| GET    | `/api/admin/products`                                | `product:read`   | รายการสินค้า + ค้นหา/กรองสถานะ/กรองสต็อกต่ำ (กรองก่อนนับและก่อนแบ่งหน้า)          |
-| GET    | `/api/admin/products/options`                        | `product:read`   | หมวดหมู่ แบรนด์ สี ไซซ์ และโฮสต์รูปที่อนุญาต (ฟอร์มอ่านจากที่นี่ ไม่ฮาร์ดโค้ด)    |
-| POST   | `/api/admin/products`                                | `product:create` | สร้างสินค้า + ตัวเลือก + รูป · `initialStock` บันทึกเป็น movement `STOCK_IN` จริง |
-| GET    | `/api/admin/products/:productId`                     | `product:read`   | รายละเอียดสินค้าสำหรับหน้าแก้ไข                                                   |
-| PATCH  | `/api/admin/products/:productId`                     | `product:update` | แก้เฉพาะฟิลด์ที่เปลี่ยน (diff กับค่าเดิม) ไม่เขียนทับทั้งก้อน                     |
-| DELETE | `/api/admin/products/:productId`                     | `product:delete` | **soft delete** (ซ่อนจากหน้าร้าน) · ลบไม่ได้ถ้ามีของถูกจองอยู่ (409)              |
-| POST   | `/api/admin/products/:productId/variants`            | `product:update` | เพิ่มตัวเลือกสินค้า                                                               |
-| PATCH  | `/api/admin/products/:productId/variants/:variantId` | `product:update` | แก้ตัวเลือก — **ไม่มีฟิลด์จำนวนโดยเจตนา** (สต็อกเดินผ่าน movement เท่านั้น)       |
+| Method | Path                                                 | ต้องมี           | รายละเอียด                                                                                           |
+| ------ | ---------------------------------------------------- | ---------------- | ---------------------------------------------------------------------------------------------------- |
+| GET    | `/api/admin/products`                                | `product:read`   | รายการสินค้า + ค้นหา/กรองสถานะ/กรองสต็อกต่ำ (กรองก่อนนับและก่อนแบ่งหน้า)                             |
+| GET    | `/api/admin/products/options`                        | `product:read`   | หมวดหมู่ แบรนด์ สี ไซซ์ และโฮสต์รูปที่อนุญาต (ฟอร์มอ่านจากที่นี่ ไม่ฮาร์ดโค้ด)                       |
+| POST   | `/api/admin/products`                                | `product:create` | สร้างสินค้า + ตัวเลือก (+ รูปจากโฮสต์ที่อนุญาต) · `initialStock` บันทึกเป็น movement `STOCK_IN` จริง |
+| GET    | `/api/admin/products/:productId`                     | `product:read`   | รายละเอียดสินค้าสำหรับหน้าแก้ไข                                                                      |
+| PATCH  | `/api/admin/products/:productId`                     | `product:update` | แก้เฉพาะฟิลด์ที่เปลี่ยน · **ไม่รับ `images` แล้ว** (STEP 47 — จัดการทีละรูปด้านล่าง)                 |
+| DELETE | `/api/admin/products/:productId`                     | `product:delete` | **soft delete** (ซ่อนจากหน้าร้าน) · ลบไม่ได้ถ้ามีของถูกจองอยู่ (409)                                 |
+| POST   | `/api/admin/products/:productId/variants`            | `product:update` | เพิ่มตัวเลือกสินค้า                                                                                  |
+| PATCH  | `/api/admin/products/:productId/variants/:variantId` | `product:update` | แก้ตัวเลือก — **ไม่มีฟิลด์จำนวนโดยเจตนา** (สต็อกเดินผ่าน movement เท่านั้น)                          |
+| GET    | `/api/admin/products/:productId/images`              | `product:read`   | รูปของสินค้า เรียงตามลำดับ (รูปแรกคือรูปหลัก)                                                        |
+| POST   | `/api/admin/products/:productId/images`              | `product:update` | อัปโหลดรูป: ไฟล์ field `file` + `alt` · ไม่เกิน 10 รูป · ด้านสั้นอย่างน้อย 600px                     |
+| PUT    | `/api/admin/products/:productId/images/order`        | `product:update` | `{ imageIds }` ลำดับใหม่ของรูป **ทุกรูป** (ไม่ครบหรือไม่ตรง = 409) · รูปแรกเป็นรูปหลัก               |
+| PATCH  | `/api/admin/products/:productId/images/:imageId`     | `product:update` | แก้คำอธิบายรูป (`alt`)                                                                               |
+| DELETE | `/api/admin/products/:productId/images/:imageId`     | `product:update` | ถอดรูป — สินค้าที่เปิดขายถอดรูปสุดท้ายไม่ได้ · **ไฟล์ยังไม่ถูกลบ** (ดูคลังรูป)                       |
+
+### คลังรูป (STEP 47)
+
+| Method | Path                     | ต้องมี         | รายละเอียด                                                                                                          |
+| ------ | ------------------------ | -------------- | ------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/admin/media`       | `media:manage` | ไฟล์ทั้งหมด + ใช้อยู่ที่ไหน (สินค้า · รีวิว · snapshot ในคำสั่งซื้อ) · กรอง `purpose`, `usage` · **อ่านอย่างเดียว** |
+| POST   | `/api/admin/media/purge` | `media:manage` | ลบไฟล์ที่ไม่มีที่ไหนใช้ต่อเนื่องเกิน 24 ชั่วโมง (ครั้งละไม่เกิน 500 ไฟล์) · เขียน AdminLog                          |
+
+ไฟล์ที่ถอดออกจากสินค้าหรือรีวิว **ไม่ถูกลบทันที** เพราะ url ถูกเก็บเป็น snapshot ใน `OrderItem.imageUrl`
+ตอนสั่งซื้อ — ลบได้เฉพาะไฟล์ที่ไม่มีที่ไหนใช้เลย และต้องไม่ถูกใช้ต่อเนื่องเกินช่วงผ่อนผัน
 
 ### คลังสินค้าและการแจ้งเตือนสต็อก
 

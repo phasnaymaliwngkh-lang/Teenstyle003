@@ -60,6 +60,12 @@ export const updateReviewSchema = z
 
 export const reviewParamsSchema = z.object({ reviewId: reviewIdSchema });
 
+/** ลบรูปหนึ่งรูปออกจากรีวิว (STEP 47) — imageId = id ของไฟล์ (`images[].id`) */
+export const reviewImageParamsSchema = z.object({
+  reviewId: reviewIdSchema,
+  imageId: z.string({ message: 'กรุณาระบุรหัสรูป' }).uuid('รหัสรูปไม่ถูกต้อง'),
+});
+
 export const helpfulSchema = z.object({
   helpful: z.boolean({ message: 'กรุณาระบุค่า helpful (true/false)' }),
 });

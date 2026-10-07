@@ -74,10 +74,14 @@ process.env (shell / Docker)  >  backend/.env  >  <root>/.env
 | `OPENAI_API_KEY` | <https://platform.openai.com/api-keys> — **เรียกจาก backend เท่านั้น** |
 | `OPENAI_MODEL`   | default `gpt-4o-mini`                                                  |
 
-### Image Storage (STEP 47)
+### รูปที่อัปโหลด (STEP 47)
 
-`CLOUDINARY_CLOUD_NAME` · `CLOUDINARY_API_KEY` · `CLOUDINARY_API_SECRET`
-→ Cloudinary Dashboard (แผนฟรีพอสำหรับ dev)
+| ตัวแปร       | Default           | หมายเหตุ                                                                                   |
+| ------------ | ----------------- | ------------------------------------------------------------------------------------------ |
+| `UPLOAD_DIR` | `backend/uploads` | โฟลเดอร์เก็บไฟล์รูป · **production ต้องเป็น volume ถาวร** (Docker ตั้งเป็น `/app/uploads`) |
+
+**ยังไม่มี Cloudinary** — ตัวแปร `CLOUDINARY_*` ที่เคยจองไว้ถูกถอดออกตอน STEP 47 เพราะไม่มีโค้ดไหนอ่าน
+(ตั้งค่าแล้วไม่เกิดอะไรขึ้นเลย ซึ่งหลอกคนตั้งว่ารูปไปอยู่บน Cloudinary แล้ว) · เหตุผลอยู่ที่ [20-images.md](20-images.md)
 
 ### Payment (STEP 11)
 

@@ -1,11 +1,13 @@
 import type { Request, Response } from 'express';
 
 import {
+  addReviewImage,
   createReview,
   deleteOwnReview,
   getReviewEligibility,
   listMyReviews,
   listProductReviews,
+  removeReviewImage,
   setReviewHelpful,
   updateOwnReview,
 } from '../services/review.service.ts';
@@ -18,6 +20,7 @@ import {
   helpfulSchema,
   myReviewsQuerySchema,
   productReviewQuerySchema,
+  reviewImageParamsSchema,
   reviewParamsSchema,
   updateReviewSchema,
 } from '../validators/review.validator.ts';
@@ -87,4 +90,20 @@ export const setReviewHelpfulHandler = asyncHandler(async (req: Request, res: Re
   const result = await setReviewHelpful(req.user!.id, reviewId, helpful);
 
   sendSuccess(res, result, helpful ? 'ขอบคุณสำหรับความคิดเห็น' : 'ยกเลิกการโหวตแล้ว');
+});
+
+/** POST /api/reviews/:reviewId/images — multipart `file` (STEP 47) */
+export const addReviewImageHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { reviewId } = reviewParamsSchema.parse(req.params);
+  const result = await addReviewImage(req.user!.id, reviewId, req.file!.buffer);
+
+  sendSuccess(res, result, 'แนบรูปแล้ว — รีวิวจะกลับไปรอร้านตรวจสอบก่อนแสดงบนหน้าสินค้า', 201);
+});
+
+/** DELETE /api/reviews/:reviewId/images/:imageId (STEP 47) */
+export const removeReviewImageHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { reviewId, imageId } = reviewImageParamsSchema.parse(req.params);
+  const result = await removeReviewImage(req.user!.id, reviewId, imageId);
+
+  sendSuccess(res, result, 'ลบรูปแล้ว — รีวิวจะกลับไปรอร้านตรวจสอบก่อนแสดงบนหน้าสินค้า');
 });

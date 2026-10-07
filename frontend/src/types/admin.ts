@@ -123,7 +123,7 @@ export interface AdminProduct {
   viewCount: number;
   category: { id: string; name: string; slug: string };
   brand: { id: string; name: string; slug: string } | null;
-  images: { id: string; url: string; alt: string; isMain: boolean; sortOrder: number }[];
+  images: AdminProductImage[];
   variants: AdminProductVariant[];
   orderItemCount: number;
   publishedAt: string | null;
@@ -149,8 +149,77 @@ export interface ProductFormOptions {
   sizes: { name: string; code: string }[];
   /** โฮสต์รูปที่ระบบอนุญาต — ตรงกับ `images.remotePatterns` ของ next.config */
   allowedImageHosts: string[];
+  /** เงื่อนไขการอัปโหลดรูปสินค้า (STEP 47) — ใช้เตือนก่อนส่งเท่านั้น backend ตรวจเนื้อไฟล์จริง */
+  imageUpload: {
+    maxBytes: number;
+    acceptedTypes: string[];
+    acceptedText: string;
+    minShortEdge: number;
+    maxImages: number;
+  };
 }
 
+/** รูปของสินค้าในหลังบ้าน — เรียงตามลำดับ รูปแรกคือรูปหลัก (STEP 47) */
+export interface AdminProductImage {
+  id: string;
+  url: string;
+  alt: string;
+  isMain: boolean;
+  sortOrder: number;
+  /** true = ไฟล์ที่ร้านอัปโหลดเอง · false = รูปจากโฮสต์ภายนอก (ข้อมูลตัวอย่าง) */
+  uploaded: boolean;
+}
+
+export interface MediaPurgeResult {
+  deleted: number;
+  freedBytes: number;
+  /** ไม่ได้ใช้แล้วแต่ยังอยู่ในช่วงผ่อนผัน */
+  waiting: number;
+}
+
+export type MediaPurpose = "PRODUCT" | "REVIEW";
+export type MediaUsageFilter = "all" | "in-use" | "unused";
+
+export interface MediaLibraryItem {
+  id: string;
+  url: string;
+  purpose: MediaPurpose;
+  width: number;
+  height: number;
+  bytes: number;
+  originalBytes: number;
+  createdAt: string;
+  uploadedBy: { id: string; name: string | null; email: string } | null;
+  inUse: boolean;
+  unusedSince: string | null;
+  deletableAt: string | null;
+  deletable: boolean;
+  usage: {
+    products: { id: string; name: string; archived: boolean }[];
+    orderItemCount: number;
+    reviews: { id: string; status: string; productName: string }[];
+  };
+}
+
+export interface MediaLibrary {
+  summary: {
+    total: number;
+    totalBytes: number;
+    originalBytes: number;
+    inUse: number;
+    unused: number;
+    deletable: number;
+    deletableBytes: number;
+    graceHours: number;
+  };
+  items: MediaLibraryItem[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+/** รูปจากโฮสต์ภายนอกตอนสร้างสินค้าผ่าน API — หน้าเว็บอัปโหลดไฟล์หลังบันทึกแทน */
 export interface ProductImageInput {
   url: string;
   alt: string;
@@ -185,15 +254,18 @@ export interface CreateProductInput {
   status: ProductStatus;
   minimumStock: number;
   tags: string[];
-  images: ProductImageInput[];
+  images?: ProductImageInput[];
   variants: ProductVariantInput[];
 }
 
 /**
  * ส่งเฉพาะฟิลด์ที่ต้องการเปลี่ยน — ฟิลด์ที่ไม่ส่งจะไม่ถูกแตะ
  * `salePrice: null` = เลิกโปรโมชัน (ต่างจากไม่ส่งมาเลย)
+ * ไม่มี `images` — รูปแก้ทีละรูปผ่าน `/images` (STEP 47) · backend ตัดทิ้งถ้าส่งมา
  */
-export type UpdateProductInput = Partial<Omit<CreateProductInput, "variants" | "salePrice">> & {
+export type UpdateProductInput = Partial<
+  Omit<CreateProductInput, "variants" | "salePrice" | "images">
+> & {
   salePrice?: number | null;
 };
 
