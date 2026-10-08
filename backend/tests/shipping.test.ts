@@ -24,6 +24,8 @@ import {
   updateShippingRateSchema,
 } from '../src/validators/shipping.validator.ts';
 
+import { storeSettingsFixture } from './helpers/store-settings.ts';
+
 /**
  * กฎล้วนของการจัดส่ง (STEP 44) — ไม่แตะฐานข้อมูล
  * ส่วนที่ต้องพิสูจน์กับของจริง (แก้อัตราแล้วทุกที่เปลี่ยนตาม · พัสดุตีกลับ · ส่งใหม่) อยู่ใน shipping-order.test.ts
@@ -119,7 +121,11 @@ describe('ข้อความนโยบายจากอัตราจร�
 });
 
 describe('ตัวแปรนโยบายในบทความ', () => {
-  const context = { shippingOptions: [option({ baseFee: 65, freeOverSubtotal: 2500 })] };
+  const context = {
+    shippingOptions: [option({ baseFee: 65, freeOverSubtotal: 2500 })],
+    store: storeSettingsFixture(),
+    paymentMethods: [],
+  };
 
   it('แทนค่าจากข้อมูลจริง (รับช่องว่างในวงเล็บ) · ตัวที่ไม่รู้จักคงไว้ตามเดิม', () => {
     const rendered = renderPolicyTokens(

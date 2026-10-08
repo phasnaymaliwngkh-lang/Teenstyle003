@@ -86,6 +86,7 @@ async function createOrder(
   await prisma.order.create({
     data: {
       orderNumber,
+      returnWindowDays: 7,
       userId,
       subtotal: total,
       total,
@@ -410,6 +411,7 @@ describe('สมุดที่อยู่ /api/users/me/addresses', () => {
     await prisma.order.create({
       data: {
         orderNumber,
+        returnWindowDays: 7,
         userId: customer.id,
         subtotal: 500,
         total: 500,

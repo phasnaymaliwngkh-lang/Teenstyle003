@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { RETURN_REASONS, RETURN_WINDOW_DAYS, refundMethodsFor } from '../src/config/returns.ts';
+import { RETURN_REASONS, refundMethodsFor } from '../src/config/returns.ts';
 import { buildOrderNumber, findOrderNumberIn } from '../src/models/order.model.ts';
 import {
   CUSTOMER_CANCELLABLE,
@@ -13,6 +13,7 @@ import {
   returnDeadline,
   returnableLines,
 } from '../src/models/return.model.ts';
+import { effectiveReturnWindowDays } from '../src/models/store-settings.model.ts';
 
 /**
  * กฎของการคืนสินค้าและคืนเงิน (STEP 43) — ฟังก์ชันบริสุทธิ์
@@ -21,6 +22,8 @@ import {
  */
 
 const DAY = 24 * 60 * 60 * 1000;
+/** จำนวนวันของคำสั่งซื้อในเทสต์ — ค่าใดก็ได้ ฟังก์ชันต้องใช้ค่าที่ส่งเข้าไป ไม่ใช่ค่าคงที่ของตัวเอง */
+const WINDOW_DAYS = 9;
 const delivered = new Date('2026-10-01T03:00:00.000Z');
 const twoLines = [
   { id: 'a', quantity: 2 },
@@ -45,6 +48,7 @@ describe('evaluateEligibility — ขอคืนได้ไหม', () => {
     deliveredAt: delivered,
     hasOpenRequest: false,
     lines: returnableLines(twoLines, []),
+    windowDays: WINDOW_DAYS,
     now: new Date(delivered.getTime() + DAY),
   };
 
@@ -52,11 +56,37 @@ describe('evaluateEligibility — ขอคืนได้ไหม', () => {
     const result = evaluateEligibility(base);
 
     expect(result.eligible).toBe(true);
-    expect(result.deadline?.getTime()).toBe(delivered.getTime() + RETURN_WINDOW_DAYS * DAY);
+    expect(result.deadline?.getTime()).toBe(delivered.getTime() + WINDOW_DAYS * DAY);
+  });
+
+  it('เลยกำหนดแล้วบอกจำนวนวันของใบนั้น ไม่ใช่ตัวเลขที่พิมพ์ไว้ในโค้ด (STEP 49)', () => {
+    const late = evaluateEligibility({ ...base, now: new Date(delivered.getTime() + 30 * DAY) });
+
+    expect(late.reason).toBe('WINDOW_CLOSED');
+    expect(late.message).toContain(`ภายใน ${WINDOW_DAYS} วัน`);
+  });
+
+  it('จำนวนวันของใบ = ค่าที่ยาวกว่าระหว่างตอนสั่งกับตอนนี้ — ร้านลดวันลงแล้วไม่มีใครเสียสิทธิ์ย้อนหลัง', () => {
+    // สั่งตอนนโยบาย 7 วัน แล้วร้านลดเหลือ 3 → ยังได้ 7
+    expect(effectiveReturnWindowDays(7, 3)).toBe(7);
+    // ร้านขยายเป็น 14 → ใบเก่าได้ 14 ด้วย (บทความประกาศ 14 ให้ทุกคนอ่าน)
+    expect(effectiveReturnWindowDays(7, 14)).toBe(14);
+
+    // วันที่ 5 หลังได้รับของ: ใบที่สั่งตอน 7 วันยังขอได้แม้ตอนนี้ร้านตั้งไว้ 3 วัน
+    const day5 = new Date(delivered.getTime() + 5 * DAY);
+    const kept = evaluateEligibility({
+      ...base,
+      windowDays: effectiveReturnWindowDays(7, 3),
+      now: day5,
+    });
+    const shortened = evaluateEligibility({ ...base, windowDays: 3, now: day5 });
+
+    expect(kept.eligible).toBe(true);
+    expect(shortened.reason).toBe('WINDOW_CLOSED');
   });
 
   it('ขอบเวลา: วันสุดท้ายพอดียังได้ · เลยไป 1 มิลลิวินาทีไม่ได้', () => {
-    const deadline = returnDeadline(delivered);
+    const deadline = returnDeadline(delivered, WINDOW_DAYS);
 
     expect(evaluateEligibility({ ...base, now: deadline }).eligible).toBe(true);
     expect(evaluateEligibility({ ...base, now: new Date(deadline.getTime() + 1) }).reason).toBe(

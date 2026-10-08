@@ -18,6 +18,7 @@ import { returnRouter } from './return.route.ts';
 import { searchRouter } from './search.route.ts';
 import { reviewRouter } from './review.route.ts';
 import { shippingRouter } from './shipping.route.ts';
+import { storeRouter } from './store.route.ts';
 import { userRouter } from './user.route.ts';
 import { wishlistRouter } from './wishlist.route.ts';
 
@@ -102,6 +103,12 @@ const API_GROUPS: readonly ApiGroup[] = [
     router: shippingRouter,
     step: 44,
     note: 'วิธีจัดส่งที่เปิดใช้ ค่าส่ง และเงื่อนไขส่งฟรี — ตัวเลขชุดเดียวกับที่หน้า checkout คิดเงิน (เปิดให้ทุกคน)',
+  },
+  {
+    path: '/store',
+    router: storeRouter,
+    step: 49,
+    note: 'ข้อมูลร้าน — คำอธิบาย ช่องทางติดต่อ โซเชียล เวลาทำการ และตัวเลขนโยบายที่ร้านตั้งเอง (เปิดให้ทุกคน)',
   },
   {
     path: '/returns',

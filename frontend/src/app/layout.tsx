@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Thai, Plus_Jakarta_Sans } from "next/font/google";
+import { Suspense } from "react";
 
 import { JsonLd } from "@/components/shared/json-ld";
 import { publicEnv } from "@/lib/env";
 import { organizationJsonLd, webSiteJsonLd } from "@/lib/seo";
+import { fetchStoreInfo } from "@/services/store.service";
 
 import "./globals.css";
 
@@ -65,9 +67,22 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="th" className={`${jakarta.variable} ${notoThai.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         {/* structured data ของตัวตนร้าน — ใส่ครั้งเดียวทั้งเว็บ (STEP 33) */}
-        <JsonLd data={[organizationJsonLd(), webSiteJsonLd()]} />
+        <JsonLd data={webSiteJsonLd()} />
+        <Suspense fallback={null}>
+          <OrganizationJsonLd />
+        </Suspense>
         {children}
       </body>
     </html>
   );
+}
+
+/**
+ * ข้อมูลร้านจากการตั้งค่าร้าน (STEP 49) — อยู่ใน `<Suspense>` เพราะ root layout ครอบทุกหน้า
+ * backend ช้าหรือล่มต้องไม่ทำให้หน้าไหนรอ · โหลดไม่ได้ = ประกาศแค่ชื่อกับ URL
+ */
+async function OrganizationJsonLd() {
+  const store = await fetchStoreInfo().catch(() => null);
+
+  return <JsonLd data={organizationJsonLd(store)} />;
 }

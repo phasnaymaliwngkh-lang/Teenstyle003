@@ -31,6 +31,7 @@ import {
   notifySafely,
 } from './notification.service.ts';
 import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
+import { getStoreSettings } from './store-settings.service.ts';
 
 /**
  * Payment service (STEP 11)
@@ -166,7 +167,7 @@ export async function getPaymentState(
 
   return {
     order: toOrder(order),
-    methods: paymentMethods(toNumber(order.total)),
+    methods: paymentMethods(toNumber(order.total), (await getStoreSettings()).codMaxTotal),
     deadline: deadline.toISOString(),
     expired,
     payable: order.status === 'PENDING_PAYMENT' && order.paymentStatus === 'PENDING' && !expired,
@@ -215,7 +216,10 @@ export async function startPayment(
   const order = await findOwnOrder(userId, orderNumber);
   assertPayable(order);
 
-  const method = paymentMethods(toNumber(order.total)).find((item) => item.code === provider);
+  const { codMaxTotal } = await getStoreSettings();
+  const method = paymentMethods(toNumber(order.total), codMaxTotal).find(
+    (item) => item.code === provider,
+  );
 
   if (!method || !method.available) {
     throw ApiError.badRequest(method?.unavailableReason ?? 'ช่องทางชำระเงินนี้ยังใช้งานไม่ได้');

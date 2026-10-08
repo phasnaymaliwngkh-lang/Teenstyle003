@@ -24,7 +24,10 @@ import type {
   UpdateKnowledgeArticleInput,
 } from '../validators/knowledge-base.validator.ts';
 
+import { paymentMethods } from '../config/payment.ts';
+
 import { loadShippingOptions } from './shipping.service.ts';
+import { getStoreSettings } from './store-settings.service.ts';
 
 /**
  * คลังความรู้ที่ AI ใช้ตอบลูกค้า (STEP 21) — เก็บใน PostgreSQL
@@ -72,11 +75,14 @@ function toArticleDto(row: ArticleRow): KnowledgeArticle {
 }
 
 /**
- * ค่าจริงที่ใช้แทนตัวแปรนโยบายในบทความ (STEP 44) — อ่านใหม่ทุกคำขอ
- * ร้านแก้ค่าส่งแล้วบทความ (และคำตอบของ AI ที่อ้างบทความ) เปลี่ยนตามทันที ไม่มีสำเนาที่ค้างค่าเก่า
+ * ค่าจริงที่ใช้แทนตัวแปรนโยบายในบทความ (STEP 44 · ข้อมูลร้านเพิ่มตอน STEP 49) — อ่านใหม่ทุกคำขอ
+ * ร้านแก้ค่าส่งหรือการตั้งค่าร้านแล้วบทความ (และคำตอบของ AI ที่อ้างบทความ) เปลี่ยนตามทันที
+ * ไม่มีสำเนาที่ค้างค่าเก่า · ช่องทางชำระเงินคิดที่ยอด 0 (บทความไม่รู้ยอดของใคร)
  */
 async function policyContext(): Promise<PolicyContext> {
-  return { shippingOptions: await loadShippingOptions() };
+  const [shippingOptions, store] = await Promise.all([loadShippingOptions(), getStoreSettings()]);
+
+  return { shippingOptions, store, paymentMethods: paymentMethods(0, store.codMaxTotal) };
 }
 
 /** บทความในมุมของคนอ่าน — แทนตัวแปรทุกช่องที่เป็นข้อความ (หน้าแก้ของแอดมินใช้ฉบับดิบ) */

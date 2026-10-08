@@ -293,7 +293,7 @@ ANALYZE u; ANALYZE p; ANALYZE v; ANALYZE v_first;
 
 INSERT INTO "Order" (id, "orderNumber", "userId", status, "paymentStatus", subtotal, "discountTotal",
                      "shippingFee", total, "addressSnapshot", "shippingMethod", "paidAt",
-                     "deliveredAt", "createdAt", "updatedAt")
+                     "deliveredAt", "returnWindowDays", "createdAt", "updatedAt")
 SELECT gen_random_uuid(), 'TS-PERF-' || lpad(g::text, 7, '0'), u.id,
        CASE WHEN g % 11 = 0 THEN 'PENDING_PAYMENT'::"OrderStatus"
             WHEN g % 13 = 0 THEN 'CANCELLED'::"OrderStatus"
@@ -306,7 +306,7 @@ SELECT gen_random_uuid(), 'TS-PERF-' || lpad(g::text, 7, '0'), u.id,
        '{"fullName":"ผู้รับทดสอบ","province":"กรุงเทพมหานคร"}'::jsonb, 'STANDARD',
        CASE WHEN g % 11 = 0 THEN NULL ELSE now() - (g % 400) * interval '1 day' + interval '3 hour' END,
        CASE WHEN g % 11 = 0 OR g % 13 = 0 THEN NULL ELSE now() - (g % 400) * interval '1 day' + interval '2 day' END,
-       now() - (g % 400) * interval '1 day', now()
+       7, now() - (g % 400) * interval '1 day', now()
 FROM generate_series(1, ${VOLUME.orders}) g
 JOIN u ON u.n = g % ${VOLUME.users};
 
@@ -439,6 +439,11 @@ const ROUTES = [
     note: 'เคยรวมสต็อกต่อแถว → 92ms ต่อคิวรี',
   },
   { path: '/api/products/filters', budgetMs: 250, note: 'เคยนับสินค้าใหม่ทุกหมวด (30 รอบ)' },
+  {
+    path: '/api/store',
+    budgetMs: 150,
+    note: 'ข้อมูลร้าน (STEP 49) — footer ทุกหน้าอ่าน · แถวเดียว ไม่ควรโตตามข้อมูล',
+  },
   { path: '/api/products/product-1', budgetMs: 250, note: 'หน้าสินค้า' },
   { path: '/api/products/product-1/reviews?limit=10', budgetMs: 250, note: 'รีวิวในหน้าสินค้า' },
   {
@@ -524,6 +529,7 @@ const ROUTES = [
   { path: '/api/admin/logs?limit=20', budgetMs: 300, staff: true },
   { path: '/api/admin/logs/filters', budgetMs: 400, staff: true },
   { path: '/api/admin/reviews?limit=20', budgetMs: 300, staff: true },
+  { path: '/api/admin/settings', budgetMs: 150, staff: true },
   {
     path: '/api/admin/catalog',
     budgetMs: 300,

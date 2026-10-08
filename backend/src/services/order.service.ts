@@ -31,6 +31,7 @@ import type { CreateOrderInput, NewAddressInput } from '../validators/order.vali
 import { notifyOrderCreated, notifySafely } from './notification.service.ts';
 import { activeShippingOptions, requireActiveShippingOption } from './shipping.service.ts';
 import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
+import { getStoreSettings } from './store-settings.service.ts';
 
 /**
  * Order service (STEP 10 — Checkout)
@@ -654,6 +655,8 @@ export async function createOrder(
         shippingMethod: input.shippingMethod,
         // ระยะเวลาที่ลูกค้าเห็นตอนสั่ง — ร้านแก้ข้อความนี้ได้ภายหลัง (กฎ STEP 10 ข้อ 5)
         shippingEtaText: shipping.etaText,
+        // นโยบายคืนสินค้าที่ใช้ตอนสั่ง (STEP 49) — ร้านลดวันลงภายหลัง ใบนี้ยังได้ตามนี้
+        returnWindowDays: (await getStoreSettings(tx)).returnWindowDays,
         shippingAddressId: addressId,
         addressSnapshot: snapshot,
         customerNote: input.customerNote ?? null,

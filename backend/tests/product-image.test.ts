@@ -438,6 +438,7 @@ describe('แก้และถอดรูป', () => {
     const order = await prisma.order.create({
       data: {
         orderNumber: `TS-TEST-${randomUUID().slice(0, 12).toUpperCase()}`,
+        returnWindowDays: 7,
         userId: customer.id,
         subtotal: 390,
         total: 390,

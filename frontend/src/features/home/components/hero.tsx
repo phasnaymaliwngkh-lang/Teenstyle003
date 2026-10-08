@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { fetchShippingOptions } from "@/services/shipping.service";
+import { fetchStoreInfo } from "@/services/store.service";
 import { formatBaht } from "@/utils/format";
 
 /**
@@ -67,9 +68,18 @@ export function Hero() {
             >
               <ShippingTrustItem />
             </Suspense>
-            <TrustItem icon={<RotateCcw className="size-4" aria-hidden />} label="คืนได้ 7 วัน">
-              ตามเงื่อนไขของร้าน
-            </TrustItem>
+            <Suspense
+              fallback={
+                <TrustItem
+                  icon={<RotateCcw className="size-4" aria-hidden />}
+                  label="เปลี่ยนคืนได้"
+                >
+                  กำลังโหลดเงื่อนไข…
+                </TrustItem>
+              }
+            >
+              <ReturnTrustItem />
+            </Suspense>
             <TrustItem icon={<Sparkles className="size-4" aria-hidden />} label="AI ช่วยเลือก">
               ตอบได้ตลอด 24 ชม.
             </TrustItem>
@@ -122,6 +132,29 @@ async function ShippingTrustItem() {
   return (
     <TrustItem icon={icon} label="ส่งฟรี">
       เมื่อยอดสินค้าครบ {formatBaht(shipping.freeShippingFrom)}
+    </TrustItem>
+  );
+}
+
+/**
+ * จำนวนวันที่คืนได้จากการตั้งค่าร้าน (STEP 49 — เดิมพิมพ์ "คืนได้ 7 วัน" ไว้ในซอร์ส)
+ * โหลดไม่ได้ = ไม่อ้างจำนวนวัน (บอกแค่ข้อเท็จจริงที่ยังจริงอยู่)
+ */
+async function ReturnTrustItem() {
+  const store = await fetchStoreInfo().catch(() => null);
+  const icon = <RotateCcw className="size-4" aria-hidden />;
+
+  if (store === null) {
+    return (
+      <TrustItem icon={icon} label="เปลี่ยนคืนได้">
+        ตามเงื่อนไขของร้าน
+      </TrustItem>
+    );
+  }
+
+  return (
+    <TrustItem icon={icon} label={`คืนได้ ${store.returnWindowDays} วัน`}>
+      ตามเงื่อนไขของร้าน
     </TrustItem>
   );
 }

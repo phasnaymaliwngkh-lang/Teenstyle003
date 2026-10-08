@@ -1,7 +1,6 @@
 import {
   REFUND_METHOD_LABEL,
   RETURN_REASONS,
-  RETURN_WINDOW_DAYS,
   type RefundMethodCode,
   type ReturnReasonCode,
 } from '../config/returns.ts';
@@ -42,17 +41,31 @@ export const HOLDING_RETURN_STATUSES = [...OPEN_RETURN_STATUSES, 'REFUNDED'] as 
 export type ReturnIneligibility =
   'NOT_DELIVERED' | 'NOT_PAID' | 'WINDOW_CLOSED' | 'OPEN_REQUEST_EXISTS' | 'NOTHING_LEFT';
 
-export const RETURN_INELIGIBILITY_MESSAGE: Record<ReturnIneligibility, string> = {
-  NOT_DELIVERED: 'ขอคืนได้หลังได้รับสินค้าแล้วเท่านั้น',
-  NOT_PAID: 'คำสั่งซื้อนี้ยังไม่มีการชำระเงินที่ร้านได้รับ จึงไม่มีเงินให้คืน',
-  WINDOW_CLOSED: `เลยกำหนดแจ้งคืนแล้ว — แจ้งได้ภายใน ${RETURN_WINDOW_DAYS} วันหลังได้รับสินค้า`,
-  OPEN_REQUEST_EXISTS: 'คำสั่งซื้อนี้มีคำขอคืนที่ยังดำเนินการอยู่ — รอผลของคำขอเดิมก่อน',
-  NOTHING_LEFT: 'ทุกชิ้นในคำสั่งซื้อนี้อยู่ในคำขอคืนแล้ว',
-};
+/** ข้อความที่ลูกค้าเห็น — จำนวนวันเป็นของคำสั่งซื้อใบนั้น (STEP 49 · ร้านแก้นโยบายได้) */
+export function returnIneligibilityMessage(
+  reason: ReturnIneligibility,
+  windowDays: number,
+): string {
+  switch (reason) {
+    case 'NOT_DELIVERED':
+      return 'ขอคืนได้หลังได้รับสินค้าแล้วเท่านั้น';
+    case 'NOT_PAID':
+      return 'คำสั่งซื้อนี้ยังไม่มีการชำระเงินที่ร้านได้รับ จึงไม่มีเงินให้คืน';
+    case 'WINDOW_CLOSED':
+      return `เลยกำหนดแจ้งคืนแล้ว — คำสั่งซื้อนี้แจ้งคืนได้ภายใน ${windowDays} วันหลังได้รับสินค้า`;
+    case 'OPEN_REQUEST_EXISTS':
+      return 'คำสั่งซื้อนี้มีคำขอคืนที่ยังดำเนินการอยู่ — รอผลของคำขอเดิมก่อน';
+    case 'NOTHING_LEFT':
+      return 'ทุกชิ้นในคำสั่งซื้อนี้อยู่ในคำขอคืนแล้ว';
+  }
+}
 
-/** วันสุดท้ายที่แจ้งคืนได้ — นับจากเวลาที่บันทึกว่าส่งถึงจริง (ไม่เดา) */
-export function returnDeadline(deliveredAt: Date): Date {
-  return new Date(deliveredAt.getTime() + RETURN_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+/**
+ * วันสุดท้ายที่แจ้งคืนได้ — นับจากเวลาที่บันทึกว่าส่งถึงจริง (ไม่เดา)
+ * @param windowDays จำนวนวันของคำสั่งซื้อใบนั้น — ผู้เรียกคิดด้วย `effectiveReturnWindowDays()`
+ */
+export function returnDeadline(deliveredAt: Date, windowDays: number): Date {
+  return new Date(deliveredAt.getTime() + windowDays * 24 * 60 * 60 * 1000);
 }
 
 export interface ReturnableLine {
@@ -88,6 +101,8 @@ export interface EligibilityInput {
   deliveredAt: Date | null;
   hasOpenRequest: boolean;
   lines: ReturnableLine[];
+  /** จำนวนวันที่แจ้งคืนได้ของใบนี้ (`effectiveReturnWindowDays` ของ snapshot กับค่าปัจจุบัน) */
+  windowDays: number;
   now: Date;
 }
 
@@ -103,11 +118,12 @@ export interface EligibilityResult {
  * ⚠️ ด่านจริงอยู่ที่ backend ตอนสร้างคำขอ ผลนี้ส่งให้หน้าเว็บซ่อน/แสดงปุ่มเท่านั้น
  */
 export function evaluateEligibility(input: EligibilityInput): EligibilityResult {
-  const deadline = input.deliveredAt === null ? null : returnDeadline(input.deliveredAt);
+  const deadline =
+    input.deliveredAt === null ? null : returnDeadline(input.deliveredAt, input.windowDays);
   const no = (reason: ReturnIneligibility): EligibilityResult => ({
     eligible: false,
     reason,
-    message: RETURN_INELIGIBILITY_MESSAGE[reason],
+    message: returnIneligibilityMessage(reason, input.windowDays),
     deadline,
   });
 

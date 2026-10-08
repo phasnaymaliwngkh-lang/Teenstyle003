@@ -126,14 +126,38 @@ describe("productJsonLd — ห้ามประกาศสิ่งที่�
 });
 
 describe("ตัวตนของร้าน — ห้ามประกาศช่องทางที่ยังไม่มีจริง", () => {
-  it("Organization ไม่มี sameAs / logo / เบอร์โทร (ยังไม่มีของจริง — STEP 49)", () => {
-    const data = organizationJsonLd();
+  const store = {
+    description: "ร้านแฟชั่นวัยรุ่น",
+    contactEmail: "care@example.com",
+    contactPhone: null,
+    socialLinks: [] as { url: string }[],
+  };
 
-    expect(data.sameAs).toBeUndefined();
-    expect(data.logo).toBeUndefined();
-    expect(data.telephone).toBeUndefined();
-    expect(data.email).toBeUndefined();
+  it("Organization ประกาศเฉพาะช่องทางที่ร้านตั้งไว้จริง — ไม่มีเบอร์ ไม่มีโซเชียล = ไม่มีช่องนั้น", () => {
+    const data = organizationJsonLd(store);
+
     expect(data["@type"]).toBe("OnlineStore");
+    expect(data.email).toBe("care@example.com");
+    expect(data.telephone).toBeUndefined();
+    expect(data.sameAs).toBeUndefined();
+    // โลโก้เป็นข้อความ ยังไม่มีไฟล์ภาพจริง
+    expect(data.logo).toBeUndefined();
+  });
+
+  it("โซเชียลที่ร้านตั้งไว้กลายเป็น sameAs · โหลดข้อมูลร้านไม่ได้ = ไม่เดาค่าแทน", () => {
+    const data = organizationJsonLd({
+      ...store,
+      contactPhone: "02-123-4567",
+      socialLinks: [{ url: "https://www.instagram.com/teenstyle.th" }],
+    });
+
+    expect(data.telephone).toBe("02-123-4567");
+    expect(data.sameAs).toEqual(["https://www.instagram.com/teenstyle.th"]);
+
+    const unknown = organizationJsonLd(null);
+    expect(unknown.email).toBeUndefined();
+    expect(unknown.description).toBeUndefined();
+    expect(unknown.name).toBe("TEENSTYLE AI");
   });
 
   /**

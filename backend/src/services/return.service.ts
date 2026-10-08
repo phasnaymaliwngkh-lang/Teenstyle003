@@ -3,7 +3,6 @@ import { getPrisma, type Prisma } from '@teenstyle/database';
 import {
   RETURN_DETAIL_MIN_LENGTH,
   RETURN_REASONS,
-  RETURN_WINDOW_DAYS,
   refundMethodsFor,
   type RefundMethodCode,
   type ReturnReasonRule,
@@ -28,6 +27,7 @@ import {
   type ReturnRow,
   type ReturnStatusCode,
 } from '../models/return.model.ts';
+import { effectiveReturnWindowDays } from '../models/store-settings.model.ts';
 import { ApiError } from '../utils/api-error.ts';
 import type {
   AdminReturnQuery,
@@ -41,6 +41,7 @@ import { restockReturnedItem } from './inventory.service.ts';
 import { settlePointsForReturn } from './loyalty.service.ts';
 import { notifyOrderRefunded, notifyReturnUpdate, notifySafely } from './notification.service.ts';
 import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
+import { getStoreSettings } from './store-settings.service.ts';
 
 /**
  * คืนสินค้าและคืนเงิน (STEP 43)
@@ -238,6 +239,7 @@ const ORDER_FOR_RETURN_SELECT = {
   status: true,
   paymentStatus: true,
   deliveredAt: true,
+  returnWindowDays: true,
   items: {
     orderBy: { createdAt: 'asc' },
     select: {
@@ -260,6 +262,16 @@ async function heldItemsOf(client: DbClient, orderId: string) {
     },
     select: { orderItemId: true, quantity: true },
   });
+}
+
+/**
+ * จำนวนวันที่แจ้งคืนได้ของใบนี้ — ค่าที่ยาวกว่าระหว่างนโยบายตอนสั่งกับนโยบายปัจจุบัน (STEP 49)
+ * ร้านลดวันลงแล้วใบเดิมไม่เสียสิทธิ์ · ร้านขยายวันแล้วใบเดิมได้ด้วย (บทความประกาศค่าใหม่ให้ทุกคนอ่าน)
+ */
+async function windowDaysOf(client: DbClient, orderDays: number): Promise<number> {
+  const { returnWindowDays } = await getStoreSettings(client);
+
+  return effectiveReturnWindowDays(orderDays, returnWindowDays);
 }
 
 async function hasOpenRequest(client: DbClient, orderId: string): Promise<boolean> {
@@ -294,6 +306,7 @@ export async function getReturnEligibility(
     }),
     contextsFor(prisma, [order.id]),
   ]);
+  const windowDays = await windowDaysOf(prisma, order.returnWindowDays);
 
   const lines = returnableLines(order.items, held);
   const result = evaluateEligibility({
@@ -302,6 +315,7 @@ export async function getReturnEligibility(
     deliveredAt: order.deliveredAt,
     hasOpenRequest: open,
     lines,
+    windowDays,
     now: new Date(),
   });
 
@@ -310,7 +324,7 @@ export async function getReturnEligibility(
     eligible: result.eligible,
     message: result.message,
     deadline: result.deadline?.toISOString() ?? null,
-    windowDays: RETURN_WINDOW_DAYS,
+    windowDays,
     reasons: [...RETURN_REASONS],
     detailMinLength: RETURN_DETAIL_MIN_LENGTH,
     items: order.items.map((item) => ({
@@ -382,12 +396,14 @@ export async function createReturnRequest(
       hasOpenRequest(tx, order.id),
     ]);
     const lines = returnableLines(order.items, held);
+    const windowDays = await windowDaysOf(tx, order.returnWindowDays);
     const eligibility = evaluateEligibility({
       status: order.status,
       paymentStatus: order.paymentStatus,
       deliveredAt: order.deliveredAt,
       hasOpenRequest: open,
       lines,
+      windowDays,
       now: new Date(),
     });
 

@@ -1,5 +1,3 @@
-import { RETURN_WINDOW_DAYS } from './store.ts';
-
 /**
  * เงื่อนไขการคืนสินค้าและคืนเงิน (STEP 43)
  *
@@ -7,10 +5,9 @@ import { RETURN_WINDOW_DAYS } from './store.ts';
  *    บทความนโยบายในคลังความรู้ และคำตอบของ AI Customer Service อ่านจากไฟล์นี้
  *    (บทเรียน STEP 21: นโยบายสองชุดที่พิมพ์แยกกัน = ลูกค้าถามสองทางได้คนละคำตอบ)
  *
- * จำนวนวันที่แจ้งคืนได้อยู่ที่ `RETURN_WINDOW_DAYS` ใน config/store.ts (ที่เดิมของมันตั้งแต่ STEP 21)
- * ไฟล์นี้ re-export ไว้ให้ผู้เรียกไม่ต้องรู้ว่ามันอยู่ไฟล์ไหน
+ * จำนวนวันที่แจ้งคืนได้ย้ายไปการตั้งค่าร้านตอน STEP 49 (`StoreSetting.returnWindowDays`)
+ * และแต่ละคำสั่งซื้อจดค่าที่ใช้ตอนสั่งไว้ (`Order.returnWindowDays`) — ดู `effectiveReturnWindowDays()`
  */
-export { RETURN_WINDOW_DAYS };
 
 export const RETURN_REASON_CODES = ['DEFECTIVE', 'WRONG_ITEM'] as const;
 

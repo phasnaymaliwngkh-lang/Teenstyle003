@@ -16,6 +16,10 @@ import {
   adminUpdateShippingRateHandler,
 } from '../controllers/shipping.controller.ts';
 import {
+  adminGetStoreSettingsHandler,
+  adminUpdateStoreSettingsHandler,
+} from '../controllers/store-settings.controller.ts';
+import {
   addVariantHandler,
   createProductHandler,
   deleteProductHandler,
@@ -171,6 +175,18 @@ adminRouter.patch(
   '/shipping/rates/:method',
   requirePermission('settings:manage'),
   adminUpdateShippingRateHandler,
+);
+
+/**
+ * การตั้งค่าร้าน (STEP 49) — ดูและแก้ = `settings:manage` (ADMIN ขึ้นไป)
+ * ค่าทุกช่องเป็นข้อมูลสาธารณะอยู่แล้ว (`GET /api/store`) · หน้านี้มีไว้แก้ จึงไม่แยกสิทธิ์ดู
+ * · จำนวนวันที่คืนได้และยอดสูงสุดของ COD คือนโยบายที่ AI เอาไปตอบลูกค้า
+ */
+adminRouter.get('/settings', requirePermission('settings:manage'), adminGetStoreSettingsHandler);
+adminRouter.patch(
+  '/settings',
+  requirePermission('settings:manage'),
+  adminUpdateStoreSettingsHandler,
 );
 adminRouter.get('/shipments', requirePermission('shipment:read'), adminListShipmentsHandler);
 adminRouter.get(

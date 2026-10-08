@@ -7,6 +7,7 @@ import {
   handleStripeWebhook,
   startPayment,
 } from '../services/payment.service.ts';
+import { getStoreSettings } from '../services/store-settings.service.ts';
 import { sendSuccess } from '../utils/api-response.ts';
 import { asyncHandler } from '../utils/async-handler.ts';
 import { orderNumberParamsSchema } from '../validators/order.validator.ts';
@@ -22,7 +23,9 @@ import { startPaymentSchema } from '../validators/payment.validator.ts';
 /** GET /api/payments/methods — ช่องทางที่ระบบเปิดใช้จริง (บอกตรง ๆ ถ้าตั้งค่าไม่ครบ) */
 export const getPaymentMethodsHandler = asyncHandler(
   async (_req: Request, res: Response): Promise<void> => {
-    sendSuccess(res, { methods: paymentMethods(0) });
+    const { codMaxTotal } = await getStoreSettings();
+
+    sendSuccess(res, { methods: paymentMethods(0, codMaxTotal) });
   },
 );
 

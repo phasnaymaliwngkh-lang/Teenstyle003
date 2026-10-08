@@ -301,6 +301,7 @@ describe('IDOR — ข้อมูลของคนอื่นเข้าถ�
     const order = await prisma.order.create({
       data: {
         orderNumber,
+        returnWindowDays: 7,
         userId: customer.id,
         subtotal: 100,
         total: 100,

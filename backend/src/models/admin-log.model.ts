@@ -41,6 +41,7 @@ export const TARGET_TYPES = [
   'Brand',
   'Size',
   'Color',
+  'StoreSetting',
 ] as const;
 
 export type TargetType = (typeof TARGET_TYPES)[number];
@@ -87,6 +88,8 @@ const TARGET_META: Readonly<Record<TargetType, TargetMeta>> = {
   Brand: { label: 'แบรนด์', aliases: [], hrefPrefix: null },
   Size: { label: 'ไซซ์', aliases: [], hrefPrefix: null },
   Color: { label: 'สี', aliases: [], hrefPrefix: null },
+  // แถวเดียวของทั้งร้าน แก้ที่ /admin/settings (STEP 49)
+  StoreSetting: { label: 'การตั้งค่าร้าน', aliases: [], hrefPrefix: null },
 };
 
 /** ทุกชื่อที่เคยใช้แทนชนิดนี้ — ใช้กับ `where.targetType.in` ตอนกรอง */
@@ -177,6 +180,7 @@ export const ACTION_LABELS: Readonly<Record<string, string>> = {
   'catalog.color.update': 'แก้สี',
   'catalog.color.delete': 'ลบสี',
   'catalog.color.reorder': 'เรียงลำดับสี',
+  'settings.store.update': 'แก้การตั้งค่าร้าน',
 };
 
 /** กลุ่มของการกระทำ — ใช้ทำตัวกรองระดับหยาบ (`action` ขึ้นต้นด้วยอะไร) */
@@ -193,6 +197,7 @@ export const ACTION_GROUPS = [
   'shipping',
   'media',
   'catalog',
+  'settings',
 ] as const;
 
 export type ActionGroup = (typeof ACTION_GROUPS)[number];
@@ -211,6 +216,7 @@ export const ACTION_GROUP_LABELS: Readonly<Record<ActionGroup, string>> = {
   shipping: 'การจัดส่ง',
   media: 'คลังรูป',
   catalog: 'หมวดหมู่ แบรนด์ ไซซ์ สี',
+  settings: 'การตั้งค่าร้าน',
 };
 
 /** คำอธิบายของ action — ค่าที่ไม่รู้จักคืนชื่อดิบ (ดีกว่าแสดงว่าง ๆ หรือเดาความหมาย) */

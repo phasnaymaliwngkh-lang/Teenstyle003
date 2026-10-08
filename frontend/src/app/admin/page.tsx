@@ -124,6 +124,12 @@ export default async function AdminDashboardPage() {
             อัตราค่าจัดส่ง
           </Link>
           <Link
+            href="/admin/settings"
+            className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            การตั้งค่าร้าน
+          </Link>
+          <Link
             href="/admin/returns"
             className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
           >

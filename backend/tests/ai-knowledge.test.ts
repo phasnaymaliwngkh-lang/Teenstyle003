@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { COD_MAX_TOTAL, paymentMethods } from '../src/config/payment.ts';
-import {
-  RETURN_WINDOW_DAYS,
-  STORE_AGENT_HOURS,
-  STORE_CONTACT_CHANNELS,
-} from '../src/config/store.ts';
+import { paymentMethods } from '../src/config/payment.ts';
 import { INITIAL_KNOWLEDGE_ARTICLES } from '../src/models/knowledge-base.model.ts';
+import { contactChannelsOf } from '../src/models/store-settings.model.ts';
 import { getStorePolicyContent } from '../src/services/ai-cs.service.ts';
 import { activeShippingOptions } from '../src/services/shipping.service.ts';
+import { getStoreSettings } from '../src/services/store-settings.service.ts';
 import {
   adminCreateArticle,
   adminDeleteArticle,
@@ -207,13 +204,16 @@ describe('STEP 21: AI Knowledge Base Service', () => {
         .map((f) => f.answer)
         .join('\n')}`;
 
-      for (const method of paymentMethods(0)) {
+      const store = await getStoreSettings();
+
+      for (const method of paymentMethods(0, store.codMaxTotal)) {
         expect(text, `ไม่พบช่องทาง "${method.name}"`).toContain(method.name);
       }
 
-      expect(text, 'ยอดสูงสุดของ COD ไม่ตรงกับ config').toContain(
-        COD_MAX_TOTAL.toLocaleString('th-TH'),
+      expect(text, 'ยอดสูงสุดของ COD ไม่ตรงกับการตั้งค่าร้าน').toContain(
+        store.codMaxTotal.toLocaleString('th-TH'),
       );
+      expect(text, 'ยังมีตัวแปรที่ไม่ถูกแทนค่า').not.toContain('{{');
       // ระบบไม่บวกค่าธรรมเนียม COD ที่ไหนเลย — บทความจึงห้ามสัญญาว่าเก็บ
       expect(text).not.toMatch(/ค่าธรรมเนียม(บริการ)?\s*(COD\s*)?\d+\s*บาท/);
     });
@@ -221,26 +221,29 @@ describe('STEP 21: AI Knowledge Base Service', () => {
     it('เงื่อนไขเปลี่ยน/คืนสินค้าใช้จำนวนวันชุดเดียวกับ Policy Engine ของ AI Customer Service', async () => {
       const article = await findArticle('return-and-exchange-policy');
       const policy = await getStorePolicyContent('return_exchange');
+      const { returnWindowDays } = await getStoreSettings();
 
-      expect(article.content).toContain(`${RETURN_WINDOW_DAYS} วัน`);
-      expect(policy).toContain(`${RETURN_WINDOW_DAYS} วัน`);
+      expect(article.content).toContain(`${returnWindowDays} วัน`);
+      expect(policy).toContain(`${returnWindowDays} วัน`);
     });
 
     it('ข้อมูลติดต่อและเวลาทำการตรงกันทั้งบทความและ Policy Engine · ไม่มีช่องทางที่ยังไม่เปิด', async () => {
       const article = await findArticle('contact-support-and-office-hours');
       const policy = await getStorePolicyContent('store_info');
+      const store = await getStoreSettings();
 
-      expect(article.content).toContain(STORE_AGENT_HOURS);
-      expect(policy).toContain(STORE_AGENT_HOURS);
+      expect(article.content).toContain(store.agentHours);
+      expect(policy).toContain(store.agentHours);
 
-      for (const channel of STORE_CONTACT_CHANNELS) {
-        if (channel.value === null) {
-          // ช่องทางที่ยังไม่เปิด ห้ามถูกพูดถึงเลย (เดิมมีเบอร์โทรสมมติ 02-999-8888)
-          expect(article.content).not.toContain(channel.label);
-          expect(policy).not.toContain(channel.label);
-        } else {
-          expect(article.content).toContain(channel.value);
-        }
+      for (const channel of contactChannelsOf(store)) {
+        expect(article.content).toContain(channel.value);
+        expect(policy).toContain(channel.value);
+      }
+
+      // ช่องทางที่ร้านไม่ได้ตั้งไว้ ห้ามถูกพูดถึงเลย (เดิมมีเบอร์โทรสมมติ 02-999-8888)
+      if (store.contactPhone === null) {
+        expect(article.content).not.toContain('โทรศัพท์');
+        expect(policy).not.toContain('โทรศัพท์');
       }
 
       expect(article.content, 'ยังมีเบอร์โทรสมมติค้างอยู่').not.toMatch(

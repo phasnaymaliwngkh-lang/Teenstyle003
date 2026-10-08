@@ -115,6 +115,7 @@ async function createOrder(spec: OrderSpec): Promise<string> {
   const order = await prisma.order.create({
     data: {
       orderNumber: `TS-20990101-${String(orderSeq).padStart(4, '0')}`,
+      returnWindowDays: 7,
       userId: spec.user.id,
       subtotal,
       shippingFee,

@@ -33,11 +33,15 @@ export interface PaymentMethodInfo {
   online: boolean;
 }
 
-/** ยอดสูงสุดที่ยอมให้เก็บเงินปลายทาง (กันความเสียหายจากออเดอร์ปลอมยอดสูง) */
-export const COD_MAX_TOTAL = 5000;
-
-export function paymentMethods(orderTotal: number): PaymentMethodInfo[] {
-  const codTooExpensive = orderTotal > COD_MAX_TOTAL;
+/**
+ * ช่องทางชำระเงินของคำสั่งซื้อยอดหนึ่ง
+ *
+ * @param codMaxTotal ยอดสูงสุดที่รับเก็บเงินปลายทาง (กันความเสียหายจากออเดอร์ปลอมยอดสูง) —
+ *                    มาจากการตั้งค่าร้าน (STEP 49) ผู้เรียกอ่านด้วย `getStoreSettings()`
+ *                    ไม่มีค่าเริ่มต้นโดยเจตนา: ลืมส่ง = คอมไพล์ไม่ผ่าน ไม่ใช่ใช้ตัวเลขเก่าเงียบ ๆ
+ */
+export function paymentMethods(orderTotal: number, codMaxTotal: number): PaymentMethodInfo[] {
+  const codTooExpensive = orderTotal > codMaxTotal;
 
   return [
     {
@@ -56,7 +60,7 @@ export function paymentMethods(orderTotal: number): PaymentMethodInfo[] {
       description: 'จ่ายเงินสดกับพนักงานส่งของตอนได้รับสินค้า',
       available: !codTooExpensive,
       unavailableReason: codTooExpensive
-        ? `ยอดเกิน ${COD_MAX_TOTAL.toLocaleString('th-TH')} บาท — กรุณาชำระเงินออนไลน์`
+        ? `ยอดเกิน ${codMaxTotal.toLocaleString('th-TH')} บาท — กรุณาชำระเงินออนไลน์`
         : null,
       online: false,
     },

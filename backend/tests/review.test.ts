@@ -79,6 +79,7 @@ async function createOrderFor(
   const order = await prisma.order.create({
     data: {
       orderNumber: `TS-TEST-${randomUUID().slice(0, 12).toUpperCase()}`,
+      returnWindowDays: 7,
       userId,
       status,
       paymentStatus: status === 'DELIVERED' ? 'PAID' : 'PENDING',

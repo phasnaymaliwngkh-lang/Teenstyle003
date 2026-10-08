@@ -65,7 +65,7 @@ const baht = (label: string, max: number) =>
  *    ตัวเลขที่พิมพ์ลงคำอธิบายจะค้างค่าเก่าทันทีที่แก้ค่าส่ง แล้วไปโผล่ในบทความที่ AI ใช้ตอบลูกค้า
  *    (เดิมคำอธิบายของ "ส่งธรรมดา" มี "ส่งฟรีเมื่อซื้อครบ 1,000 บาท" ฝังอยู่ — ถอดออกตอน STEP 44)
  */
-const MONEY_IN_TEXT = /\d[\d,.]*\s*(บาท|฿)|฿\s*\d/;
+export const MONEY_IN_TEXT = /\d[\d,.]*\s*(บาท|฿)|฿\s*\d/;
 
 export const updateShippingRateSchema = z
   .object({

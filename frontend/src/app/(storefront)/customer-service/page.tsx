@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { CheckCircle2, Headphones, ShieldCheck, UserCheck } from "lucide-react";
+import { Suspense } from "react";
 
 import { CsChat } from "@/features/customer-service/components/cs-chat";
+import { fetchStoreInfo } from "@/services/store.service";
 
 export const metadata: Metadata = {
   title: "ฝ่ายบริการลูกค้า — AI Customer Service",
@@ -37,7 +39,9 @@ export default function CustomerServicePage() {
           </span>
           <span className="flex items-center gap-1">
             <CheckCircle2 className="size-4 text-success" aria-hidden />
-            นโยบายเปลี่ยนคืนภายใน 7 วัน
+            <Suspense fallback="นโยบายเปลี่ยนคืนตามเงื่อนไขของร้าน">
+              <ReturnPolicyText />
+            </Suspense>
           </span>
           <span className="flex items-center gap-1">
             <UserCheck className="size-4 text-warning" aria-hidden />
@@ -50,4 +54,16 @@ export default function CustomerServicePage() {
       <CsChat />
     </div>
   );
+}
+
+/**
+ * จำนวนวันที่คืนได้จากการตั้งค่าร้าน (STEP 49 — เดิมพิมพ์ "7 วัน" ไว้ในซอร์ส)
+ * ค่าชุดเดียวกับที่ AI ในแชตด้านล่างตอบ · โหลดไม่ได้ = ไม่อ้างจำนวนวัน
+ */
+async function ReturnPolicyText() {
+  const store = await fetchStoreInfo().catch(() => null);
+
+  return store === null
+    ? "นโยบายเปลี่ยนคืนตามเงื่อนไขของร้าน"
+    : `นโยบายเปลี่ยนคืนภายใน ${store.returnWindowDays} วัน`;
 }

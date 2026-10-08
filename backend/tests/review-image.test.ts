@@ -55,6 +55,7 @@ async function deliveredOrder(userId: string): Promise<void> {
   const order = await prisma.order.create({
     data: {
       orderNumber: `TS-TEST-${randomUUID().slice(0, 12).toUpperCase()}`,
+      returnWindowDays: 7,
       userId,
       status: 'DELIVERED',
       paymentStatus: 'PAID',

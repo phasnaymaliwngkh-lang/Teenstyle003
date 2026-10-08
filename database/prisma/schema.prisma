@@ -831,6 +831,10 @@ model Order {
   /// ระยะเวลาจัดส่งที่บอกลูกค้าตอนสั่ง (STEP 44) — snapshot เพราะร้านแก้ข้อความนี้ได้ภายหลัง
   /// ประวัติต้องบอกสิ่งที่ลูกค้าเห็นตอนกดสั่ง ไม่ใช่ข้อความปัจจุบัน (กฎ STEP 10 ข้อ 5)
   shippingEtaText String?
+  /// จำนวนวันที่แจ้งคืนได้ตามนโยบายตอนสั่ง (STEP 49) — ร้านแก้ค่านี้ได้ที่ /admin/settings
+  /// สิทธิ์ใช้ค่าที่ยาวกว่าระหว่างค่านี้กับค่าปัจจุบัน: ร้านลดวันลงแล้วใบที่สั่งไปแล้วไม่เสียสิทธิ์
+  /// · ไม่มีค่าเริ่มต้นโดยเจตนา — ตัวสร้างคำสั่งซื้อต้องอ่านจากการตั้งค่าร้าน (ลืมแล้วคอมไพล์ไม่ผ่าน)
+  returnWindowDays Int
   /// cache ของ trackingNumber จาก Shipment ล่าสุด — อัปเดตพร้อมกันใน transaction เดียว
   trackingNumber  String?
 
@@ -1016,6 +1020,35 @@ model ShippingRate {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// การตั้งค่าร้าน (STEP 49) — **มีแถวเดียวเสมอ** (`id = 1` · CHECK ในฐานข้อมูล · migration ใส่ค่าตั้งต้น)
+///
+/// ข้อมูลร้านที่ลูกค้าเห็นและ AI เอาไปตอบในฐานะนโยบาย — เดิมพิมพ์ไว้ใน config/store.ts · footer ·
+/// หน้าแรก แยกกันหลายที่ (footer เคยโฆษณาเบอร์โทร 02-000-0000 ที่ร้านไม่มี)
+/// ช่องที่ไม่มีค่า (null) = ร้านยังไม่มีช่องทางนั้น → ไม่แสดงที่ไหนเลย ไม่ใช่แสดงค่าสมมติ
+model StoreSetting {
+  id               Int      @id @default(1)
+  /// คำอธิบายร้าน — footer · หน้าเกี่ยวกับเรา · structured data
+  description      String
+  contactEmail     String?
+  contactPhone     String?
+  /// ลิงก์โปรไฟล์ของร้าน (https · โดเมนของแพลตฟอร์มนั้น · ต้องมี path ไม่ใช่หน้าแรกของแพลตฟอร์ม)
+  instagramUrl     String?
+  tiktokUrl        String?
+  facebookUrl      String?
+  lineUrl          String?
+  /// เวลาทำการของเจ้าหน้าที่คนจริง เช่น "วันจันทร์ – เสาร์ เวลา 09:00 – 18:00 น."
+  agentHours       String
+  /// วันที่ร้านส่งของ เช่น "จันทร์ – เสาร์"
+  shippingDays     String
+  /// เวลาตัดรอบส่งของ "HH:MM"
+  cutoffTime       String
+  /// จำนวนวันที่แจ้งคืนได้นับจากวันที่ได้รับของ (คำสั่งซื้อใหม่ snapshot ค่านี้ไว้)
+  returnWindowDays Int
+  /// ยอดสูงสุดที่รับเก็บเงินปลายทาง
+  codMaxTotal      Decimal  @db.Decimal(12, 2)
+  updatedAt        DateTime @updatedAt
 }
 
 // ============================================================================

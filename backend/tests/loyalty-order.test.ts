@@ -181,6 +181,7 @@ async function seedPaidSpend(user: TestUser, amount: number): Promise<void> {
   const order = await prisma.order.create({
     data: {
       orderNumber: `TEST-${suffix}-${randomUUID().slice(0, 8)}`,
+      returnWindowDays: 7,
       userId: user.id,
       status: 'DELIVERED',
       paymentStatus: 'PAID',

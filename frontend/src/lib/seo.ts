@@ -12,7 +12,7 @@ import { publicEnv } from "./env";
  * กฎที่ยึดตลอดไฟล์นี้: **ห้ามประกาศสิ่งที่ไม่มีจริง**
  *   - ไม่มีรีวิว → ไม่ใส่ `aggregateRating` (ไม่ใช่ใส่ 0 ดาว)
  *   - ยังไม่มีหน้าค้นหาที่ทำงานจริง → ไม่ประกาศ `SearchAction`
- *   - ยังไม่มีโปรไฟล์โซเชียลจริงของร้าน → ไม่ใส่ `sameAs`
+ *   - ร้านไม่ได้ตั้งโปรไฟล์โซเชียลไว้ → ไม่ใส่ `sameAs` (ตั้งไว้ = ประกาศเฉพาะที่ตั้ง · STEP 49)
  *   - ไม่รู้ว่าเนื้อหาแก้ครั้งสุดท้ายเมื่อไร → ไม่ใส่ `lastModified` ใน sitemap
  */
 
@@ -75,22 +75,35 @@ export const NOINDEX_NOFOLLOW: Metadata["robots"] = {
 
 export type JsonLdObject = Record<string, unknown>;
 
-/** ตัวตนของร้าน — ใส่ไว้ที่ root layout ครั้งเดียว */
-export function organizationJsonLd(): JsonLdObject {
+/** ข้อมูลร้านที่ประกาศใน structured data ได้ — มาจากการตั้งค่าร้าน (`GET /api/store`) */
+export interface OrganizationFacts {
+  description: string;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  socialLinks: readonly { url: string }[];
+}
+
+/**
+ * ตัวตนของร้าน — ใส่ไว้ที่ root layout ครั้งเดียว
+ *
+ * อีเมล · เบอร์โทร · `sameAs` มาจากการตั้งค่าร้าน (STEP 49) และ **ใส่เฉพาะที่ร้านตั้งไว้จริง**
+ * (ลิงก์โซเชียลถูกตรวจที่ backend ว่าเป็นโปรไฟล์บนโดเมนของแพลตฟอร์มแล้ว ไม่ใช่หน้าแรกของแพลตฟอร์ม)
+ * · โหลดข้อมูลร้านไม่ได้ (`null`) = ประกาศแค่ชื่อกับ URL ไม่เดาค่าแทน
+ * · ไม่ใส่ `logo` — โลโก้เป็นข้อความ ยังไม่มีไฟล์ภาพจริง
+ */
+export function organizationJsonLd(store: OrganizationFacts | null): JsonLdObject {
   return {
     "@context": "https://schema.org",
     "@type": "OnlineStore",
     name: SITE_NAME,
     url: SITE_URL,
     slogan: "Find your style, be you",
-    description:
-      "ร้านค้าออนไลน์แฟชั่นสำหรับวัยรุ่น เสื้อผ้าหลากหลายสไตล์ พร้อมผู้ช่วยแนะนำการแต่งตัวด้วย AI",
-    /*
-     * ไม่ใส่ `logo`, `sameAs`, `telephone`, `email` โดยเจตนา
-     * โลโก้เป็นข้อความ (ยังไม่มีไฟล์ภาพจริง) · ลิงก์โซเชียลในโปรเจกต์ยังเป็น placeholder
-     * (instagram.com เฉย ๆ ไม่ใช่โปรไฟล์ของร้าน) · เบอร์/อีเมลต้องมาจาก config ของ backend
-     * การประกาศค่าสมมติในนี้คือการบอก Google ว่าร้านนี้มีตัวตนแบบที่ไม่มีจริง → STEP 49
-     */
+    ...(store === null ? {} : { description: store.description }),
+    ...(store?.contactEmail ? { email: store.contactEmail } : {}),
+    ...(store?.contactPhone ? { telephone: store.contactPhone } : {}),
+    ...(store && store.socialLinks.length > 0
+      ? { sameAs: store.socialLinks.map((link) => link.url) }
+      : {}),
   };
 }
 

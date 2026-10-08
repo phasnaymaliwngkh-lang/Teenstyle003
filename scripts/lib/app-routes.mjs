@@ -75,6 +75,7 @@ export const ROUTES = [
   { path: '/admin/catalog?tab=brands', as: 'admin' },
   { path: '/admin/catalog?tab=sizes', as: 'admin' },
   { path: '/admin/catalog?tab=colors', as: 'admin', note: 'วงกลมสี + ช่องเลือกสี' },
+  { path: '/admin/settings', as: 'admin', note: 'ฟอร์มการตั้งค่าร้าน 5 กลุ่ม · ลิงก์โซเชียลยาว' },
   {
     path: '/admin/media',
     as: 'admin',

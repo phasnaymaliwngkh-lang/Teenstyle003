@@ -2,21 +2,16 @@ import { getPrisma, type Prisma } from '@teenstyle/database';
 import OpenAI from 'openai';
 
 import { env } from '../config/env.ts';
-import { COD_MAX_TOTAL, paymentMethods } from '../config/payment.ts';
-import {
-  availableContactChannels,
-  RETURN_WINDOW_DAYS,
-  STORE_AGENT_HOURS,
-  STORE_AI_HOURS,
-  STORE_CUTOFF_TIME,
-  STORE_SHIPPING_DAYS,
-} from '../config/store.ts';
+import { paymentMethods } from '../config/payment.ts';
+import { STORE_AI_HOURS } from '../config/store.ts';
 import { findOrderNumberIn, ORDER_NUMBER_EXAMPLE } from '../models/order.model.ts';
 import { describeShippingRates } from '../models/shipping.model.ts';
+import { contactChannelsOf, formatCutoffTime } from '../models/store-settings.model.ts';
 import { ApiError } from '../utils/api-error.ts';
 import { logger } from '../utils/logger.ts';
 
 import { activeShippingOptions } from './shipping.service.ts';
+import { getStoreSettings } from './store-settings.service.ts';
 
 export interface CsOwner {
   userId?: string;
@@ -122,12 +117,15 @@ const CS_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 /**
  * ดึงนโยบายทางการของร้าน (Single Source of Truth)
  *
- * ⚠️ ทุกตัวเลขและทุกข้อความที่เป็น "นโยบาย" ต้องอ่านจาก config เท่านั้น
+ * ⚠️ ทุกตัวเลขและทุกข้อความที่เป็น "นโยบาย" ต้องอ่านจากการตั้งค่าร้าน/ตาราง ShippingRate เท่านั้น
  *    ห้ามพิมพ์ค่าซ้ำลงมาในฟังก์ชันนี้ เพราะจะกลายเป็นแหล่งความจริงที่สอง
  *    (เดิมพิมพ์ COD 5,000 · เวลาตัดรอบ 12:00 · เวลาทำการ จ–อา 09:00–21:00 ไว้เองทั้งหมด
  *     แล้วขัดกับบทความในคลังความรู้ที่พิมพ์คนละค่า — ลูกค้าถามสองทางได้คนละคำตอบ)
+ *    ตั้งแต่ STEP 49 อ่านจาก `StoreSetting` ชุดเดียวกับที่บทความแทนค่าตัวแปร `{{store.*}}`
  */
 export async function getStorePolicyContent(topic: string): Promise<string> {
+  const store = await getStoreSettings();
+
   switch (topic) {
     case 'shipping': {
       /**
@@ -136,10 +134,10 @@ export async function getStorePolicyContent(topic: string): Promise<string> {
        */
       const optionsText = describeShippingRates(await activeShippingOptions());
 
-      return `📦 **นโยบายและช่องทางการจัดส่งของ TEENSTYLE**\n${optionsText}\n\n*หมายเหตุ: ร้านจัดส่งวัน${STORE_SHIPPING_DAYS} ตัดรอบเวลา ${STORE_CUTOFF_TIME}*`;
+      return `📦 **นโยบายและช่องทางการจัดส่งของ TEENSTYLE**\n${optionsText}\n\n*หมายเหตุ: ร้านจัดส่งวัน${store.shippingDays} ตัดรอบเวลา ${formatCutoffTime(store.cutoffTime)}*`;
     }
     case 'payment': {
-      const methodsText = paymentMethods(0)
+      const methodsText = paymentMethods(0, store.codMaxTotal)
         .map((m) => {
           const state = m.available
             ? 'พร้อมใช้งาน'
@@ -149,18 +147,18 @@ export async function getStorePolicyContent(topic: string): Promise<string> {
         })
         .join('\n');
 
-      return `💳 **ช่องทางการชำระเงินที่รองรับ**\n${methodsText}\n\n*หมายเหตุ: เก็บเงินปลายทาง (COD) รับยอดสูงสุดไม่เกิน ${COD_MAX_TOTAL.toLocaleString('th-TH')} บาท และไม่มีค่าธรรมเนียมเพิ่ม*`;
+      return `💳 **ช่องทางการชำระเงินที่รองรับ**\n${methodsText}\n\n*หมายเหตุ: เก็บเงินปลายทาง (COD) รับยอดสูงสุดไม่เกิน ${store.codMaxTotal.toLocaleString('th-TH')} บาท และไม่มีค่าธรรมเนียมเพิ่ม*`;
     }
     case 'return_exchange': {
-      return `🔄 **นโยบายการเปลี่ยนและคืนสินค้า**\n• สามารถแจ้งเปลี่ยนไซซ์หรือคืนสินค้าได้ภายใน **${RETURN_WINDOW_DAYS} วัน** นับจากวันที่ได้รับพัสดุ\n• สินค้าต้องอยู่ในสภาพเดิม ไม่ผ่านการซัก ป้ายราคาและแพ็กเกจต้องอยู่ครบ\n• กรณีสินค้ามีตำหนิจากการผลิตหรือส่งผิดแบบ/ไซซ์ ทางร้านยินดีรับผิดชอบค่าจัดส่งเปลี่ยนสินค้าให้ทั้งหมด\n• **ขอคืนเงิน** (สินค้ามีตำหนิหรือร้านส่งผิด): ยื่นคำขอได้เองที่หน้ารายละเอียดคำสั่งซื้อ ปุ่ม "ขอคืนสินค้า" แล้วติดตามผลได้ที่ "คำขอคืนสินค้า" ในบัญชี\n• **เปลี่ยนไซซ์**: แจ้งเจ้าหน้าที่ในแชตนี้ได้ทันทีครับ`;
+      return `🔄 **นโยบายการเปลี่ยนและคืนสินค้า**\n• สามารถแจ้งเปลี่ยนไซซ์หรือคืนสินค้าได้ภายใน **${store.returnWindowDays} วัน** นับจากวันที่ได้รับพัสดุ\n• สินค้าต้องอยู่ในสภาพเดิม ไม่ผ่านการซัก ป้ายราคาและแพ็กเกจต้องอยู่ครบ\n• กรณีสินค้ามีตำหนิจากการผลิตหรือส่งผิดแบบ/ไซซ์ ทางร้านยินดีรับผิดชอบค่าจัดส่งเปลี่ยนสินค้าให้ทั้งหมด\n• **ขอคืนเงิน** (สินค้ามีตำหนิหรือร้านส่งผิด): ยื่นคำขอได้เองที่หน้ารายละเอียดคำสั่งซื้อ ปุ่ม "ขอคืนสินค้า" แล้วติดตามผลได้ที่ "คำขอคืนสินค้า" ในบัญชี\n• **เปลี่ยนไซซ์**: แจ้งเจ้าหน้าที่ในแชตนี้ได้ทันทีครับ`;
     }
     case 'store_info':
     default: {
-      const channels = availableContactChannels()
+      const channels = contactChannelsOf(store)
         .map((c) => `• ${c.label}: ${c.value}${c.note ? ` (${c.note})` : ''}`)
         .join('\n');
 
-      return `🏪 **ข้อมูลร้าน TEENSTYLE**\n• ร้านค้าออนไลน์แฟชั่นวัยรุ่น "Find your style, be you 💜"\n• ผู้ช่วย AI ให้บริการ${STORE_AI_HOURS}\n• เจ้าหน้าที่คนจริงให้บริการ ${STORE_AGENT_HOURS}\n\n**ช่องทางติดต่อ**\n${channels}`;
+      return `🏪 **ข้อมูลร้าน TEENSTYLE**\n• ${store.description}\n• ผู้ช่วย AI ให้บริการ${STORE_AI_HOURS}\n• เจ้าหน้าที่คนจริงให้บริการ ${store.agentHours}\n\n**ช่องทางติดต่อ**\n${channels}`;
     }
   }
 }

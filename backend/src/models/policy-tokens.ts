@@ -1,3 +1,5 @@
+import type { PaymentMethodInfo } from '../config/payment.ts';
+
 import {
   describeFreeShipping,
   describeShippingEta,
@@ -5,6 +7,12 @@ import {
   describeShippingRates,
   type ShippingOption,
 } from './shipping.model.ts';
+import {
+  contactChannelsOf,
+  describeContactChannels,
+  formatCutoffTime,
+  type StoreSettings,
+} from './store-settings.model.ts';
 
 /**
  * ตัวแปรนโยบายในบทความคลังความรู้ (STEP 44)
@@ -22,6 +30,23 @@ import {
 
 export interface PolicyContext {
   shippingOptions: readonly ShippingOption[];
+  /** การตั้งค่าร้าน (STEP 49) — ช่องทางติดต่อ เวลาทำการ จำนวนวันที่คืนได้ ยอดสูงสุดของ COD */
+  store: StoreSettings;
+  /** สถานะจริงของช่องทางชำระเงิน ณ ตอนที่อ่าน (เดิมบทความแช่สถานะไว้ตั้งแต่ตอน seed) */
+  paymentMethods: readonly PaymentMethodInfo[];
+}
+
+/** รายการช่องทางชำระเงินพร้อมสถานะ — รูปเดียวกับที่บทความเคยพิมพ์ไว้ตอน seed */
+export function describePaymentMethods(methods: readonly PaymentMethodInfo[]): string {
+  return methods
+    .map((method) => {
+      const state = method.available
+        ? '✅ เปิดให้ใช้งานแล้ว'
+        : `⛔️ ยังไม่เปิดให้ใช้งาน${method.unavailableReason ? ` — ${method.unavailableReason}` : ''}`;
+
+      return `- **${method.name}** — ${method.description}\n  สถานะ: ${state}`;
+    })
+    .join('\n');
 }
 
 interface PolicyToken {
@@ -46,6 +71,37 @@ export const POLICY_TOKENS: Readonly<Record<string, PolicyToken>> = {
   'shipping.methods': {
     description: 'รายชื่อวิธีจัดส่งที่เลือกได้',
     render: ({ shippingOptions }) => describeShippingMethods(shippingOptions),
+  },
+  // ── การตั้งค่าร้าน (STEP 49) ──
+  'store.contact': {
+    description: 'รายการช่องทางติดต่อที่ร้านเปิดอยู่จริง (ช่องที่ไม่ได้ตั้งไว้จะไม่ถูกพูดถึง)',
+    render: ({ store }) => describeContactChannels(contactChannelsOf(store)),
+  },
+  'store.agent_hours': {
+    description: 'เวลาทำการของเจ้าหน้าที่คนจริง',
+    render: ({ store }) => store.agentHours,
+  },
+  'store.shipping_days': {
+    description: 'วันที่ร้านส่งของ',
+    render: ({ store }) => store.shippingDays,
+  },
+  'store.cutoff_time': {
+    description: 'เวลาตัดรอบส่งของ เช่น "12:00 น."',
+    render: ({ store }) => formatCutoffTime(store.cutoffTime),
+  },
+  'returns.window_days': {
+    description:
+      'จำนวนวันที่แจ้งคืนได้ (ตัวเลขอย่างเดียว เขียน "ภายใน {{returns.window_days}} วัน")',
+    render: ({ store }) => String(store.returnWindowDays),
+  },
+  'payment.cod_max': {
+    description:
+      'ยอดสูงสุดที่รับเก็บเงินปลายทาง (ตัวเลขอย่างเดียว เขียน "{{payment.cod_max}} บาท")',
+    render: ({ store }) => store.codMaxTotal.toLocaleString('th-TH'),
+  },
+  'payment.methods': {
+    description: 'รายการช่องทางชำระเงินพร้อมสถานะจริง ณ ตอนที่อ่าน',
+    render: ({ paymentMethods }) => describePaymentMethods(paymentMethods),
   },
 };
 

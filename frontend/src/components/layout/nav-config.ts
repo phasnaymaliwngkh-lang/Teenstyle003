@@ -71,10 +71,7 @@ export const FOOTER_SECTIONS: readonly {
   },
 ];
 
-/** โซเชียลมีเดีย — STEP 49 จะย้ายไปตั้งค่าใน Store Settings */
-export const SOCIAL_LINKS: readonly { label: string; href: string }[] = [
-  { label: "Instagram", href: "https://instagram.com" },
-  { label: "TikTok", href: "https://tiktok.com" },
-  { label: "Facebook", href: "https://facebook.com" },
-  { label: "LINE", href: "https://line.me" },
-];
+/*
+ * โซเชียลมีเดียไม่อยู่ในไฟล์นี้แล้ว (แก้ตอน STEP 49) — เดิมเป็นลิงก์ไป instagram.com / tiktok.com เฉย ๆ
+ * ไม่ใช่โปรไฟล์ของร้าน · ตอนนี้ร้านตั้งเองที่ /admin/settings และ footer แสดงเฉพาะช่องที่ร้านมีจริง
+ */

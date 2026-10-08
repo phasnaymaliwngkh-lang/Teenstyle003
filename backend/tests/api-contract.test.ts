@@ -70,6 +70,8 @@ const GUEST_REACHABLE: Record<string, Extract<ApiRouteAuth, 'public' | 'optional
   'GET /api/payments/methods': 'public',
   // ค่าส่งและเงื่อนไขส่งฟรีเป็นนโยบายที่ต้องรู้ก่อนตัดสินใจซื้อ (STEP 44 · หน้าแรกอ่านจากที่นี่)
   'GET /api/shipping/options': 'public',
+  // ข้อมูลร้าน (STEP 49) — footer ทุกหน้าและหน้าเกี่ยวกับเราอ่านจากที่นี่
+  'GET /api/store': 'public',
   'POST /api/payments/webhook/stripe': 'public',
 
   // ตะกร้าของ guest อ้างอิงด้วย cookie `cart-token`

@@ -69,6 +69,7 @@ async function createOrder(userId: string, status: 'PENDING_PAYMENT' | 'SHIPPING
   const order = await prisma.order.create({
     data: {
       orderNumber: testOrderNumber(),
+      returnWindowDays: 7,
       userId,
       status,
       paymentStatus: status === 'PENDING_PAYMENT' ? 'PENDING' : 'PAID',
