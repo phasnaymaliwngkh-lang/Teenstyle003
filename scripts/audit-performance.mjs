@@ -525,6 +525,12 @@ const ROUTES = [
   { path: '/api/admin/logs/filters', budgetMs: 400, staff: true },
   { path: '/api/admin/reviews?limit=20', budgetMs: 300, staff: true },
   {
+    path: '/api/admin/catalog',
+    budgetMs: 300,
+    note: 'หมวด/แบรนด์/สี/ไซซ์ + จำนวนที่ใช้ — GROUP BY รอบเดียวต่อชนิด ไม่ใช่ subquery ต่อแถว',
+    staff: true,
+  },
+  {
     path: '/api/admin/media?limit=24',
     budgetMs: 400,
     note: 'คลังรูป — ไล่ว่า url ถูกใช้ที่ไหน (รวม snapshot ใน OrderItem ทั้งตาราง)',

@@ -24,6 +24,7 @@ import {
   productImportRowSchema,
 } from '../validators/import-export.validator.ts';
 
+import { assertCatalogRefsActive } from './catalog-guard.ts';
 import type { AdminActor } from './product-admin.service.ts';
 import { notifySafely, notifyWishlistPriceDrops } from './notification.service.ts';
 import { scanAlertsAfterStockChange } from './stock-alert.service.ts';
@@ -504,7 +505,8 @@ export async function getTemplate(
       barcode: '2000000000010',
       initialStock: 20,
       description: 'เสื้อยืดทรงโอเวอร์ไซส์ ผลิตจากผ้าคอตตอน 100%',
-      status: 'ACTIVE',
+      // สินค้าใหม่จากไฟล์ยังไม่มีรูป จึงเปิดขายทันทีไม่ได้ (STEP 48) — เพิ่มรูปแล้วค่อยเปิดขาย
+      status: 'DRAFT',
     });
 
     styleWorksheet(worksheet);
@@ -617,6 +619,8 @@ export async function importProducts(
     sizeRef: { id: string; name: string } | null;
     isExistingVariant: boolean;
     isExistingProduct: boolean;
+    /** สถานะที่จะบันทึกจริง — ไม่ระบุ: สินค้าใหม่ = DRAFT · สินค้าเดิม = คงสถานะเดิม */
+    status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
   }> = [];
 
   // ดึง Master Data มาแคชไว้ในหน่วยความจำสำหรับการตรวจสอบรอบเดียว (High Performance)
@@ -624,17 +628,24 @@ export async function importProducts(
     [
       prisma.category.findMany({
         where: { deletedAt: null },
-        select: { id: true, name: true, slug: true },
+        select: { id: true, name: true, slug: true, isActive: true },
       }),
       prisma.brand.findMany({
         where: { deletedAt: null },
-        select: { id: true, name: true, slug: true },
+        select: { id: true, name: true, slug: true, isActive: true },
       }),
-      prisma.color.findMany({ select: { id: true, name: true, slug: true } }),
-      prisma.size.findMany({ select: { id: true, name: true, code: true } }),
+      prisma.color.findMany({ select: { id: true, name: true, slug: true, isActive: true } }),
+      prisma.size.findMany({ select: { id: true, name: true, code: true, isActive: true } }),
       prisma.product.findMany({
         where: { deletedAt: null },
-        select: { id: true, sku: true, slug: true, name: true },
+        select: {
+          id: true,
+          sku: true,
+          slug: true,
+          name: true,
+          status: true,
+          _count: { select: { images: true } },
+        },
       }),
       prisma.productVariant.findMany({
         where: { deletedAt: null },
@@ -712,6 +723,16 @@ export async function importProducts(
       continue;
     }
 
+    // ผูกได้เฉพาะของที่เปิดใช้อยู่ — กฎเดียวกับการแก้สินค้าในหลังบ้าน (STEP 48 · catalog-guard.ts)
+    if (!categoryRef.isActive) {
+      errors.push({
+        row: r,
+        field: 'category',
+        message: `หมวดหมู่ "${categoryRef.name}" ปิดใช้งานอยู่ — เปิดที่หน้าหมวดหมู่และตัวเลือกสินค้าก่อน หรือใช้หมวดอื่น`,
+      });
+      continue;
+    }
+
     // 4. ตรวจสอบแบรนด์ (Brand)
     let brandRef: { id: string; name: string } | null = null;
     if (data.brand) {
@@ -728,10 +749,24 @@ export async function importProducts(
         });
         continue;
       }
+      if (!foundBrand.isActive) {
+        errors.push({
+          row: r,
+          field: 'brand',
+          message: `แบรนด์ "${foundBrand.name}" ปิดใช้งานอยู่ — เปิดที่หน้าหมวดหมู่และตัวเลือกสินค้าก่อน`,
+        });
+        continue;
+      }
       brandRef = foundBrand;
     }
 
-    // 5. ตรวจสอบสี (Color)
+    /**
+     * 5–6. สีและไซซ์
+     *
+     * ⚠️ แก้ตอน STEP 48: เดิม **หาไม่เจอแล้วข้ามไปเงียบ ๆ** — พิมพ์ "แดง" ผิดเป็น "แดด"
+     *    ได้ตัวเลือกที่ไม่มีสีแทน (และตัวเลือกอื่นของสินค้าเดียวกันที่ไม่มีสีจะชน unique)
+     *    ตอนนี้กรอกมาแต่หาไม่เจอ = ผิด ต้องบอกให้แก้ · เว้นว่าง = ตั้งใจไม่ระบุ
+     */
     let colorRef: { id: string; name: string } | null = null;
     if (data.color) {
       const foundColor = colors.find(
@@ -739,12 +774,19 @@ export async function importProducts(
           c.name.toLowerCase() === data.color!.toLowerCase() ||
           c.slug.toLowerCase() === data.color!.toLowerCase(),
       );
-      if (foundColor) {
-        colorRef = foundColor;
+      if (!foundColor || !foundColor.isActive) {
+        errors.push({
+          row: r,
+          field: 'color',
+          message: foundColor
+            ? `สี "${foundColor.name}" ปิดใช้งานอยู่ — เปิดที่หน้าหมวดหมู่และตัวเลือกสินค้าก่อน`
+            : `ไม่พบสี "${data.color}" ในระบบ — เพิ่มที่หน้าหมวดหมู่และตัวเลือกสินค้าก่อน หรือเว้นว่างถ้าไม่มีสี`,
+        });
+        continue;
       }
+      colorRef = foundColor;
     }
 
-    // 6. ตรวจสอบไซซ์ (Size)
     let sizeRef: { id: string; name: string } | null = null;
     if (data.size) {
       const foundSize = sizes.find(
@@ -752,9 +794,17 @@ export async function importProducts(
           s.name.toLowerCase() === data.size!.toLowerCase() ||
           s.code.toLowerCase() === data.size!.toLowerCase(),
       );
-      if (foundSize) {
-        sizeRef = foundSize;
+      if (!foundSize || !foundSize.isActive) {
+        errors.push({
+          row: r,
+          field: 'size',
+          message: foundSize
+            ? `ไซซ์ "${foundSize.name}" ปิดใช้งานอยู่ — เปิดที่หน้าหมวดหมู่และตัวเลือกสินค้าก่อน`
+            : `ไม่พบไซซ์ "${data.size}" ในระบบ — เพิ่มที่หน้าหมวดหมู่และตัวเลือกสินค้าก่อน หรือเว้นว่างถ้าไม่มีไซซ์`,
+        });
+        continue;
       }
+      sizeRef = foundSize;
     }
 
     // 7. ตรวจสอบ SKU ชนกันภายในไฟล์เดียวกัน
@@ -768,12 +818,32 @@ export async function importProducts(
     }
     seenVariantSkusInFile.add(data.variantSku);
 
-    const isExistingProduct = existingProducts.some(
+    const existingProduct = existingProducts.find(
       (p) => p.sku.toLowerCase() === data.sku.toLowerCase(),
     );
+    const isExistingProduct = existingProduct !== undefined;
     const isExistingVariant = existingVariants.some(
       (v) => v.sku.toLowerCase() === data.variantSku.toLowerCase(),
     );
+
+    /**
+     * สถานะ (แก้ตอน STEP 48)
+     *   - ไม่ระบุ: สินค้าใหม่ = ฉบับร่าง · สินค้าเดิม = **คงสถานะเดิม**
+     *     (เดิมค่าเริ่มต้นเป็น ACTIVE → นำเข้าไฟล์ราคาใหม่แล้วสินค้าที่เก็บเข้าคลังไว้กลับมาขายเอง)
+     *   - เปิดขายต้องมีรูปอย่างน้อย 1 รูป (กฎ STEP 14 ข้อ 4) — ไฟล์นำเข้าไม่มีรูป
+     *     เดิมสินค้าใหม่จากไฟล์เปิดขายทันทีแบบไม่มีรูป หน้าร้านจึงมีการ์ดสินค้าที่ไม่มีภาพ
+     */
+    const status = data.status ?? existingProduct?.status ?? 'DRAFT';
+    if (status === 'ACTIVE' && (existingProduct?._count.images ?? 0) === 0) {
+      errors.push({
+        row: r,
+        field: 'status',
+        message: isExistingProduct
+          ? 'สินค้านี้ยังไม่มีรูป จึงเปิดขายไม่ได้ — เพิ่มรูปที่หน้าแก้ไขสินค้าก่อน หรือนำเข้าเป็น DRAFT'
+          : 'สินค้าใหม่จากไฟล์ยังไม่มีรูป จึงเปิดขายทันทีไม่ได้ — นำเข้าเป็น DRAFT แล้วเพิ่มรูปที่หน้าแก้ไขสินค้า',
+      });
+      continue;
+    }
 
     validRows.push({
       rowNumber: r,
@@ -784,6 +854,7 @@ export async function importProducts(
       sizeRef,
       isExistingProduct,
       isExistingVariant,
+      status,
     });
   }
 
@@ -838,11 +909,23 @@ export async function importProducts(
       const first = firstRow.data;
       const categoryRef = firstRow.categoryRef;
       const brandRef = firstRow.brandRef;
+      const status = firstRow.status;
+
+      /**
+       * ตรวจซ้ำในทรานแซกชันพร้อมล็อกแถว — ระหว่างตรวจไฟล์กับบันทึกจริงอาจมีคนปิดหมวด/สีไปแล้ว (STEP 48)
+       * ปิดไปแล้ว = ทั้งไฟล์ไม่ถูกบันทึก (ทรานแซกชันเดียว) พร้อมบอกว่าอะไรถูกปิด
+       */
+      await assertCatalogRefsActive(tx, {
+        categoryId: categoryRef.id,
+        brandId: brandRef?.id ?? null,
+        colorIds: rows.map((row) => row.colorRef?.id ?? null),
+        sizeIds: rows.map((row) => row.sizeRef?.id ?? null),
+      });
 
       // ตรวจหา product เดิม
       let product = await tx.product.findUnique({
         where: { sku: prodSku },
-        select: { id: true, slug: true, totalStock: true },
+        select: { id: true, slug: true, totalStock: true, publishedAt: true },
       });
 
       const slug =
@@ -864,11 +947,11 @@ export async function importProducts(
             salePrice: first.salePrice ?? null,
             categoryId: categoryRef.id,
             brandId: brandRef?.id ?? null,
-            status: first.status,
+            status,
             minimumStock: first.minimumStock,
-            publishedAt: first.status === 'ACTIVE' ? new Date() : null,
+            publishedAt: status === 'ACTIVE' ? new Date() : null,
           },
-          select: { id: true, slug: true, totalStock: true },
+          select: { id: true, slug: true, totalStock: true, publishedAt: true },
         });
         createdProducts += 1;
       } else {
@@ -880,8 +963,12 @@ export async function importProducts(
             salePrice: first.salePrice ?? null,
             categoryId: categoryRef.id,
             brandId: brandRef?.id ?? null,
-            status: first.status,
+            status,
             minimumStock: first.minimumStock,
+            // เปิดขายครั้งแรกจากไฟล์ต้องมีวันเผยแพร่ (กฎ STEP 14 ข้อ 4) — เดิมไม่ตั้งให้
+            ...(status === 'ACTIVE' && product.publishedAt === null
+              ? { publishedAt: new Date() }
+              : {}),
           },
         });
         updatedProducts += 1;

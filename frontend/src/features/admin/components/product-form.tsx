@@ -158,7 +158,11 @@ export function ProductForm({
             />
           </Field>
 
-          <Field label="หมวดหมู่ *" error={errors.categorySlug?.message}>
+          <Field
+            label="หมวดหมู่ *"
+            error={errors.categorySlug?.message}
+            hint="แสดงเฉพาะหมวดที่เปิดใช้อยู่ · เพิ่มหรือแก้ได้ที่เมนู หมวดหมู่ / แบรนด์ / ไซซ์ / สี"
+          >
             <select {...form.register("categorySlug")} disabled={disabled} className={inputClass}>
               <option value="">— เลือกหมวดหมู่ —</option>
               {options.categories.map((category) => (

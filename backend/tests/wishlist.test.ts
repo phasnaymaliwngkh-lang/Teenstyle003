@@ -32,7 +32,30 @@ let otherUserId = '';
 let otherToken = '';
 
 /** สินค้าที่มีหลายตัวเลือก — ใช้ทดสอบว่าไม่เดาตัวเลือกให้ */
-let multiVariantProduct = { id: '', slug: '', finalPrice: 0, originalSalePrice: null as unknown };
+let multiVariantProduct = {
+  id: '',
+  slug: '',
+  finalPrice: 0,
+  originalPrice: null as unknown,
+  originalSalePrice: null as unknown,
+};
+
+/**
+ * คืนราคาของสินค้าตัวอย่างให้เป็นค่าเดิม **ทั้งสองช่อง**
+ *
+ * ⚠️ แก้ตอน STEP 48: เดิมเทสต์ "ราคาแพงขึ้น" คืน `price` เป็น `finalPrice` (= ราคาลด) แทนราคาเดิม
+ *    และปล่อยให้ afterAll คืน `salePrice` → ทุกรอบที่รัน ราคาเต็มของสินค้าตัวอย่างลดลงเงียบ ๆ
+ *    (590 → 390) และรอบที่ afterAll ล้มกลางทาง ราคาลดก็หายไปด้วย
+ */
+async function restoreProductPrice() {
+  await prisma.product.update({
+    where: { id: multiVariantProduct.id },
+    data: {
+      price: multiVariantProduct.originalPrice as never,
+      salePrice: multiVariantProduct.originalSalePrice as never,
+    },
+  });
+}
 
 const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
 
@@ -80,21 +103,21 @@ beforeAll(async () => {
     id: product.id,
     slug: product.slug,
     finalPrice: Number(String(product.salePrice ?? product.price)),
+    originalPrice: product.price,
     originalSalePrice: product.salePrice,
   };
 });
 
 afterAll(async () => {
-  // คืนราคาลดของสินค้าให้เป็นค่าเดิม (เทสต์แก้ชั่วคราวเพื่อดูป้ายราคาลด)
-  await prisma.product.update({
-    where: { id: multiVariantProduct.id },
-    data: { salePrice: multiVariantProduct.originalSalePrice as never },
-  });
-
-  await prisma.wishlist.deleteMany({ where: { userId: { in: [userId, otherUserId] } } });
-  await prisma.session.deleteMany({ where: { userId: { in: [userId, otherUserId] } } });
-  await prisma.user.deleteMany({ where: { id: { in: [userId, otherUserId] } } });
-  await disconnectDatabase();
+  // คืนราคาของสินค้าให้เป็นค่าเดิม (เทสต์แก้ชั่วคราวเพื่อดูป้ายราคาลด) — คืนไม่ได้ก็ยังต้องลบผู้ใช้ทดสอบ
+  try {
+    if (multiVariantProduct.id !== '') await restoreProductPrice();
+  } finally {
+    await prisma.wishlist.deleteMany({ where: { userId: { in: [userId, otherUserId] } } });
+    await prisma.session.deleteMany({ where: { userId: { in: [userId, otherUserId] } } });
+    await prisma.user.deleteMany({ where: { id: { in: [userId, otherUserId] } } });
+    await disconnectDatabase();
+  }
 });
 
 describe('สิทธิ์และการเข้าถึง', () => {
@@ -310,10 +333,7 @@ describe('ราคาลดและความพร้อมขาย', () =
       expect(res.body.data.items[0].priceDrop).toBeNull();
       expect(res.body.data.summary.priceDropCount).toBe(0);
     } finally {
-      await prisma.product.update({
-        where: { id: multiVariantProduct.id },
-        data: { price: multiVariantProduct.finalPrice },
-      });
+      await restoreProductPrice();
     }
   });
 

@@ -183,7 +183,8 @@ describe('STEP 18: Import / Export (CSV, Excel)', () => {
     const validGtin = internalGtin13(String(Date.now()).slice(-10));
     const validCsv = [
       'productName,sku,category,price,variantSku,initialStock,barcode,status',
-      `"เสื้อยืดเทสต์นำเข้า ${suffix}","TS-IMP-${suffix}","เสื้อยืด",450,"TS-IMP-VAR-${suffix}",15,"${validGtin}","ACTIVE"`,
+      // สินค้าใหม่จากไฟล์ยังไม่มีรูป จึงนำเข้าเป็นฉบับร่าง (STEP 48 — ACTIVE ถูกปฏิเสธ มีเทสต์แยก)
+      `"เสื้อยืดเทสต์นำเข้า ${suffix}","TS-IMP-${suffix}","เสื้อยืด",450,"TS-IMP-VAR-${suffix}",15,"${validGtin}","DRAFT"`,
     ].join('\n');
 
     it('Dry Run: ตรวจสอบความถูกต้องโดยไม่บันทึกลงฐานข้อมูล', async () => {

@@ -1,6 +1,6 @@
 # 09 — REST API Reference (STEP 29)
 
-Endpoint ทั้งหมดของ TEENSTYLE AI ที่เปิดใช้จริง **159 เส้นทาง** (นับรวม `GET /health` และ `GET /api`)
+Endpoint ทั้งหมดของ TEENSTYLE AI ที่เปิดใช้จริง **175 เส้นทาง** (นับรวม `GET /health` และ `GET /api`)
 
 > **เอกสารนี้ถูกบังคับให้ตรงกับโค้ด**
 > [backend/tests/api-contract.test.ts](../backend/tests/api-contract.test.ts) อ่านแผนผัง endpoint
@@ -391,6 +391,31 @@ backend อ่าน token ได้ 2 ทาง:
 | PATCH  | `/api/admin/products/:productId/images/:imageId`     | `product:update` | แก้คำอธิบายรูป (`alt`)                                                                               |
 | DELETE | `/api/admin/products/:productId/images/:imageId`     | `product:update` | ถอดรูป — สินค้าที่เปิดขายถอดรูปสุดท้ายไม่ได้ · **ไฟล์ยังไม่ถูกลบ** (ดูคลังรูป)                       |
 
+### หมวดหมู่ · แบรนด์ · ไซซ์ · สี (STEP 48)
+
+| Method | Path                                  | ต้องมี           | รายละเอียด                                                                            |
+| ------ | ------------------------------------- | ---------------- | ------------------------------------------------------------------------------------- |
+| GET    | `/api/admin/catalog`                  | `product:read`   | ทั้ง 4 ชุด + จำนวนที่ใช้อยู่ + เหตุผลที่ปิด ลบ หรือแก้ slug ไม่ได้ (`blockers`)       |
+| POST   | `/api/admin/catalog/categories`       | `catalog:manage` | เพิ่มหมวด · หมวดแม่ต้องเป็นหมวดบนสุด (ซ้อนได้ 2 ชั้น)                                 |
+| PUT    | `/api/admin/catalog/categories/order` | `catalog:manage` | `{ parentId, ids }` ลำดับใหม่ของหมวดทุกหมวดในกลุ่มนั้น (ไม่ครบ = 409)                 |
+| PATCH  | `/api/admin/catalog/categories/:id`   | `catalog:manage` | แก้ชื่อ slug คำอธิบาย หมวดแม่ เปิด/ปิด · ปิดไม่ได้ถ้ามีสินค้าที่ขายอยู่ (409)         |
+| DELETE | `/api/admin/catalog/categories/:id`   | `catalog:manage` | soft delete ได้เฉพาะตอนไม่มีสินค้า หมวดย่อย และคูปองที่จำกัดไว้ · คืน slug ให้ใช้ใหม่ |
+| POST   | `/api/admin/catalog/brands`           | `catalog:manage` | เพิ่มแบรนด์                                                                           |
+| PATCH  | `/api/admin/catalog/brands/:id`       | `catalog:manage` | แก้แบรนด์ · ปิดไม่ได้ถ้ามีสินค้าที่ขายอยู่                                            |
+| DELETE | `/api/admin/catalog/brands/:id`       | `catalog:manage` | soft delete ได้เฉพาะตอนไม่มีสินค้า · คืนชื่อและ slug ให้ใช้ใหม่                       |
+| POST   | `/api/admin/catalog/sizes`            | `catalog:manage` | เพิ่มไซซ์ (รหัสแปลงเป็นตัวพิมพ์ใหญ่ให้)                                               |
+| PUT    | `/api/admin/catalog/sizes/order`      | `catalog:manage` | `{ ids }` ลำดับใหม่ของไซซ์ทุกไซซ์                                                     |
+| PATCH  | `/api/admin/catalog/sizes/:id`        | `catalog:manage` | แก้ไซซ์ · รหัสแก้ได้เฉพาะตอนยังไม่มีตัวเลือกใช้                                       |
+| DELETE | `/api/admin/catalog/sizes/:id`        | `catalog:manage` | ลบจริงได้เฉพาะตอนไม่มีตัวเลือกไหนอ้างถึงเลย (รวมที่ปิดแล้ว)                           |
+| POST   | `/api/admin/catalog/colors`           | `catalog:manage` | เพิ่มสี · `hex` เป็น #RRGGBB                                                          |
+| PUT    | `/api/admin/catalog/colors/order`     | `catalog:manage` | `{ ids }` ลำดับใหม่ของสีทุกสี                                                         |
+| PATCH  | `/api/admin/catalog/colors/:id`       | `catalog:manage` | แก้สี · slug แก้ได้เฉพาะตอนยังไม่มีตัวเลือกใช้                                        |
+| DELETE | `/api/admin/catalog/colors/:id`       | `catalog:manage` | ลบจริงได้เฉพาะตอนไม่มีตัวเลือกไหนอ้างถึงเลย                                           |
+
+ทุกการเปลี่ยนตอบด้วยภาพรวมชุดใหม่ทั้งหมด (จำนวนที่ใช้และ `blockers` ของรายการอื่นเปลี่ยนตามได้) ·
+**สินค้าที่เปิดขายใช้ได้เฉพาะหมวด แบรนด์ สี และไซซ์ที่เปิดใช้อยู่** — สร้าง/แก้สินค้า เพิ่มตัวเลือก นำเข้าไฟล์
+ด้วยของที่ปิดอยู่ได้ 400 พร้อมชื่อของที่ปิด
+
 ### คลังรูป (STEP 47)
 
 | Method | Path                     | ต้องมี         | รายละเอียด                                                                                                          |
@@ -535,12 +560,13 @@ backend อ่าน token ได้ 2 ทาง:
 
 ## กลุ่มที่ยังไม่มี — เรียกแล้วได้ 404
 
-| Path          | จะมาใน | ตอนนี้ทำอย่างไร                                      |
-| ------------- | -----: | ---------------------------------------------------- |
-| `/api/brands` |     48 | กรองตามแบรนด์ผ่าน `/api/products/search` ได้อยู่แล้ว |
+ตอนนี้ไม่มี · `/api/brands` เคยประกาศไว้ว่าจะมาใน STEP 48 แต่ตัดสินใจ **ไม่สร้าง**:
+แบรนด์ที่หน้าร้านใช้อยู่ใน `GET /api/products/filters` แล้ว (นับเฉพาะสินค้าที่ขายอยู่) —
+endpoint ที่สองที่นับแบรนด์ด้วยเกณฑ์ของตัวเองคือที่มาของตัวเลขสองชุดที่ไม่ตรงกัน ·
+การจัดการแบรนด์อยู่ที่ `/api/admin/catalog/brands`
 
-เทสต์ยิงทุก path ในตารางนี้แล้วยืนยันว่าได้ 404 จริง — **ประกาศว่า "ยังไม่มี" แล้วมีอยู่จริงก็ผิด**
-เพราะหมายความว่าเอกสารซ่อน endpoint ที่เรียกได้
+เพิ่มกลุ่มที่ "ยังไม่มี" เมื่อไร เทสต์ยิงทุก path ในตารางแล้วยืนยันว่าได้ 404 จริง —
+**ประกาศว่า "ยังไม่มี" แล้วมีอยู่จริงก็ผิด** เพราะหมายความว่าเอกสารซ่อน endpoint ที่เรียกได้
 
 ## ข้อจำกัดที่รู้อยู่
 

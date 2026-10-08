@@ -586,10 +586,12 @@ model ProductVariant {
   /// บาร์โค้ด/QR ที่สแกนได้ (STEP 17)
   barcode String? @unique
 
+  /// ⚠️ onDelete: Restrict (STEP 48) — เดิมเป็น SetNull: ลบสี/ไซซ์ทิ้งแล้วตัวเลือกที่ใช้อยู่
+  ///    กลายเป็น "ไม่มีสี" เงียบ ๆ · ตอนนี้ฐานข้อมูลไม่ยอมให้ลบสี/ไซซ์ที่ยังมีตัวเลือกอ้างถึง
   colorId String? @db.Uuid
-  color   Color?  @relation(fields: [colorId], references: [id])
+  color   Color?  @relation(fields: [colorId], references: [id], onDelete: Restrict)
   sizeId  String? @db.Uuid
-  size    Size?   @relation(fields: [sizeId], references: [id])
+  size    Size?   @relation(fields: [sizeId], references: [id], onDelete: Restrict)
 
   /// ถ้า null ให้ใช้ราคาของ Product
   price     Decimal? @db.Decimal(12, 2)

@@ -172,6 +172,12 @@ export default async function AdminDashboardPage() {
             คลังสินค้า
           </Link>
           <Link
+            href="/admin/catalog"
+            className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
+          >
+            หมวดหมู่ / แบรนด์ / ไซซ์ / สี
+          </Link>
+          <Link
             href="/admin/media"
             className="flex min-h-11 items-center rounded-[var(--radius-pill)] border border-line px-5 text-sm font-semibold transition hover:border-brand-soft hover:bg-lilac-50"
           >

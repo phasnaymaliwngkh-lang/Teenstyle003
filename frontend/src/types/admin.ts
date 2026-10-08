@@ -612,3 +612,78 @@ export interface CreateCouponInput {
 }
 
 export type UpdateCouponInput = Partial<CreateCouponInput>;
+
+/* ─────────────── หมวดหมู่ · แบรนด์ · ไซซ์ · สี (STEP 48) ─────────────── */
+
+export type CatalogKind = "categories" | "brands" | "sizes" | "colors";
+
+/** เหตุผลที่ทำไม่ได้ — มาจาก server ชุดเดียวกับที่ใช้ตัดสินจริง · null = ทำได้ */
+export interface CatalogBlockers {
+  deactivate: string | null;
+  remove: string | null;
+  slug: string | null;
+}
+
+export interface CatalogCategory {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  parentId: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  usage: {
+    products: number;
+    activeProducts: number;
+    children: number;
+    activeChildren: number;
+    coupons: number;
+  };
+  blockers: CatalogBlockers;
+}
+
+export interface CatalogBrand {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  isActive: boolean;
+  usage: { products: number; activeProducts: number };
+  blockers: CatalogBlockers;
+}
+
+export interface CatalogVariantUsage {
+  /** ตัวเลือกทุกตัวที่อ้างถึง (รวมที่ปิด/ลบแล้ว) */
+  variants: number;
+  /** ตัวเลือกที่เปิดขายอยู่จริง */
+  sellingVariants: number;
+}
+
+export interface CatalogSize {
+  id: string;
+  name: string;
+  code: string;
+  sortOrder: number;
+  isActive: boolean;
+  usage: CatalogVariantUsage;
+  blockers: CatalogBlockers;
+}
+
+export interface CatalogColor {
+  id: string;
+  name: string;
+  slug: string;
+  hex: string;
+  sortOrder: number;
+  isActive: boolean;
+  usage: CatalogVariantUsage;
+  blockers: CatalogBlockers;
+}
+
+export interface CatalogOverview {
+  /** หมวดบนสุดตามลำดับ แต่ละหมวดตามด้วยหมวดย่อยของมัน */
+  categories: CatalogCategory[];
+  brands: CatalogBrand[];
+  sizes: CatalogSize[];
+  colors: CatalogColor[];
+}

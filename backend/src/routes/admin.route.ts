@@ -33,6 +33,24 @@ import {
   uploadProductImageHandler,
 } from '../controllers/product-image.controller.ts';
 import { getMediaLibraryHandler, purgeMediaHandler } from '../controllers/media.controller.ts';
+import {
+  createBrandHandler,
+  createCategoryHandler,
+  createColorHandler,
+  createSizeHandler,
+  deleteBrandHandler,
+  deleteCategoryHandler,
+  deleteColorHandler,
+  deleteSizeHandler,
+  getCatalogHandler,
+  reorderCategoriesHandler,
+  reorderColorsHandler,
+  reorderSizesHandler,
+  updateBrandHandler,
+  updateCategoryHandler,
+  updateColorHandler,
+  updateSizeHandler,
+} from '../controllers/catalog-admin.controller.ts';
 import { uploadImageFile } from '../middlewares/upload-image.ts';
 import {
   adjustStockHandler,
@@ -260,6 +278,31 @@ adminRouter.delete(
   requirePermission('product:update'),
   removeProductImageHandler,
 );
+
+/**
+ * หมวดหมู่ · แบรนด์ · ไซซ์ · สี (STEP 48)
+ *   - ดู (พร้อมจำนวนที่ใช้อยู่และเหตุผลที่ปิด/ลบไม่ได้) → `product:read` (EMPLOYEE มี — ต้องรู้ว่ามีหมวดอะไรบ้าง)
+ *   - เพิ่ม · แก้ · ปิด · ลบ · เรียง → `catalog:manage` (ADMIN ขึ้นไป — เปลี่ยนโครงของหน้าร้านทั้งร้าน)
+ * ⚠️ `PUT …/order` ใช้เมธอดคนละตัวกับ `PATCH …/:id` จึงไม่ถูก `/:id` จับไปก่อน
+ */
+const manageCatalog = requirePermission('catalog:manage');
+
+adminRouter.get('/catalog', requirePermission('product:read'), getCatalogHandler);
+adminRouter.post('/catalog/categories', manageCatalog, createCategoryHandler);
+adminRouter.put('/catalog/categories/order', manageCatalog, reorderCategoriesHandler);
+adminRouter.patch('/catalog/categories/:id', manageCatalog, updateCategoryHandler);
+adminRouter.delete('/catalog/categories/:id', manageCatalog, deleteCategoryHandler);
+adminRouter.post('/catalog/brands', manageCatalog, createBrandHandler);
+adminRouter.patch('/catalog/brands/:id', manageCatalog, updateBrandHandler);
+adminRouter.delete('/catalog/brands/:id', manageCatalog, deleteBrandHandler);
+adminRouter.post('/catalog/sizes', manageCatalog, createSizeHandler);
+adminRouter.put('/catalog/sizes/order', manageCatalog, reorderSizesHandler);
+adminRouter.patch('/catalog/sizes/:id', manageCatalog, updateSizeHandler);
+adminRouter.delete('/catalog/sizes/:id', manageCatalog, deleteSizeHandler);
+adminRouter.post('/catalog/colors', manageCatalog, createColorHandler);
+adminRouter.put('/catalog/colors/order', manageCatalog, reorderColorsHandler);
+adminRouter.patch('/catalog/colors/:id', manageCatalog, updateColorHandler);
+adminRouter.delete('/catalog/colors/:id', manageCatalog, deleteColorHandler);
 
 /**
  * คลังรูป (STEP 47) — `media:manage` (ADMIN ขึ้นไป)

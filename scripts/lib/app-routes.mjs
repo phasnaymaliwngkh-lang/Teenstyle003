@@ -68,6 +68,14 @@ export const ROUTES = [
   { path: '/admin/products/new', as: 'admin' },
   { path: '/admin/products/{productId}', as: 'admin' },
   {
+    path: '/admin/catalog',
+    as: 'admin',
+    note: 'หมวดหมู่เป็นต้นไม้ (หมวดย่อยเยื้อง) + ปุ่มเรียงลำดับ',
+  },
+  { path: '/admin/catalog?tab=brands', as: 'admin' },
+  { path: '/admin/catalog?tab=sizes', as: 'admin' },
+  { path: '/admin/catalog?tab=colors', as: 'admin', note: 'วงกลมสี + ช่องเลือกสี' },
+  {
     path: '/admin/media',
     as: 'admin',
     note: 'คลังรูป (STEP 47) — การ์ดรูปมีชื่อสินค้า/อีเมลผู้อัปโหลดที่ยาวได้',

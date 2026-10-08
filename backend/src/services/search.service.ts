@@ -13,7 +13,7 @@ import type { SearchQuery, SuggestQuery } from '../validators/search.validator.t
 
 import { searchArticles } from './knowledge-base.service.ts';
 import { searchLooks } from './look.service.ts';
-import { searchProducts, type ShopResult } from './shop.service.ts';
+import { SELLING_VARIANT, searchProducts, type ShopResult } from './shop.service.ts';
 
 /**
  * ค้นหาทั้งร้านจากช่องเดียว (STEP 45) — สินค้า · ลุค · คำตอบในคลังความรู้
@@ -24,11 +24,20 @@ import { searchProducts, type ShopResult } from './shop.service.ts';
  *    และทุกเงื่อนไขที่ตีความได้ถูกส่งกลับไปให้หน้าเว็บแสดงและยกเลิกได้
  */
 
-/** คำศัพท์ของร้านสำหรับตีความ — อ่านใหม่ทุกคำขอ (สี/ไซซ์/หมวดแก้ได้ · ตารางเล็ก ~1ms) */
+/**
+ * คำศัพท์ของร้านสำหรับตีความ — อ่านใหม่ทุกคำขอ (สี/ไซซ์/หมวดแก้ได้ · ตารางเล็ก ~1ms)
+ *
+ * ⚠️ สีนับเฉพาะที่มีตัวเลือกขายอยู่จริง (แก้ตอน STEP 48 — เงื่อนไขเดียวกับแผงกรองของ `/shop`)
+ *    ร้านเพิ่มสีใหม่หรือปิดสีได้แล้วที่ /admin/catalog — ถ้านับทุกสี "เสื้อสีที่ยังไม่มีสินค้า"
+ *    จะถูกตีความเป็นตัวกรองที่ไม่มีผล แล้วได้หน้าว่างโดยไม่บอกว่าร้านไม่มีสีนี้ (กฎ STEP 45 ข้อ 3)
+ */
 export async function loadSearchVocabulary(): Promise<SearchVocabulary> {
   const prisma = getPrisma();
   const [colors, sizes, categories, tags] = await Promise.all([
-    prisma.color.findMany({ select: { slug: true, name: true } }),
+    prisma.color.findMany({
+      where: { isActive: true, variants: { some: SELLING_VARIANT } },
+      select: { slug: true, name: true },
+    }),
     prisma.size.findMany({ select: { code: true, name: true } }),
     prisma.category.findMany({ where: { deletedAt: null }, select: { name: true } }),
     prisma.$queryRaw<{ tag: string }[]>`

@@ -64,13 +64,21 @@ async function seedRbac(): Promise<void> {
   log('roles', ROLES.map((r) => `${r.name}(${r.permissionKeys.length})`).join(' · '));
 }
 
-// ─── 2. Size / Color / Category / Brand (STEP 48) ────────────────────────────
+// ─── 2. Size / Color / Category / Brand ──────────────────────────────────────
 
+/**
+ * ⚠️ **สร้างเฉพาะที่ยังไม่มี — ไม่เขียนทับของเดิม** (`update: {}` · แก้ตอน STEP 48)
+ *
+ * ตั้งแต่ STEP 48 ร้านแก้หมวดหมู่ แบรนด์ ไซซ์ และสีเองได้ที่ /admin/catalog
+ * เดิม seed เขียนชื่อ ลำดับ หมวดแม่ และ `isActive: true` ทับทุกครั้งที่รัน
+ * → รัน seed ซ้ำ (เอกสาร deploy เคยบอกให้รัน) = ทุกอย่างที่ร้านแก้ถูกย้อนกลับ
+ *   และของที่ร้านปิดไว้กลับมาเปิดเงียบ ๆ
+ */
 async function seedCatalogBasics(): Promise<void> {
   for (const size of SIZES) {
     await prisma.size.upsert({
       where: { code: size.code },
-      update: { name: size.name, sortOrder: size.sortOrder, isActive: true },
+      update: {},
       create: size,
     });
   }
@@ -79,7 +87,7 @@ async function seedCatalogBasics(): Promise<void> {
   for (const color of COLORS) {
     await prisma.color.upsert({
       where: { slug: color.slug },
-      update: { name: color.name, hex: color.hex, sortOrder: color.sortOrder, isActive: true },
+      update: {},
       create: color,
     });
   }
@@ -101,13 +109,7 @@ async function seedCatalogBasics(): Promise<void> {
 
     await prisma.category.upsert({
       where: { slug: category.slug },
-      update: {
-        name: category.name,
-        description: category.description,
-        sortOrder: category.sortOrder,
-        parentId: parent?.id ?? null,
-        isActive: true,
-      },
+      update: {},
       create: {
         name: category.name,
         slug: category.slug,
@@ -126,7 +128,7 @@ async function seedCatalogBasics(): Promise<void> {
   for (const brand of BRANDS) {
     await prisma.brand.upsert({
       where: { slug: brand.slug },
-      update: { name: brand.name, description: brand.description, isActive: true },
+      update: {},
       create: brand,
     });
   }

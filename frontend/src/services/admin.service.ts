@@ -8,6 +8,8 @@ import type {
   AdminProduct,
   AdminProductImage,
   AssignBarcodeResult,
+  CatalogKind,
+  CatalogOverview,
   MediaPurgeResult,
   CreateProductInput,
   DeleteProductResult,
@@ -273,6 +275,55 @@ export function removeProductImage(
     `/api/admin/products/${encodeURIComponent(productId)}/images/${encodeURIComponent(imageId)}`,
     { method: "DELETE", cache: "no-store" },
   );
+}
+
+/* ─────────────── หมวดหมู่ · แบรนด์ · ไซซ์ · สี (STEP 48) ─────────────── */
+
+/**
+ * ทุกคำสั่งตอบด้วยภาพรวมชุดใหม่ทั้งหมด — จำนวนที่ใช้และเหตุผลที่ทำไม่ได้ของรายการอื่นเปลี่ยนตามได้
+ * (เช่นปิดหมวดย่อยแล้วหมวดแม่ปิดได้) หน้าเว็บจึงใช้ผลจาก server ไม่ต้องคำนวณเอง
+ */
+export function createCatalogItem(
+  kind: CatalogKind,
+  body: Record<string, unknown>,
+): Promise<CatalogOverview> {
+  return apiFetch<CatalogOverview>(`/api/admin/catalog/${kind}`, {
+    method: "POST",
+    json: body,
+    cache: "no-store",
+  });
+}
+
+export function updateCatalogItem(
+  kind: CatalogKind,
+  id: string,
+  body: Record<string, unknown>,
+): Promise<CatalogOverview> {
+  return apiFetch<CatalogOverview>(`/api/admin/catalog/${kind}/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    json: body,
+    cache: "no-store",
+  });
+}
+
+export function deleteCatalogItem(kind: CatalogKind, id: string): Promise<CatalogOverview> {
+  return apiFetch<CatalogOverview>(`/api/admin/catalog/${kind}/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    cache: "no-store",
+  });
+}
+
+/** ลำดับใหม่ของ **ทุกรายการ** ในกลุ่ม (หมวดหมู่ต้องบอกหมวดแม่ของกลุ่ม · null = หมวดบนสุด) */
+export function reorderCatalog(
+  kind: Exclude<CatalogKind, "brands">,
+  ids: string[],
+  parentId?: string | null,
+): Promise<CatalogOverview> {
+  return apiFetch<CatalogOverview>(`/api/admin/catalog/${kind}/order`, {
+    method: "PUT",
+    json: kind === "categories" ? { parentId: parentId ?? null, ids } : { ids },
+    cache: "no-store",
+  });
 }
 
 /** ลบไฟล์ที่ไม่มีที่ไหนใช้เกินช่วงผ่อนผัน (`media:manage`) */

@@ -142,13 +142,15 @@ const API_GROUPS: readonly ApiGroup[] = [
  * เดิมปนอยู่ในรายการเดียวกันโดยมีแค่ฟิลด์ `status: 'planned'` กำกับ
  * ซึ่งอ่านผ่าน ๆ แล้วเข้าใจว่าเรียกได้ (กฎเดียวกับ STEP 4 ข้อ 2: ห้ามใส่ลิงก์ไปหน้าที่ยังไม่มี)
  */
-const PLANNED_GROUPS = [
-  {
-    path: '/api/brands',
-    step: 48,
-    note: 'รายการแบรนด์แยกกลุ่ม — ตอนนี้กรองแบรนด์ผ่าน /api/products ได้แล้ว',
-  },
-] as const;
+/**
+ * ตอนนี้ไม่มีกลุ่มที่ประกาศว่า "กำลังจะมี"
+ *
+ * `/api/brands` เคยอยู่ที่นี่ (จะมาใน STEP 48) — ตอนทำ STEP 48 ตัดสินใจ **ไม่สร้าง**:
+ * แบรนด์ที่หน้าร้านต้องใช้อยู่ใน `GET /api/products/filters` แล้ว (นับเฉพาะสินค้าที่ขายอยู่)
+ * endpoint ที่สองที่นับแบรนด์ด้วยเกณฑ์ของตัวเองคือที่มาของตัวเลขสองชุดที่ไม่ตรงกัน
+ * ส่วนการจัดการแบรนด์อยู่ที่ `/api/admin/catalog`
+ */
+const PLANNED_GROUPS: ReadonlyArray<{ path: string; step: number; note: string }> = [];
 
 /** endpoint ที่เป็นของ Next.js ไม่ใช่ Express — ต้องบอกไว้ ไม่งั้นดูเหมือน API นี้ไม่มีระบบล็อกอิน */
 const EXTERNAL_GROUPS = [

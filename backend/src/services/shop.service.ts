@@ -288,6 +288,16 @@ export interface ShopFiltersDto {
   priceRange: { min: number; max: number };
 }
 
+/**
+ * ตัวเลือกที่ค้นเจอด้วยตัวกรองสี/ไซซ์ของ `searchProducts` — ใช้ตัดสินว่าสี/ไซซ์ไหนควรอยู่ในแผงกรอง
+ * และสีไหนที่ตัวค้นหา (search.service) ถือว่า "ร้านมี"
+ */
+export const SELLING_VARIANT = {
+  deletedAt: null,
+  isActive: true,
+  product: { deletedAt: null, status: 'ACTIVE' },
+} as const satisfies Prisma.ProductVariantWhereInput;
+
 export async function getShopFilters(): Promise<ShopFiltersDto> {
   const prisma = getPrisma();
   const activeProduct = { deletedAt: null, status: 'ACTIVE' } as const;
@@ -330,13 +340,18 @@ export async function getShopFilters(): Promise<ShopFiltersDto> {
         _count: { select: { products: { where: activeProduct } } },
       },
     }),
+    /**
+     * ไซซ์/สี: เฉพาะที่มีตัวเลือกของสินค้าที่เปิดขายใช้อยู่ (STEP 48) — เงื่อนไขเดียวกับตัวกรองใน
+     * `searchProducts` (ตัวเลือกเปิด · ไม่ถูกลบ) · เดิมแสดงทุกสีที่เปิดใช้ ร้านเพิ่มสีใหม่ที่ /admin/catalog
+     * แล้วสีนั้นโผล่ในแผงกรองทันทีทั้งที่กดแล้วได้หน้าว่าง (กฎ STEP 27 ข้อ 4: ตัวเลือกต้องมาจากข้อมูลจริง)
+     */
     prisma.size.findMany({
-      where: { isActive: true },
+      where: { isActive: true, variants: { some: SELLING_VARIANT } },
       orderBy: { sortOrder: 'asc' },
       select: { name: true, code: true },
     }),
     prisma.color.findMany({
-      where: { isActive: true },
+      where: { isActive: true, variants: { some: SELLING_VARIANT } },
       orderBy: { sortOrder: 'asc' },
       select: { name: true, slug: true, hex: true },
     }),

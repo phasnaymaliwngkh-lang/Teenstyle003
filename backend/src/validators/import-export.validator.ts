@@ -94,7 +94,8 @@ export const productImportRowSchema = z
       .trim()
       .min(1, 'ต้องระบุชื่อหรือ slug หมวดหมู่'),
     brand: z.string().trim().optional().or(z.literal('')),
-    status: z.enum(['DRAFT', 'ACTIVE', 'ARCHIVED']).default('ACTIVE'),
+    /** ไม่ระบุ = สินค้าใหม่เป็นฉบับร่าง · สินค้าเดิมคงสถานะเดิม (STEP 48 — เดิมค่าเริ่มต้นเป็น ACTIVE) */
+    status: z.enum(['DRAFT', 'ACTIVE', 'ARCHIVED']).optional(),
     price: z
       .number({ message: 'ราคาต้องเป็นตัวเลข' })
       .positive('ราคาต้องมากกว่า 0')

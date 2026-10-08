@@ -37,6 +37,10 @@ export const TARGET_TYPES = [
   'ShippingRate',
   'Shipment',
   'MediaAsset',
+  'Category',
+  'Brand',
+  'Size',
+  'Color',
 ] as const;
 
 export type TargetType = (typeof TARGET_TYPES)[number];
@@ -78,6 +82,11 @@ const TARGET_META: Readonly<Record<TargetType, TargetMeta>> = {
   Shipment: { label: 'พัสดุ', aliases: [], hrefPrefix: '/admin/shipments/' },
   // ไฟล์รูปไม่มีหน้ารายตัว — ดูได้รวมกันที่ /admin/media (STEP 47)
   MediaAsset: { label: 'ไฟล์รูป', aliases: [], hrefPrefix: null },
+  // แก้ได้รวมกันที่ /admin/catalog ไม่มีหน้ารายตัว (STEP 48)
+  Category: { label: 'หมวดหมู่', aliases: [], hrefPrefix: null },
+  Brand: { label: 'แบรนด์', aliases: [], hrefPrefix: null },
+  Size: { label: 'ไซซ์', aliases: [], hrefPrefix: null },
+  Color: { label: 'สี', aliases: [], hrefPrefix: null },
 };
 
 /** ทุกชื่อที่เคยใช้แทนชนิดนี้ — ใช้กับ `where.targetType.in` ตอนกรอง */
@@ -153,6 +162,21 @@ export const ACTION_LABELS: Readonly<Record<string, string>> = {
   'shipping.shipment.update': 'แก้ข้อมูลพัสดุ',
   'shipping.shipment.create': 'ส่งพัสดุใหม่หลังถูกตีกลับ',
   'media.purge': 'ลบไฟล์รูปที่ไม่ได้ใช้แล้ว',
+  'catalog.category.create': 'เพิ่มหมวดหมู่',
+  'catalog.category.update': 'แก้หมวดหมู่',
+  'catalog.category.delete': 'ลบหมวดหมู่',
+  'catalog.category.reorder': 'เรียงลำดับหมวดหมู่',
+  'catalog.brand.create': 'เพิ่มแบรนด์',
+  'catalog.brand.update': 'แก้แบรนด์',
+  'catalog.brand.delete': 'ลบแบรนด์',
+  'catalog.size.create': 'เพิ่มไซซ์',
+  'catalog.size.update': 'แก้ไซซ์',
+  'catalog.size.delete': 'ลบไซซ์',
+  'catalog.size.reorder': 'เรียงลำดับไซซ์',
+  'catalog.color.create': 'เพิ่มสี',
+  'catalog.color.update': 'แก้สี',
+  'catalog.color.delete': 'ลบสี',
+  'catalog.color.reorder': 'เรียงลำดับสี',
 };
 
 /** กลุ่มของการกระทำ — ใช้ทำตัวกรองระดับหยาบ (`action` ขึ้นต้นด้วยอะไร) */
@@ -168,6 +192,7 @@ export const ACTION_GROUPS = [
   'return',
   'shipping',
   'media',
+  'catalog',
 ] as const;
 
 export type ActionGroup = (typeof ACTION_GROUPS)[number];
@@ -185,6 +210,7 @@ export const ACTION_GROUP_LABELS: Readonly<Record<ActionGroup, string>> = {
   return: 'คืนสินค้าและคืนเงิน',
   shipping: 'การจัดส่ง',
   media: 'คลังรูป',
+  catalog: 'หมวดหมู่ แบรนด์ ไซซ์ สี',
 };
 
 /** คำอธิบายของ action — ค่าที่ไม่รู้จักคืนชื่อดิบ (ดีกว่าแสดงว่าง ๆ หรือเดาความหมาย) */

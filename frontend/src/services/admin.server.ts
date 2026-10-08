@@ -8,6 +8,7 @@ import type {
   AdminProduct,
   AdminProductListResult,
   BarcodeLookupResult,
+  CatalogOverview,
   InventoryListResult,
   LabelSheet,
   MediaLibrary,
@@ -23,6 +24,11 @@ import type {
  * ทุก endpoint ต้องล็อกอิน + เป็นพนักงาน + มีสิทธิ์ตรงกับงาน (backend ตรวจ)
  * หน้า admin ตรวจสิทธิ์ซ้ำที่ layout/page ผ่าน DAL อีกชั้น
  */
+
+/** หมวดหมู่ · แบรนด์ · ไซซ์ · สี พร้อมจำนวนที่ใช้และเหตุผลที่ทำไม่ได้ (STEP 48) */
+export function fetchCatalogOnServer(): Promise<CatalogOverview> {
+  return apiFetchAsUser<CatalogOverview>("/api/admin/catalog", { cache: "no-store" });
+}
 
 /** คลังรูป (STEP 47) — `media:manage` · อ่านอย่างเดียว */
 export function fetchMediaLibraryOnServer(params: URLSearchParams): Promise<MediaLibrary> {

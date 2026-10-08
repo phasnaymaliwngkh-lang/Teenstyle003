@@ -13,6 +13,7 @@ import type {
   UpdateVariantInput,
 } from '../validators/product-admin.validator.ts';
 
+import { assertCatalogRefsActive } from './catalog-guard.ts';
 import { notifySafely, notifyWishlistPriceDrops } from './notification.service.ts';
 import { toAdminProductImage, type AdminProductImageDto } from './product-image.service.ts';
 
@@ -379,6 +380,8 @@ async function resolveRefs(
       select: { id: true },
     });
     if (!category) throw ApiError.badRequest(`ไม่พบหมวดหมู่ "${input.categorySlug}"`);
+    // ผูกได้เฉพาะหมวดที่เปิดใช้อยู่ — ล็อกแถวกันคนปิดหมวดพร้อมกัน (STEP 48)
+    await assertCatalogRefsActive(tx, { categoryId: category.id });
     result.categoryId = category.id;
   }
 
@@ -391,6 +394,7 @@ async function resolveRefs(
         select: { id: true },
       });
       if (!brand) throw ApiError.badRequest(`ไม่พบแบรนด์ "${input.brandSlug}"`);
+      await assertCatalogRefsActive(tx, { brandId: brand.id });
       result.brandId = brand.id;
     }
   }
@@ -423,6 +427,12 @@ async function createVariantRow(
   if (variant.sizeCode !== undefined && size === null) {
     throw ApiError.badRequest(`ไม่พบไซซ์ "${variant.sizeCode}"`);
   }
+
+  // ตัวเลือกใหม่ใช้ได้เฉพาะสี/ไซซ์ที่เปิดใช้อยู่ (STEP 48)
+  await assertCatalogRefsActive(tx, {
+    colorIds: [color?.id ?? null],
+    sizeIds: [size?.id ?? null],
+  });
 
   const created = await tx.productVariant.create({
     data: {
@@ -638,7 +648,9 @@ export async function updateProduct(
           brandId: true,
           tags: true,
           images: { select: { id: true } },
-          variants: { select: { isActive: true, deletedAt: true } },
+          variants: {
+            select: { isActive: true, deletedAt: true, colorId: true, sizeId: true },
+          },
         },
       });
 
@@ -668,6 +680,24 @@ export async function updateProduct(
       }
 
       const refs = await resolveRefs(tx, input);
+
+      /**
+       * เปิดขาย = ทุกอย่างที่สินค้าใช้ต้องเปิดใช้อยู่ (STEP 48)
+       * ฉบับร่างที่สร้างไว้ก่อนร้านปิดหมวด/สีบางตัว จะเปิดขายไม่ได้จนกว่าจะแก้ — ไม่งั้นหน้าร้าน
+       * ขายของในหมวดที่ซ่อนอยู่ (กรองหาไม่เจอ) หรือตัวเลือกที่สีถูกซ่อนจากตัวกรอง
+       */
+      if (input.status === 'ACTIVE') {
+        const selling = current.variants.filter(
+          (variant) => variant.isActive && variant.deletedAt === null,
+        );
+
+        await assertCatalogRefsActive(tx, {
+          categoryId: refs.categoryId ?? current.categoryId,
+          brandId: refs.brandId !== undefined ? refs.brandId : current.brandId,
+          colorIds: selling.map((variant) => variant.colorId),
+          sizeIds: selling.map((variant) => variant.sizeId),
+        });
+      }
 
       await tx.product.update({
         where: { id: productId },
@@ -865,10 +895,20 @@ export async function updateVariant(
           price: true,
           salePrice: true,
           isActive: true,
+          colorId: true,
+          sizeId: true,
         },
       });
 
       if (!variant) throw ApiError.notFound('ไม่พบตัวเลือกสินค้านี้');
+
+      // เปิดตัวเลือกกลับมาขาย = สี/ไซซ์ของมันต้องเปิดใช้อยู่ (STEP 48)
+      if (input.isActive === true && !variant.isActive) {
+        await assertCatalogRefsActive(tx, {
+          colorIds: [variant.colorId],
+          sizeIds: [variant.sizeId],
+        });
+      }
 
       // ตรวจกับค่าที่จะเป็นจริงหลังแก้ ไม่ใช่เฉพาะค่าที่ส่งมาในคำขอนี้
       const nextPrice =
